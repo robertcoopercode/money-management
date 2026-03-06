@@ -1,0 +1,14 @@
+{
+  "plugins": ["typescript", "react", "jsx-a11y", "unicorn"],
+  "rules": {
+    "react-in-jsx-scope": "off",
+    "unicorn/prefer-module": "off"
+  },
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "apps/web/src/routeTree.gen.ts",
+    "packages/db/generated"
+  ]
+}
