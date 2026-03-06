@@ -39,6 +39,7 @@ export const listTransactions = (filters: TransactionFilterInput) =>
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: filters.limit,
+        skip: filters.offset,
       }),
     catch: (error) =>
       new Error(`Unable to list transactions: ${String(error)}`),

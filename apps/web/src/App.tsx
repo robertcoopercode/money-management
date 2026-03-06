@@ -150,6 +150,7 @@ const shiftMonth = (current: string, amount: number) => {
 }
 
 const defaultTransactionDate = new Date().toISOString().slice(0, 10)
+const TRANSACTION_PAGE_SIZE = 100
 
 const parseCsvFile = async (file: File) => {
   return file.text()
@@ -276,6 +277,7 @@ const App = () => {
     note: "",
     cleared: false,
   })
+  const [transactionOffset, setTransactionOffset] = useState(0)
   const [mortgageInput, setMortgageInput] = useState({
     accountId: "",
     interestRateAnnual: "0.055",
@@ -307,10 +309,10 @@ const App = () => {
   })
 
   const transactionsQuery = useQuery({
-    queryKey: ["transactions", newTransaction.accountId],
+    queryKey: ["transactions", newTransaction.accountId, transactionOffset],
     queryFn: () =>
       apiFetch<Transaction[]>(
-        `/api/transactions?limit=200&accountId=${newTransaction.accountId}`,
+        `/api/transactions?limit=${TRANSACTION_PAGE_SIZE}&offset=${transactionOffset}&accountId=${newTransaction.accountId}`,
       ),
     enabled: Boolean(newTransaction.accountId),
   })
@@ -582,6 +584,8 @@ const App = () => {
       month: item.month,
       balance: Number((item.balanceMinor / 100).toFixed(2)),
     })) ?? []
+  const transactionsHasNextPage =
+    (transactionsQuery.data?.length ?? 0) >= TRANSACTION_PAGE_SIZE
 
   const planningCategoryById = useMemo(
     () =>
@@ -762,12 +766,14 @@ const App = () => {
             >
               <select
                 value={newTransaction.accountId}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextAccountId = event.target.value
+                  setTransactionOffset(0)
                   setNewTransaction((current) => ({
                     ...current,
-                    accountId: event.target.value,
+                    accountId: nextAccountId,
                   }))
-                }
+                }}
                 required
               >
                 <option value="">Select account</option>
@@ -975,6 +981,37 @@ const App = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="inline-controls" style={{ marginTop: "0.75rem" }}>
+              <span className="muted">
+                Page {Math.floor(transactionOffset / TRANSACTION_PAGE_SIZE) + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setTransactionOffset((current) =>
+                    Math.max(current - TRANSACTION_PAGE_SIZE, 0),
+                  )
+                }
+                disabled={
+                  transactionOffset === 0 || transactionsQuery.isLoading
+                }
+              >
+                Previous Page
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setTransactionOffset(
+                    (current) => current + TRANSACTION_PAGE_SIZE,
+                  )
+                }
+                disabled={
+                  !transactionsHasNextPage || transactionsQuery.isLoading
+                }
+              >
+                Next Page
+              </button>
             </div>
           </section>
         </Tabs.Panel>
@@ -1224,12 +1261,14 @@ const App = () => {
             <div className="transaction-form">
               <select
                 value={newTransaction.accountId}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextAccountId = event.target.value
+                  setTransactionOffset(0)
                   setNewTransaction((current) => ({
                     ...current,
-                    accountId: event.target.value,
+                    accountId: nextAccountId,
                   }))
-                }
+                }}
               >
                 <option value="">Select account</option>
                 {(accountsQuery.data ?? []).map((account) => (
