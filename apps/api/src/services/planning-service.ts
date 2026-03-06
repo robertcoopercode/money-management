@@ -1,5 +1,6 @@
 import { prisma } from "@money/db"
 import { Effect } from "effect"
+import { calculateMonthlyPaymentMinor } from "../domain/mortgage.js"
 import {
   calculateCategoryAvailableMinor,
   calculateReadyToAssignMinor,
@@ -30,6 +31,14 @@ type PlanningCategory = {
   assignedMinor: number
   activityMinor: number
   availableMinor: number
+}
+
+type PlanningMortgageTarget = {
+  accountId: string
+  accountName: string
+  linkedCategoryId: string | null
+  linkedCategoryName: string | null
+  requiredMonthlyPaymentMinor: number
 }
 
 export const getPlanningMonth = (month: string) =>
@@ -145,8 +154,8 @@ export const getPlanningMonth = (month: string) =>
         }
       }
 
-      const [incomeThroughMonth, totalAssignedThroughMonth] = await Promise.all(
-        [
+      const [incomeThroughMonth, totalAssignedThroughMonth, mortgageProfiles] =
+        await Promise.all([
           prisma.transaction.aggregate({
             _sum: { amountMinor: true },
             where: {
@@ -164,14 +173,33 @@ export const getPlanningMonth = (month: string) =>
               },
             },
           }),
-        ],
-      )
+          prisma.mortgageProfile.findMany({
+            include: {
+              account: true,
+              linkedCategory: true,
+            },
+          }),
+        ])
 
       const readyToAssignMinor = calculateReadyToAssignMinor({
         incomeThroughMonthMinor: incomeThroughMonth._sum.amountMinor ?? 0,
         assignedThroughMonthMinor:
           totalAssignedThroughMonth._sum.assignedMinor ?? 0,
       })
+
+      const mortgageTargets: PlanningMortgageTarget[] = mortgageProfiles.map(
+        (profile) => ({
+          accountId: profile.accountId,
+          accountName: profile.account.name,
+          linkedCategoryId: profile.linkedCategoryId,
+          linkedCategoryName: profile.linkedCategory?.name ?? null,
+          requiredMonthlyPaymentMinor: calculateMonthlyPaymentMinor(
+            profile.principalMinor,
+            Number(profile.interestRateAnnual),
+            profile.amortizationMonths,
+          ),
+        }),
+      )
 
       await prisma.budgetMonth.update({
         where: { id: budgetMonth.id },
@@ -182,6 +210,7 @@ export const getPlanningMonth = (month: string) =>
         month,
         readyToAssignMinor,
         categories,
+        mortgageTargets,
       }
     },
     catch: (error) =>

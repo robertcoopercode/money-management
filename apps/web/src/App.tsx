@@ -68,6 +68,13 @@ type PlanningResponse = {
   month: string
   readyToAssignMinor: number
   categories: PlanningCategory[]
+  mortgageTargets: Array<{
+    accountId: string
+    accountName: string
+    linkedCategoryId: string | null
+    linkedCategoryName: string | null
+    requiredMonthlyPaymentMinor: number
+  }>
 }
 
 type ReportingResponse = {
@@ -501,6 +508,17 @@ const App = () => {
       month: item.month,
       expense: Number((item.expenseMinor / 100).toFixed(2)),
     })) ?? []
+
+  const planningCategoryById = useMemo(
+    () =>
+      new Map(
+        (planningQuery.data?.categories ?? []).map((category) => [
+          category.categoryId,
+          category,
+        ]),
+      ),
+    [planningQuery.data?.categories],
+  )
 
   return (
     <div className="app-shell">
@@ -1148,6 +1166,52 @@ const App = () => {
               Ready to Assign:{" "}
               {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
             </p>
+
+            {(planningQuery.data?.mortgageTargets.length ?? 0) > 0 ? (
+              <div className="table-wrap" style={{ marginBottom: "0.8rem" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mortgage Account</th>
+                      <th>Linked Category</th>
+                      <th>Required Payment</th>
+                      <th>Assigned This Month</th>
+                      <th>To Go</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(planningQuery.data?.mortgageTargets ?? []).map(
+                      (target) => {
+                        const linkedCategory = target.linkedCategoryId
+                          ? planningCategoryById.get(target.linkedCategoryId)
+                          : undefined
+                        const assignedMinor = linkedCategory?.assignedMinor ?? 0
+                        const toGoMinor = Math.max(
+                          target.requiredMonthlyPaymentMinor - assignedMinor,
+                          0,
+                        )
+
+                        return (
+                          <tr key={target.accountId}>
+                            <td>{target.accountName}</td>
+                            <td>{target.linkedCategoryName ?? "Unlinked"}</td>
+                            <td>
+                              {formatMoney(target.requiredMonthlyPaymentMinor)}
+                            </td>
+                            <td>{formatMoney(assignedMinor)}</td>
+                            <td
+                              className={toGoMinor > 0 ? "amount-outflow" : ""}
+                            >
+                              {formatMoney(toGoMinor)}
+                            </td>
+                          </tr>
+                        )
+                      },
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
 
             {planningQuery.isLoading ? (
               <p className="muted">Loading planning data...</p>
