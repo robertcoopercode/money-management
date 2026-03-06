@@ -11,9 +11,9 @@ import {
 } from "@visx/xychart"
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
+import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
-import { isPayeeMergeSelectionValid } from "./lib/payee-merge.js"
 import { buildNextTransactionDraft } from "./lib/transaction-entry.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
 
@@ -568,16 +568,6 @@ const App = () => {
 
     return filtered
   }, [payeesQuery.data, payeeSearch, payeeSort])
-  const canMergePayees = isPayeeMergeSelectionValid(
-    payeeMerge.sourcePayeeId,
-    payeeMerge.targetPayeeId,
-  )
-  const payeeMergeValidationMessage =
-    !payeeMerge.sourcePayeeId || !payeeMerge.targetPayeeId
-      ? "Select both a source and target payee."
-      : !canMergePayees
-        ? "Source and target payees must be different."
-        : null
 
   return (
     <div className="app-shell">
@@ -1022,69 +1012,18 @@ const App = () => {
             </article>
             <article className="card">
               <h2>Merge duplicate payees</h2>
-              <form
-                className="form-grid"
-                onSubmit={(event) => {
-                  event.preventDefault()
-
-                  if (!canMergePayees) {
-                    toast.error("Pick two different payees to perform a merge.")
-                    return
-                  }
-
+              <PayeeMergeForm
+                payees={payeesQuery.data ?? []}
+                selection={payeeMerge}
+                isPending={mergePayeeMutation.isPending}
+                onSelectionChange={setPayeeMerge}
+                onInvalidSubmit={() => {
+                  toast.error("Pick two different payees to perform a merge.")
+                }}
+                onValidSubmit={() => {
                   mergePayeeMutation.mutate()
                 }}
-              >
-                <label>
-                  Source (duplicate)
-                  <select
-                    value={payeeMerge.sourcePayeeId}
-                    onChange={(event) =>
-                      setPayeeMerge((current) => ({
-                        ...current,
-                        sourcePayeeId: event.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="">Select payee</option>
-                    {(payeesQuery.data ?? []).map((payee) => (
-                      <option key={payee.id} value={payee.id}>
-                        {payee.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Target (keep)
-                  <select
-                    value={payeeMerge.targetPayeeId}
-                    onChange={(event) =>
-                      setPayeeMerge((current) => ({
-                        ...current,
-                        targetPayeeId: event.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="">Select payee</option>
-                    {(payeesQuery.data ?? []).map((payee) => (
-                      <option key={payee.id} value={payee.id}>
-                        {payee.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="submit"
-                  disabled={!canMergePayees || mergePayeeMutation.isPending}
-                >
-                  {mergePayeeMutation.isPending ? "Merging..." : "Merge Payees"}
-                </button>
-                {payeeMergeValidationMessage ? (
-                  <p className="muted">{payeeMergeValidationMessage}</p>
-                ) : null}
-              </form>
+              />
             </article>
           </section>
 
