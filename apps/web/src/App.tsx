@@ -257,6 +257,10 @@ const App = () => {
     startingBalance: "0",
   })
   const [newPayee, setNewPayee] = useState("")
+  const [payeeSearch, setPayeeSearch] = useState("")
+  const [payeeSort, setPayeeSort] = useState<"name-asc" | "name-desc">(
+    "name-asc",
+  )
   const [selectedPayeeId, setSelectedPayeeId] = useState("")
   const [payeeMerge, setPayeeMerge] = useState({
     sourcePayeeId: "",
@@ -588,6 +592,23 @@ const App = () => {
       ),
     [planningQuery.data?.categories],
   )
+
+  const visiblePayees = useMemo(() => {
+    const normalizedSearch = payeeSearch.trim().toLowerCase()
+    const filtered = (payeesQuery.data ?? []).filter((payee) =>
+      payee.name.toLowerCase().includes(normalizedSearch),
+    )
+
+    filtered.sort((left, right) => {
+      if (payeeSort === "name-asc") {
+        return left.name.localeCompare(right.name)
+      }
+
+      return right.name.localeCompare(left.name)
+    })
+
+    return filtered
+  }, [payeesQuery.data, payeeSearch, payeeSort])
 
   return (
     <div className="app-shell">
@@ -1037,13 +1058,33 @@ const App = () => {
             <h2>Payees</h2>
             <div className="inline-controls" style={{ marginBottom: "0.8rem" }}>
               <label>
+                Search
+                <input
+                  value={payeeSearch}
+                  onChange={(event) => setPayeeSearch(event.target.value)}
+                  placeholder="Search payees..."
+                />
+              </label>
+              <label>
+                Sort
+                <select
+                  value={payeeSort}
+                  onChange={(event) =>
+                    setPayeeSort(event.target.value as "name-asc" | "name-desc")
+                  }
+                >
+                  <option value="name-asc">Name (A → Z)</option>
+                  <option value="name-desc">Name (Z → A)</option>
+                </select>
+              </label>
+              <label>
                 Inspect transactions
                 <select
                   value={selectedPayeeId}
                   onChange={(event) => setSelectedPayeeId(event.target.value)}
                 >
                   <option value="">Select payee</option>
-                  {(payeesQuery.data ?? []).map((payee) => (
+                  {visiblePayees.map((payee) => (
                     <option key={payee.id} value={payee.id}>
                       {payee.name}
                     </option>
@@ -1056,8 +1097,10 @@ const App = () => {
                 <p className="muted">Loading payees...</p>
               ) : (payeesQuery.data?.length ?? 0) === 0 ? (
                 <p className="muted">No payees yet.</p>
+              ) : visiblePayees.length === 0 ? (
+                <p className="muted">No payees match your search.</p>
               ) : (
-                (payeesQuery.data ?? []).map((payee) => (
+                visiblePayees.map((payee) => (
                   <div className="list-item" key={payee.id}>
                     <strong>{payee.name}</strong>
                     <span className="muted">ID: {payee.id}</span>
