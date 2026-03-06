@@ -81,6 +81,11 @@ type ReportingResponse = {
   }>
 }
 
+type AssignmentMutationInput = {
+  categoryId: string
+  assignedMinor: number
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -351,7 +356,7 @@ const App = () => {
   })
 
   const assignMutation = useMutation({
-    mutationFn: (input: { categoryId: string; assignedMinor: number }) =>
+    mutationFn: (input: AssignmentMutationInput) =>
       apiFetch("/api/planning/assignments", {
         method: "POST",
         body: JSON.stringify({

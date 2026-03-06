@@ -5,6 +5,7 @@ import {
   prisma,
 } from "@money/db"
 import { Effect } from "effect"
+import { parseCsvRecords } from "../domain/csv.js"
 import { findBestImportCandidate } from "../domain/import-matching.js"
 
 type ImportInput = {
@@ -19,60 +20,28 @@ type ImportInput = {
   }
 }
 
-type ParsedCsvRow = Record<string, string>
-
-const parseCsvText = (csvText: string): ParsedCsvRow[] => {
-  const lines = csvText
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  if (lines.length < 2) {
-    return []
-  }
-
-  const headerLine = lines[0]
-  const rowLines = lines.slice(1)
-
-  if (!headerLine) {
-    return []
-  }
-
-  const headers = headerLine
-    .split(",")
-    .map((header) => header.trim().replace(/^"|"$/g, ""))
-
-  return rowLines.map((line) => {
-    const rowValues = line
-      .split(",")
-      .map((value) => value.trim())
-      .map((value) => value.replace(/^"|"$/g, ""))
-    const row: ParsedCsvRow = {}
-
-    for (const [index, header] of headers.entries()) {
-      row[header] = rowValues[index] ?? ""
-    }
-
-    return row
-  })
-}
-
-const parseAmountMinor = (rawAmount: string) => {
+const parseAmountMinor = (rawAmount: string): number | null => {
   const cleaned = rawAmount.replace(/[$,\s]/gu, "")
+
+  if (!cleaned.length) {
+    return null
+  }
+
   const amount = Number(cleaned)
 
   if (Number.isNaN(amount)) {
-    return 0
+    return null
   }
 
   return Math.round(amount * 100)
 }
 
-const parseDate = (rawDate: string): Date => {
+const parseDate = (rawDate: string): Date | null => {
   const normalized = rawDate.trim()
 
   if (/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) {
-    return new Date(`${normalized}T00:00:00.000Z`)
+    const parsed = new Date(`${normalized}T00:00:00.000Z`)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
   }
 
   const [partOne, partTwo, partThree] = normalized.split(/[/-]/u)
@@ -87,7 +56,13 @@ const parseDate = (rawDate: string): Date => {
     }
   }
 
-  return new Date(normalized)
+  const parsed = new Date(normalized)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  return parsed
 }
 
 const normalizePayee = (name: string) =>
@@ -96,7 +71,7 @@ const normalizePayee = (name: string) =>
 export const importTransactionsFromCsv = (input: ImportInput) =>
   Effect.tryPromise({
     try: async () => {
-      const rows = parseCsvText(input.csvText)
+      const rows = parseCsvRecords(input.csvText)
       const importBatch = await prisma.importBatch.create({
         data: {
           accountId: input.accountId,
@@ -113,6 +88,19 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
       for (const [index, row] of rows.entries()) {
         const amountMinor = parseAmountMinor(row[input.mapping.amount] ?? "")
         const date = parseDate(row[input.mapping.date] ?? "")
+
+        if (amountMinor === null || date === null) {
+          await prisma.importRowMatch.create({
+            data: {
+              importBatchId: importBatch.id,
+              rowIndex: index,
+              action: ImportRowAction.SKIPPED,
+              matchReason: "Skipped row with invalid amount or date format.",
+            },
+          })
+          continue
+        }
+
         const payeeName = (row[input.mapping.payee] ?? "").trim()
         const note = input.mapping.note
           ? (row[input.mapping.note] ?? "").trim()

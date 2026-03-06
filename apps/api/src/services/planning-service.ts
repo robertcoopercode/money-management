@@ -1,5 +1,9 @@
 import { prisma } from "@money/db"
 import { Effect } from "effect"
+import {
+  calculateCategoryAvailableMinor,
+  calculateReadyToAssignMinor,
+} from "../domain/planning.js"
 
 const monthStart = (month: string) => new Date(`${month}-01T00:00:00.000Z`)
 
@@ -123,10 +127,12 @@ export const getPlanningMonth = (month: string) =>
         for (const category of group.categories) {
           const assignedMinor = assignmentMap.get(category.id) ?? 0
           const activityMinor = activityMap.get(category.id) ?? 0
-          const priorAvailable =
-            (priorAssignmentMap.get(category.id) ?? 0) +
-            (priorActivityMap.get(category.id) ?? 0)
-          const availableMinor = priorAvailable + assignedMinor + activityMinor
+          const availableMinor = calculateCategoryAvailableMinor({
+            priorAssignedMinor: priorAssignmentMap.get(category.id) ?? 0,
+            priorActivityMinor: priorActivityMap.get(category.id) ?? 0,
+            assignedMinor,
+            activityMinor,
+          })
 
           categories.push({
             categoryId: category.id,
@@ -161,9 +167,11 @@ export const getPlanningMonth = (month: string) =>
         ],
       )
 
-      const readyToAssignMinor =
-        (incomeThroughMonth._sum.amountMinor ?? 0) -
-        (totalAssignedThroughMonth._sum.assignedMinor ?? 0)
+      const readyToAssignMinor = calculateReadyToAssignMinor({
+        incomeThroughMonthMinor: incomeThroughMonth._sum.amountMinor ?? 0,
+        assignedThroughMonthMinor:
+          totalAssignedThroughMonth._sum.assignedMinor ?? 0,
+      })
 
       await prisma.budgetMonth.update({
         where: { id: budgetMonth.id },

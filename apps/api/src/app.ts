@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { ZodError } from "zod"
@@ -17,24 +18,44 @@ export const app = new Hono()
 
 app.use("*", cors())
 app.use("*", async (context, next) => {
-  const startedAt = Date.now()
-  await next()
-  const durationMs = Date.now() - startedAt
+  const requestId = context.req.header("x-request-id") ?? randomUUID()
+  context.header("x-request-id", requestId)
 
-  apiLogger.info({
-    method: context.req.method,
-    path: context.req.path,
-    status: context.res.status,
-    durationMs,
-  })
+  const startedAt = Date.now()
+  try {
+    await next()
+  } finally {
+    const durationMs = Date.now() - startedAt
+
+    apiLogger.info({
+      requestId,
+      method: context.req.method,
+      path: context.req.path,
+      status: context.res.status,
+      durationMs,
+    })
+  }
 })
 
 app.onError((error, context) => {
+  const requestId =
+    context.res.headers.get("x-request-id") ??
+    context.req.header("x-request-id") ??
+    "unknown"
+
+  apiLogger.error({
+    requestId,
+    method: context.req.method,
+    path: context.req.path,
+    message: error.message,
+  })
+
   if (error instanceof ZodError) {
     return context.json(
       {
         message: "Validation failed.",
         issues: error.issues,
+        requestId,
       },
       400,
     )
@@ -44,6 +65,7 @@ app.onError((error, context) => {
     {
       message: "Unexpected server error.",
       error: error.message,
+      requestId,
     },
     500,
   )
