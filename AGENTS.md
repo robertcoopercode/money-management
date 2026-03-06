@@ -73,16 +73,22 @@ pnpm db:seed
 
 ## Cursor Cloud specific instructions
 
-The cloud agent VM has Postgres installed natively (no Docker). The environment
-is configured via `.cursor/environment.json` which handles:
+The cloud agent VM has PostgreSQL 16 installed natively (no Docker needed).
+The VM snapshot update script handles dependency installation, Prisma client
+generation, migrations, and seeding automatically on startup.
 
-1. Starting Postgres service and creating the `money_management` database
-2. Copying `.env.example` to `.env` (uses localhost connection string)
-3. Installing dependencies and running Prisma migrations + seed
+### Starting services
 
-Dev servers (API on :3001, Web on :5173) launch automatically in tmux terminals.
+Before running the app, ensure Postgres is running:
 
-If you need to reset the database:
+```bash
+sudo service postgresql start
+```
+
+Then start the dev servers (see "Local development" above for commands).
+API runs on `:3001`, Web on `:5173`.
+
+### Database reset
 
 ```bash
 sudo -u postgres psql -c "DROP DATABASE money_management;"
@@ -90,3 +96,11 @@ sudo -u postgres psql -c "CREATE DATABASE money_management;"
 pnpm db:migrate
 pnpm db:seed
 ```
+
+### Caveats
+
+- The `.env` file is created from `.env.example` by the update script (no-clobber).
+  If `DATABASE_URL` is wrong or missing, check `.env` manually.
+- `pnpm db:generate` must run before `pnpm db:migrate`; the update script does both.
+- Quality checks: `pnpm lint`, `pnpm typecheck`, `pnpm format:check` (see root `package.json`).
+- Tests: `pnpm test` runs vitest for both `apps/api` and `apps/web`.
