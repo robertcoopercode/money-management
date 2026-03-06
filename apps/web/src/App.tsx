@@ -89,6 +89,10 @@ type ReportingResponse = {
     incomeMinor: number
     expenseMinor: number
   }>
+  accountBalanceTrend: Array<{
+    month: string
+    balanceMinor: number
+  }>
 }
 
 type AssignmentMutationInput = {
@@ -566,6 +570,12 @@ const App = () => {
     reportingQuery.data?.incomeExpenseByMonth.map((item) => ({
       month: item.month,
       expense: Number((item.expenseMinor / 100).toFixed(2)),
+    })) ?? []
+
+  const accountBalanceTrendChartData =
+    reportingQuery.data?.accountBalanceTrend.map((item) => ({
+      month: item.month,
+      balance: Number((item.balanceMinor / 100).toFixed(2)),
     })) ?? []
 
   const planningCategoryById = useMemo(
@@ -1473,6 +1483,58 @@ const App = () => {
                               <strong>{datum.month}</strong>
                               <div>
                                 {formatMoney(Math.round(datum.expense * 100))}
+                              </div>
+                            </div>
+                          )
+                        }}
+                      />
+                    </XYChart>
+                  )}
+                </ParentSize>
+              )}
+            </div>
+
+            <div className="chart-card">
+              {reportingQuery.isLoading ? (
+                <p className="muted">Loading account balance trend...</p>
+              ) : accountBalanceTrendChartData.length === 0 ? (
+                <p className="muted">
+                  No account balance trend for selected filters.
+                </p>
+              ) : (
+                <ParentSize>
+                  {({ width }) => (
+                    <XYChart
+                      height={320}
+                      width={width}
+                      xScale={{ type: "band" }}
+                      yScale={{ type: "linear", nice: true }}
+                    >
+                      <AnimatedAxis orientation="bottom" />
+                      <AnimatedAxis orientation="left" />
+                      <AnimatedGrid columns={false} numTicks={4} />
+                      <BarSeries
+                        dataKey="Account Balance"
+                        data={accountBalanceTrendChartData}
+                        xAccessor={(d) => d.month}
+                        yAccessor={(d) => d.balance}
+                      />
+                      <Tooltip
+                        renderTooltip={({ tooltipData }) => {
+                          const datum = tooltipData?.nearestDatum?.datum as {
+                            month: string
+                            balance: number
+                          } | undefined
+
+                          if (!datum) {
+                            return null
+                          }
+
+                          return (
+                            <div className="tooltip">
+                              <strong>{datum.month}</strong>
+                              <div>
+                                {formatMoney(Math.round(datum.balance * 100))}
                               </div>
                             </div>
                           )
