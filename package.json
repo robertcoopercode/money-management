@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.30.2",
   "scripts": {
+    "dev": "pnpm --parallel --filter @money/api --filter @money/web dev",
     "dev:web": "pnpm --filter @money/web dev",
     "dev:api": "pnpm --filter @money/api dev",
     "build": "pnpm -r --if-present build",
