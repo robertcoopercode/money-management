@@ -142,27 +142,98 @@ export const updateTransaction = (
   },
 ) =>
   Effect.tryPromise({
-    try: () =>
-      prisma.transaction.update({
+    try: async () => {
+      const existing = await prisma.transaction.findUnique({
         where: { id: transactionId },
-        data: {
-          accountId: input.accountId,
-          transferAccountId: input.transferAccountId,
-          isTransfer:
-            input.transferAccountId !== undefined
-              ? Boolean(input.transferAccountId)
-              : undefined,
-          date: input.date ? toDate(input.date) : undefined,
-          amountMinor: input.amountMinor,
-          payeeId: input.payeeId,
-          categoryId: input.categoryId,
-          note: input.note,
-          cleared: input.cleared,
+        select: {
+          id: true,
+          transferPairId: true,
         },
-        include: {
-          ...transactionInclude,
-        },
-      }),
+      })
+
+      if (!existing) {
+        throw new Error("Transaction not found.")
+      }
+
+      if (
+        existing.transferPairId &&
+        (input.accountId !== undefined ||
+          input.transferAccountId !== undefined ||
+          input.categoryId !== undefined)
+      ) {
+        throw new Error(
+          "Changing transfer accounts/categories requires recreating the transfer.",
+        )
+      }
+
+      if (!existing.transferPairId) {
+        return prisma.transaction.update({
+          where: { id: transactionId },
+          data: {
+            accountId: input.accountId,
+            transferAccountId: input.transferAccountId,
+            isTransfer:
+              input.transferAccountId !== undefined
+                ? Boolean(input.transferAccountId)
+                : undefined,
+            date: input.date ? toDate(input.date) : undefined,
+            amountMinor: input.amountMinor,
+            payeeId: input.payeeId,
+            categoryId: input.categoryId,
+            note: input.note,
+            cleared: input.cleared,
+          },
+          include: {
+            ...transactionInclude,
+          },
+        })
+      }
+
+      return prisma.$transaction(async (transactionDb) => {
+        await transactionDb.transaction.update({
+          where: { id: transactionId },
+          data: {
+            date: input.date ? toDate(input.date) : undefined,
+            amountMinor: input.amountMinor,
+            payeeId: input.payeeId,
+            note: input.note,
+            cleared: input.cleared,
+          },
+        })
+
+        const mirror = await transactionDb.transaction.findFirst({
+          where: {
+            transferPairId: existing.transferPairId,
+            id: { not: transactionId },
+          },
+          select: { id: true },
+        })
+
+        if (mirror) {
+          await transactionDb.transaction.update({
+            where: { id: mirror.id },
+            data: {
+              date: input.date ? toDate(input.date) : undefined,
+              amountMinor:
+                input.amountMinor !== undefined
+                  ? toMirrorTransferAmountMinor(input.amountMinor)
+                  : undefined,
+              payeeId: input.payeeId,
+              note:
+                input.note !== undefined
+                  ? buildMirrorTransferNote(input.note)
+                  : undefined,
+              cleared: input.cleared,
+            },
+          })
+        }
+
+        return transactionDb.transaction.findUniqueOrThrow({
+          where: { id: transactionId },
+          include: transactionInclude,
+        })
+      })
+    },
     catch: (error) =>
       new Error(`Unable to update transaction: ${String(error)}`),
   })

@@ -89,6 +89,13 @@ type AssignmentMutationInput = {
   assignedMinor: number
 }
 
+type UpdateTransactionMutationInput = {
+  transactionId: string
+  patch: {
+    cleared?: boolean
+  }
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -373,6 +380,35 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Unable to create transaction: ${error.message}`)
+    },
+  })
+
+  const updateTransactionMutation = useMutation({
+    mutationFn: ({ transactionId, patch }: UpdateTransactionMutationInput) =>
+      apiFetch<Transaction>(`/api/transactions/${transactionId}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => {
+      toast.success("Transaction updated")
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to update transaction: ${error.message}`)
+    },
+  })
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (transactionId: string) =>
+      apiFetch<void>(`/api/transactions/${transactionId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Transaction deleted")
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to delete transaction: ${error.message}`)
     },
   })
 
@@ -751,18 +787,19 @@ const App = () => {
                     <th>Note</th>
                     <th>Amount</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactionsQuery.isLoading ? (
                     <tr>
-                      <td colSpan={7} className="muted">
+                      <td colSpan={8} className="muted">
                         Loading transactions...
                       </td>
                     </tr>
                   ) : (transactionsQuery.data?.length ?? 0) === 0 ? (
                     <tr>
-                      <td colSpan={7} className="muted">
+                      <td colSpan={8} className="muted">
                         No transactions in this account yet.
                       </td>
                     </tr>
@@ -795,6 +832,34 @@ const App = () => {
                         </td>
                         <td>
                           <TransactionBadge transaction={transaction} />
+                        </td>
+                        <td>
+                          <div className="row-actions">
+                            <label className="checkbox-inline">
+                              <input
+                                type="checkbox"
+                                checked={transaction.cleared}
+                                onChange={() =>
+                                  updateTransactionMutation.mutate({
+                                    transactionId: transaction.id,
+                                    patch: { cleared: !transaction.cleared },
+                                  })
+                                }
+                                disabled={updateTransactionMutation.isPending}
+                              />
+                              Cleared
+                            </label>
+                            <button
+                              type="button"
+                              className="button-danger"
+                              onClick={() =>
+                                deleteTransactionMutation.mutate(transaction.id)
+                              }
+                              disabled={deleteTransactionMutation.isPending}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
