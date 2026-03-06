@@ -103,6 +103,11 @@ type UpdateTransactionMutationInput = {
   }
 }
 
+type CsvPreview = {
+  headers: string[]
+  rows: string[][]
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -146,6 +151,58 @@ const parseCsvFile = async (file: File) => {
   return file.text()
 }
 
+const splitCsvLine = (line: string) => {
+  const values: string[] = []
+  let current = ""
+  let inQuotes = false
+
+  for (const char of line) {
+    if (char === '"') {
+      inQuotes = !inQuotes
+      continue
+    }
+
+    if (char === "," && !inQuotes) {
+      values.push(current.trim())
+      current = ""
+      continue
+    }
+
+    current += char
+  }
+
+  values.push(current.trim())
+  return values
+}
+
+const buildCsvPreview = (csvText: string): CsvPreview | null => {
+  const lines = csvText
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length < 2) {
+    return null
+  }
+
+  const headerLine = lines[0]
+
+  if (!headerLine) {
+    return null
+  }
+
+  const headers = splitCsvLine(headerLine)
+  const rows = lines
+    .slice(1, 6)
+    .map((line) => splitCsvLine(line))
+    .filter((row) => row.length > 0)
+
+  return {
+    headers,
+    rows,
+  }
+}
+
 const TransactionBadge = ({ transaction }: { transaction: Transaction }) => {
   const isImported = transaction.origins.some(
     (origin) => origin.originType === "CSV_IMPORT",
@@ -174,6 +231,7 @@ const App = () => {
 
   const [month, setMonth] = useState(formatMonth(new Date()))
   const [selectedCsvFile, setSelectedCsvFile] = useState<File | null>(null)
+  const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null)
   const [importMapping, setImportMapping] = useState({
     date: "date",
     amount: "amount",
@@ -464,6 +522,7 @@ const App = () => {
         `Imported ${result.rowsTotal} rows (${result.rowsMatched} matched).`,
       )
       setSelectedCsvFile(null)
+      setCsvPreview(null)
       refetchCoreData()
     },
     onError: (error) => {
@@ -1128,9 +1187,19 @@ const App = () => {
               <input
                 type="file"
                 accept=".csv,text/csv"
-                onChange={(event) =>
-                  setSelectedCsvFile(event.target.files?.[0] ?? null)
-                }
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null
+                  setSelectedCsvFile(file)
+
+                  if (!file) {
+                    setCsvPreview(null)
+                    return
+                  }
+
+                  void parseCsvFile(file).then((csvText) => {
+                    setCsvPreview(buildCsvPreview(csvText))
+                  })
+                }}
               />
               <button
                 type="button"
@@ -1140,6 +1209,35 @@ const App = () => {
                 Import CSV
               </button>
             </div>
+
+            {csvPreview ? (
+              <div className="table-wrap" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      {csvPreview.headers.map((header) => (
+                        <th key={header}>{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.rows.map((row, index) => (
+                      <tr key={`${index}-${row.join("-")}`}>
+                        {csvPreview.headers.map((_, headerIndex) => (
+                          <td key={`${index}-${headerIndex}`}>
+                            {row[headerIndex] ?? ""}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="muted" style={{ marginTop: "0.8rem" }}>
+                Select a CSV file to preview first five rows before import.
+              </p>
+            )}
           </section>
         </Tabs.Panel>
 
