@@ -1363,6 +1363,46 @@ const App = () => {
                 </tbody>
               </table>
             </div>
+
+            <div className="table-wrap" style={{ marginTop: "0.8rem" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Category</th>
+                    <th>Total Spending</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportingQuery.isLoading ? (
+                    <tr>
+                      <td colSpan={3} className="muted">
+                        Loading spending breakdown...
+                      </td>
+                    </tr>
+                  ) : (reportingQuery.data?.spendingByCategory.length ?? 0) ===
+                    0 ? (
+                    <tr>
+                      <td colSpan={3} className="muted">
+                        No category spending breakdown for selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    (reportingQuery.data?.spendingByCategory ?? []).map(
+                      (item) => (
+                        <tr key={item.categoryId}>
+                          <td>{item.groupName}</td>
+                          <td>{item.categoryName}</td>
+                          <td className="amount-outflow">
+                            {formatMoney(-item.totalMinor)}
+                          </td>
+                        </tr>
+                      ),
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         </Tabs.Panel>
 
