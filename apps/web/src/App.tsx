@@ -12,6 +12,8 @@ import {
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
 import { buildCsvPreview } from "./lib/csv-preview.js"
+import { isPayeeMergeSelectionValid } from "./lib/payee-merge.js"
+import { buildNextTransactionDraft } from "./lib/transaction-entry.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
 
 import "./App.css"
@@ -400,14 +402,7 @@ const App = () => {
       }),
     onSuccess: () => {
       toast.success("Transaction saved")
-      setNewTransaction((current) => ({
-        ...current,
-        amount: "",
-        note: "",
-        payeeId: "",
-        categoryId: "",
-        cleared: false,
-      }))
+      setNewTransaction((current) => buildNextTransactionDraft(current))
       refetchCoreData()
       window.setTimeout(() => amountRef.current?.focus(), 0)
     },
@@ -572,6 +567,16 @@ const App = () => {
 
     return filtered
   }, [payeesQuery.data, payeeSearch, payeeSort])
+  const canMergePayees = isPayeeMergeSelectionValid(
+    payeeMerge.sourcePayeeId,
+    payeeMerge.targetPayeeId,
+  )
+  const payeeMergeValidationMessage =
+    !payeeMerge.sourcePayeeId || !payeeMerge.targetPayeeId
+      ? "Select both a source and target payee."
+      : !canMergePayees
+        ? "Source and target payees must be different."
+        : null
 
   return (
     <div className="app-shell">
@@ -1002,6 +1007,12 @@ const App = () => {
                 className="form-grid"
                 onSubmit={(event) => {
                   event.preventDefault()
+
+                  if (!canMergePayees) {
+                    toast.error("Pick two different payees to perform a merge.")
+                    return
+                  }
+
                   mergePayeeMutation.mutate()
                 }}
               >
@@ -1045,7 +1056,15 @@ const App = () => {
                     ))}
                   </select>
                 </label>
-                <button type="submit">Merge Payees</button>
+                <button
+                  type="submit"
+                  disabled={!canMergePayees || mergePayeeMutation.isPending}
+                >
+                  {mergePayeeMutation.isPending ? "Merging..." : "Merge Payees"}
+                </button>
+                {payeeMergeValidationMessage ? (
+                  <p className="muted">{payeeMergeValidationMessage}</p>
+                ) : null}
               </form>
             </article>
           </section>
