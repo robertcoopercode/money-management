@@ -14,6 +14,8 @@ export const registerReportRoutes = (app: Hono) => {
         toDate: query.toDate,
         accountIds: query.accountIds?.split(",").filter(Boolean),
         categoryIds: query.categoryIds?.split(",").filter(Boolean),
+        payeeIds: query.payeeIds?.split(",").filter(Boolean),
+        cleared: query.cleared,
       }),
     )
 

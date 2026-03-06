@@ -9,6 +9,8 @@ export type ReportFilters = {
   toDate?: string
   accountIds?: string[]
   categoryIds?: string[]
+  payeeIds?: string[]
+  cleared?: boolean
 }
 
 export const getReports = (filters: ReportFilters) =>
@@ -30,6 +32,10 @@ export const getReports = (filters: ReportFilters) =>
         categoryId: filters.categoryIds?.length
           ? { in: filters.categoryIds }
           : undefined,
+        payeeId: filters.payeeIds?.length
+          ? { in: filters.payeeIds }
+          : undefined,
+        cleared: filters.cleared,
       } as const
 
       const [transactions, scopedAccounts] = await Promise.all([

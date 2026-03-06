@@ -72,6 +72,8 @@ export const reportFilterSchema = z.object({
   toDate: z.iso.date().optional(),
   accountIds: z.string().optional(),
   categoryIds: z.string().optional(),
+  payeeIds: z.string().optional(),
+  cleared: z.coerce.boolean().optional(),
 })
 
 export const mortgageProfileSchema = z.object({

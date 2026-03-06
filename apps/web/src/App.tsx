@@ -250,6 +250,8 @@ const App = () => {
   const [reportFilters, setReportFilters] = useState({
     accountId: "",
     categoryId: "",
+    payeeId: "",
+    cleared: "all" as "all" | "cleared" | "uncleared",
   })
   const [newAccount, setNewAccount] = useState({
     name: "",
@@ -336,6 +338,17 @@ const App = () => {
 
       if (reportFilters.categoryId) {
         query.set("categoryIds", reportFilters.categoryId)
+      }
+
+      if (reportFilters.payeeId) {
+        query.set("payeeIds", reportFilters.payeeId)
+      }
+
+      if (reportFilters.cleared !== "all") {
+        query.set(
+          "cleared",
+          reportFilters.cleared === "cleared" ? "true" : "false",
+        )
       }
 
       return apiFetch<ReportingResponse>(`/api/reports?${query.toString()}`)
@@ -1523,6 +1536,42 @@ const App = () => {
                       </option>
                     )),
                   )}
+                </select>
+              </label>
+              <label>
+                Payee
+                <select
+                  value={reportFilters.payeeId}
+                  onChange={(event) =>
+                    setReportFilters((current) => ({
+                      ...current,
+                      payeeId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">All payees</option>
+                  {(payeesQuery.data ?? []).map((payee) => (
+                    <option key={payee.id} value={payee.id}>
+                      {payee.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cleared Status
+                <select
+                  value={reportFilters.cleared}
+                  onChange={(event) =>
+                    setReportFilters((current) => ({
+                      ...current,
+                      cleared: event.target
+                        .value as "all" | "cleared" | "uncleared",
+                    }))
+                  }
+                >
+                  <option value="all">All</option>
+                  <option value="cleared">Cleared only</option>
+                  <option value="uncleared">Uncleared only</option>
                 </select>
               </label>
             </div>
