@@ -5,7 +5,7 @@ import {
   prisma,
 } from "@money/db"
 import { Effect } from "effect"
-import { parseCsvRecords } from "../domain/csv.js"
+import { findMissingMappedColumns, parseCsvRecords } from "../domain/csv.js"
 import { findBestImportCandidate } from "../domain/import-matching.js"
 
 type ImportInput = {
@@ -72,17 +72,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
   Effect.tryPromise({
     try: async () => {
       const rows = parseCsvRecords(input.csvText)
-      const mappingColumns = [
-        input.mapping.date,
-        input.mapping.amount,
-        input.mapping.payee,
-        input.mapping.note,
-      ].filter((column): column is string => Boolean(column?.trim()))
-
-      const missingColumns = mappingColumns.filter(
-        (columnName) =>
-          rows.length > 0 && !Object.hasOwn(rows[0] ?? {}, columnName),
-      )
+      const missingColumns = findMissingMappedColumns(rows, input.mapping)
 
       if (missingColumns.length > 0) {
         throw new Error(

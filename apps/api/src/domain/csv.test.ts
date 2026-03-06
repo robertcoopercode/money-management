@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { parseCsvRecords } from "./csv.js"
+import { findMissingMappedColumns, parseCsvRecords } from "./csv.js"
 
 describe("parseCsvRecords", () => {
   it("parses default header-based csv rows", () => {
@@ -26,5 +26,20 @@ describe("parseCsvRecords", () => {
       payee: "Store, Downtown",
       note: "tea, milk",
     })
+  })
+
+  it("reports missing mapping columns", () => {
+    const rows = parseCsvRecords(
+      "bookingDate,amount,payee\n2026-01-01,-10.00,Coffee",
+    )
+
+    const missingColumns = findMissingMappedColumns(rows, {
+      date: "date",
+      amount: "amount",
+      payee: "payee",
+      note: "note",
+    })
+
+    expect(missingColumns).toEqual(["date", "note"])
   })
 })
