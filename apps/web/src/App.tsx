@@ -12,6 +12,7 @@ import {
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
 import { buildCsvPreview } from "./lib/csv-preview.js"
+import { toDisplayErrorMessage } from "./lib/errors.js"
 import { isPayeeMergeSelectionValid } from "./lib/payee-merge.js"
 import { buildNextTransactionDraft } from "./lib/transaction-entry.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
@@ -693,6 +694,14 @@ const App = () => {
 
             <article className="card">
               <h2>Accounts</h2>
+              {accountsQuery.isError ? (
+                <p className="error-text">
+                  {toDisplayErrorMessage(
+                    accountsQuery.error,
+                    "Failed to load accounts.",
+                  )}
+                </p>
+              ) : null}
               <div className="list">
                 {accountsQuery.isLoading ? (
                   <p className="muted">Loading accounts...</p>
@@ -869,6 +878,16 @@ const App = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {transactionsQuery.isError ? (
+                    <tr>
+                      <td colSpan={8} className="error-text">
+                        {toDisplayErrorMessage(
+                          transactionsQuery.error,
+                          "Failed to load transactions.",
+                        )}
+                      </td>
+                    </tr>
+                  ) : null}
                   {transactionsQuery.isLoading ? (
                     <tr>
                       <td colSpan={8} className="muted">
@@ -1108,6 +1127,14 @@ const App = () => {
               </label>
             </div>
             <div className="list">
+              {payeesQuery.isError ? (
+                <p className="error-text">
+                  {toDisplayErrorMessage(
+                    payeesQuery.error,
+                    "Failed to load payees.",
+                  )}
+                </p>
+              ) : null}
               {payeesQuery.isLoading ? (
                 <p className="muted">Loading payees...</p>
               ) : (payeesQuery.data?.length ?? 0) === 0 ? (
@@ -1137,6 +1164,16 @@ const App = () => {
                     </tr>
                   </thead>
                   <tbody>
+                    {payeeTransactionsQuery.isError ? (
+                      <tr>
+                        <td colSpan={5} className="error-text">
+                          {toDisplayErrorMessage(
+                            payeeTransactionsQuery.error,
+                            "Failed to load payee transactions.",
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
                     {payeeTransactionsQuery.isLoading ? (
                       <tr>
                         <td colSpan={5} className="muted">
@@ -1334,6 +1371,14 @@ const App = () => {
               Ready to Assign:{" "}
               {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
             </p>
+            {planningQuery.isError ? (
+              <p className="error-text">
+                {toDisplayErrorMessage(
+                  planningQuery.error,
+                  "Failed to load planning data.",
+                )}
+              </p>
+            ) : null}
 
             {(planningQuery.data?.mortgageTargets.length ?? 0) > 0 ? (
               <div className="table-wrap" style={{ marginBottom: "0.8rem" }}>
@@ -1435,6 +1480,14 @@ const App = () => {
         <Tabs.Panel className="panel" value="reports">
           <section className="card">
             <h2>Reporting</h2>
+            {reportingQuery.isError ? (
+              <p className="error-text">
+                {toDisplayErrorMessage(
+                  reportingQuery.error,
+                  "Failed to load reporting data.",
+                )}
+              </p>
+            ) : null}
             <div className="inline-controls">
               <label>
                 From
@@ -1822,6 +1875,13 @@ const App = () => {
               <h2>Mortgage summary</h2>
               {mortgageQuery.isLoading ? (
                 <p className="muted">Loading mortgage profile...</p>
+              ) : mortgageQuery.isError ? (
+                <p className="error-text">
+                  {toDisplayErrorMessage(
+                    mortgageQuery.error,
+                    "Failed to load mortgage profile.",
+                  )}
+                </p>
               ) : mortgageQuery.data ? (
                 <div className="summary-block">
                   <div className="summary-row">

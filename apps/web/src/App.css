@@ -175,6 +175,12 @@ button:disabled {
   font-size: 0.86rem;
 }
 
+.error-text {
+  color: rgb(255 156 156 / 96%);
+  margin: 0.25rem 0;
+  font-size: 0.86rem;
+}
+
 .transaction-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
