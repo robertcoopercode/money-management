@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountType {
+  CHEQUING
+  CREDIT_CARD
+  MORTGAGE
+}
+
+enum OriginType {
+  MANUAL
+  CSV_IMPORT
+}
+
+enum ImportBatchStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum ImportRowAction {
+  MERGED
+  CREATED
+  SKIPPED
+}
+
+enum PaymentFrequency {
+  MONTHLY
+  BIWEEKLY
+}
+
+model Account {
+  id                  String        @id @default(cuid())
+  name                String
+  type                AccountType
+  institution         String?
+  startingBalanceMinor Int          @default(0)
+  openedAt            DateTime?
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  transactions        Transaction[]
+  incomingTransferLinks Transaction[] @relation("TransferTarget")
+  importBatches       ImportBatch[]
+  mortgageProfile     MortgageProfile?
+}
+
+model Payee {
+  id             String         @id @default(cuid())
+  name           String
+  normalizedName String
+  isArchived     Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  aliases        PayeeAlias[]
+  transactions   Transaction[]
+
+  @@index([normalizedName])
+}
+
+model PayeeAlias {
+  id        String   @id @default(cuid())
+  payeeId   String
+  aliasName String
+  source    String?
+  createdAt DateTime @default(now())
+  payee     Payee    @relation(fields: [payeeId], references: [id], onDelete: Cascade)
+
+  @@unique([payeeId, aliasName])
+}
+
+model CategoryGroup {
+  id         String     @id @default(cuid())
+  name       String
+  sortOrder  Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  categories Category[]
+
+  @@unique([name])
+}
+
+model Category {
+  id               String               @id @default(cuid())
+  name             String
+  groupId          String
+  isIncomeCategory Boolean              @default(false)
+  isArchived       Boolean              @default(false)
+  sortOrder        Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  assignments      CategoryAssignment[]
+  group            CategoryGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mortgageProfiles MortgageProfile[]
+  transactions     Transaction[]
+
+  @@unique([groupId, name])
+}
+
+model Transaction {
+  id             String              @id @default(cuid())
+  accountId      String
+  date           DateTime
+  amountMinor    Int
+  payeeId        String?
+  categoryId     String?
+  note           String?
+  cleared        Boolean             @default(false)
+  manualCreated  Boolean             @default(true)
+  importLinked   Boolean             @default(false)
+  isTransfer     Boolean             @default(false)
+  transferAccountId String?
+  transferPairId String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  account        Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category       Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  payee          Payee?              @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  transferAccount Account?           @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  origins        TransactionOrigin[]
+  matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
+
+  @@index([accountId, date])
+  @@index([accountId, cleared, date])
+  @@index([isTransfer, date])
+  @@index([categoryId, date])
+  @@index([amountMinor, date])
+  @@index([transferPairId])
+}
+
+model TransactionOrigin {
+  id              String       @id @default(cuid())
+  transactionId   String
+  originType      OriginType
+  importBatchId   String?
+  rawReference    String?
+  rawPayload      Json?
+  createdAt       DateTime     @default(now())
+  importBatch     ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([originType, importBatchId])
+  @@unique([transactionId, originType, importBatchId])
+}
+
+model ImportBatch {
+  id          String              @id @default(cuid())
+  accountId   String
+  uploadedAt  DateTime            @default(now())
+  fileName    String
+  status      ImportBatchStatus   @default(PENDING)
+  rowsTotal   Int                 @default(0)
+  rowsMatched Int                 @default(0)
+  rowsCreated Int                 @default(0)
+  rowsSkipped Int                 @default(0)
+  account     Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  matches     ImportRowMatch[]
+  origins     TransactionOrigin[]
+}
+
+model ImportRowMatch {
+  id                   String          @id @default(cuid())
+  importBatchId        String
+  rowIndex             Int
+  matchedTransactionId String?
+  matchScore           Float?
+  matchReason          String?
+  action               ImportRowAction
+  createdAt            DateTime        @default(now())
+  importBatch          ImportBatch     @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  matchedTransaction   Transaction?    @relation("MatchedTransaction", fields: [matchedTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([importBatchId, rowIndex])
+}
+
+model BudgetMonth {
+  id                 String               @id @default(cuid())
+  month              String
+  readyToAssignMinor Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  assignments        CategoryAssignment[]
+
+  @@unique([month])
+}
+
+model CategoryAssignment {
+  id            String     @id @default(cuid())
+  budgetMonthId String
+  categoryId    String
+  assignedMinor Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  budgetMonth   BudgetMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade)
+  category      Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetMonthId, categoryId])
+  @@index([categoryId, budgetMonthId])
+}
+
+model MortgageProfile {
+  id                 String           @id @default(cuid())
+  accountId          String           @unique
+  interestRateAnnual Decimal          @db.Decimal(8, 6)
+  amortizationMonths Int
+  principalMinor     Int
+  paymentFrequency   PaymentFrequency @default(MONTHLY)
+  linkedCategoryId   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  account            Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  linkedCategory     Category?        @relation(fields: [linkedCategoryId], references: [id], onDelete: SetNull)
+}

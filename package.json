@@ -1,0 +1,32 @@
+{
+  "name": "money-management",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.2",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @money/api --filter @money/web dev",
+    "dev:web": "pnpm --filter @money/web dev",
+    "dev:api": "pnpm --filter @money/api dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "oxlint .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @money/db db:generate",
+    "db:migrate": "pnpm --filter @money/db db:migrate",
+    "db:seed": "pnpm --filter @money/db db:seed",
+    "test": "pnpm -r --if-present test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["prisma", "@prisma/engines", "@prisma/client", "esbuild"]
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260305",
+    "oxfmt": "^0.2.0",
+    "oxlint": "^1.23.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.0"
+  }
+}

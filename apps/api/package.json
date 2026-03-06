@@ -1,0 +1,27 @@
+{
+  "name": "@money/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsgo --noEmit",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@money/db": "workspace:*",
+    "@money/shared": "workspace:*",
+    "csv-parse": "^6.1.0",
+    "dotenv": "^17.2.3",
+    "effect": "^3.19.3",
+    "hono": "^4.10.6",
+    "pino": "^10.1.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1"
+  }
+}

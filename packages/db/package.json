@@ -1,0 +1,26 @@
+{
+  "name": "@money/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:seed": "tsx prisma/seed.ts",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.2",
+    "@prisma/client": "^7.4.2",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.18.0",
+    "prisma": "^7.4.2"
+  }
+}
