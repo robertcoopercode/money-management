@@ -14,10 +14,13 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.18.0"
+    "@prisma/adapter-pg": "^7.4.2",
+    "@prisma/client": "^7.4.2",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "prisma": "^6.18.0"
+    "@types/pg": "^8.18.0",
+    "prisma": "^7.4.2"
   }
 }

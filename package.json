@@ -16,6 +16,9 @@
     "db:seed": "pnpm --filter @money/db db:seed",
     "test": "pnpm -r --if-present test"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["prisma", "@prisma/engines", "@prisma/client", "esbuild"]
+  },
   "devDependencies": {
     "@typescript/native-preview": "^7.0.0-dev.20260305",
     "oxfmt": "^0.2.0",
