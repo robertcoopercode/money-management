@@ -167,6 +167,10 @@ const App = () => {
     fromDate: `${new Date().getUTCFullYear()}-01-01`,
     toDate: `${new Date().getUTCFullYear()}-12-31`,
   })
+  const [reportFilters, setReportFilters] = useState({
+    accountId: "",
+    categoryId: "",
+  })
   const [newAccount, setNewAccount] = useState({
     name: "",
     type: "CHEQUING" as Account["type"],
@@ -233,11 +237,23 @@ const App = () => {
   })
 
   const reportingQuery = useQuery({
-    queryKey: ["reports", reportRange],
-    queryFn: () =>
-      apiFetch<ReportingResponse>(
-        `/api/reports?fromDate=${reportRange.fromDate}&toDate=${reportRange.toDate}`,
-      ),
+    queryKey: ["reports", reportRange, reportFilters],
+    queryFn: () => {
+      const query = new URLSearchParams({
+        fromDate: reportRange.fromDate,
+        toDate: reportRange.toDate,
+      })
+
+      if (reportFilters.accountId) {
+        query.set("accountIds", reportFilters.accountId)
+      }
+
+      if (reportFilters.categoryId) {
+        query.set("categoryIds", reportFilters.categoryId)
+      }
+
+      return apiFetch<ReportingResponse>(`/api/reports?${query.toString()}`)
+    },
   })
 
   const mortgageQuery = useQuery({
@@ -561,18 +577,26 @@ const App = () => {
             <article className="card">
               <h2>Accounts</h2>
               <div className="list">
-                {(accountsQuery.data ?? []).map((account) => (
-                  <div className="list-item" key={account.id}>
-                    <div>
-                      <strong>{account.name}</strong>
-                      <p className="muted">
-                        {account.type.replaceAll("_", " ")} ·{" "}
-                        {account.institution ?? "No institution"}
-                      </p>
+                {accountsQuery.isLoading ? (
+                  <p className="muted">Loading accounts...</p>
+                ) : (accountsQuery.data?.length ?? 0) === 0 ? (
+                  <p className="muted">
+                    No accounts yet. Add one to get started.
+                  </p>
+                ) : (
+                  (accountsQuery.data ?? []).map((account) => (
+                    <div className="list-item" key={account.id}>
+                      <div>
+                        <strong>{account.name}</strong>
+                        <p className="muted">
+                          {account.type.replaceAll("_", " ")} ·{" "}
+                          {account.institution ?? "No institution"}
+                        </p>
+                      </div>
+                      <strong>{formatMoney(account.balanceMinor)}</strong>
                     </div>
-                    <strong>{formatMoney(account.balanceMinor)}</strong>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </article>
           </section>
@@ -705,29 +729,45 @@ const App = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(transactionsQuery.data ?? []).map((transaction) => (
-                    <tr key={transaction.id}>
-                      <td>
-                        {new Date(transaction.date).toISOString().slice(0, 10)}
-                      </td>
-                      <td>{transaction.account.name}</td>
-                      <td>{transaction.payee?.name ?? "—"}</td>
-                      <td>{transaction.category?.name ?? "—"}</td>
-                      <td>{transaction.note ?? "—"}</td>
-                      <td
-                        className={
-                          transaction.amountMinor >= 0
-                            ? "amount-inflow"
-                            : "amount-outflow"
-                        }
-                      >
-                        {formatMoney(transaction.amountMinor)}
-                      </td>
-                      <td>
-                        <TransactionBadge transaction={transaction} />
+                  {transactionsQuery.isLoading ? (
+                    <tr>
+                      <td colSpan={7} className="muted">
+                        Loading transactions...
                       </td>
                     </tr>
-                  ))}
+                  ) : (transactionsQuery.data?.length ?? 0) === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="muted">
+                        No transactions in this account yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    (transactionsQuery.data ?? []).map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td>
+                          {new Date(transaction.date)
+                            .toISOString()
+                            .slice(0, 10)}
+                        </td>
+                        <td>{transaction.account.name}</td>
+                        <td>{transaction.payee?.name ?? "—"}</td>
+                        <td>{transaction.category?.name ?? "—"}</td>
+                        <td>{transaction.note ?? "—"}</td>
+                        <td
+                          className={
+                            transaction.amountMinor >= 0
+                              ? "amount-inflow"
+                              : "amount-outflow"
+                          }
+                        >
+                          {formatMoney(transaction.amountMinor)}
+                        </td>
+                        <td>
+                          <TransactionBadge transaction={transaction} />
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -829,12 +869,18 @@ const App = () => {
               </label>
             </div>
             <div className="list">
-              {(payeesQuery.data ?? []).map((payee) => (
-                <div className="list-item" key={payee.id}>
-                  <strong>{payee.name}</strong>
-                  <span className="muted">ID: {payee.id}</span>
-                </div>
-              ))}
+              {payeesQuery.isLoading ? (
+                <p className="muted">Loading payees...</p>
+              ) : (payeesQuery.data?.length ?? 0) === 0 ? (
+                <p className="muted">No payees yet.</p>
+              ) : (
+                (payeesQuery.data ?? []).map((payee) => (
+                  <div className="list-item" key={payee.id}>
+                    <strong>{payee.name}</strong>
+                    <span className="muted">ID: {payee.id}</span>
+                  </div>
+                ))
+              )}
             </div>
 
             {selectedPayeeId ? (
@@ -850,27 +896,41 @@ const App = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(payeeTransactionsQuery.data ?? []).map((transaction) => (
-                      <tr key={transaction.id}>
-                        <td>
-                          {new Date(transaction.date)
-                            .toISOString()
-                            .slice(0, 10)}
-                        </td>
-                        <td>{transaction.account.name}</td>
-                        <td>{transaction.category?.name ?? "—"}</td>
-                        <td>{transaction.note ?? "—"}</td>
-                        <td
-                          className={
-                            transaction.amountMinor >= 0
-                              ? "amount-inflow"
-                              : "amount-outflow"
-                          }
-                        >
-                          {formatMoney(transaction.amountMinor)}
+                    {payeeTransactionsQuery.isLoading ? (
+                      <tr>
+                        <td colSpan={5} className="muted">
+                          Loading payee transactions...
                         </td>
                       </tr>
-                    ))}
+                    ) : (payeeTransactionsQuery.data?.length ?? 0) === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="muted">
+                          No transactions for selected payee.
+                        </td>
+                      </tr>
+                    ) : (
+                      (payeeTransactionsQuery.data ?? []).map((transaction) => (
+                        <tr key={transaction.id}>
+                          <td>
+                            {new Date(transaction.date)
+                              .toISOString()
+                              .slice(0, 10)}
+                          </td>
+                          <td>{transaction.account.name}</td>
+                          <td>{transaction.category?.name ?? "—"}</td>
+                          <td>{transaction.note ?? "—"}</td>
+                          <td
+                            className={
+                              transaction.amountMinor >= 0
+                                ? "amount-inflow"
+                                : "amount-outflow"
+                            }
+                          >
+                            {formatMoney(transaction.amountMinor)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -987,44 +1047,54 @@ const App = () => {
               {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
             </p>
 
-            {groupedPlanningRows.map(([groupName, rows]) => (
-              <div className="planning-group" key={groupName}>
-                <h3>{groupName}</h3>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Category</th>
-                      <th>Assigned</th>
-                      <th>Activity</th>
-                      <th>Available</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.categoryId}>
-                        <td>{row.categoryName}</td>
-                        <td>
-                          <input
-                            className="small-input"
-                            defaultValue={(row.assignedMinor / 100).toString()}
-                            onBlur={(event) =>
-                              assignMutation.mutate({
-                                categoryId: row.categoryId,
-                                assignedMinor: parseMoneyInputToMinor(
-                                  event.target.value,
-                                ),
-                              })
-                            }
-                          />
-                        </td>
-                        <td>{formatMoney(row.activityMinor)}</td>
-                        <td>{formatMoney(row.availableMinor)}</td>
+            {planningQuery.isLoading ? (
+              <p className="muted">Loading planning data...</p>
+            ) : groupedPlanningRows.length === 0 ? (
+              <p className="muted">
+                No planning categories available yet. Run database seed data.
+              </p>
+            ) : (
+              groupedPlanningRows.map(([groupName, rows]) => (
+                <div className="planning-group" key={groupName}>
+                  <h3>{groupName}</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th>Assigned</th>
+                        <th>Activity</th>
+                        <th>Available</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.categoryId}>
+                          <td>{row.categoryName}</td>
+                          <td>
+                            <input
+                              className="small-input"
+                              defaultValue={(
+                                row.assignedMinor / 100
+                              ).toString()}
+                              onBlur={(event) =>
+                                assignMutation.mutate({
+                                  categoryId: row.categoryId,
+                                  assignedMinor: parseMoneyInputToMinor(
+                                    event.target.value,
+                                  ),
+                                })
+                              }
+                            />
+                          </td>
+                          <td>{formatMoney(row.activityMinor)}</td>
+                          <td>{formatMoney(row.availableMinor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))
+            )}
           </section>
         </Tabs.Panel>
 
@@ -1058,50 +1128,96 @@ const App = () => {
                   }
                 />
               </label>
+              <label>
+                Account
+                <select
+                  value={reportFilters.accountId}
+                  onChange={(event) =>
+                    setReportFilters((current) => ({
+                      ...current,
+                      accountId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">All accounts</option>
+                  {(accountsQuery.data ?? []).map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Category
+                <select
+                  value={reportFilters.categoryId}
+                  onChange={(event) =>
+                    setReportFilters((current) => ({
+                      ...current,
+                      categoryId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">All categories</option>
+                  {(categoriesQuery.data ?? []).flatMap((group) =>
+                    group.categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {group.name} · {category.name}
+                      </option>
+                    )),
+                  )}
+                </select>
+              </label>
             </div>
 
             <div className="chart-card">
-              <ParentSize>
-                {({ width }) => (
-                  <XYChart
-                    height={320}
-                    width={width}
-                    xScale={{ type: "band" }}
-                    yScale={{ type: "linear", nice: true }}
-                  >
-                    <AnimatedAxis orientation="bottom" />
-                    <AnimatedAxis orientation="left" />
-                    <AnimatedGrid columns={false} numTicks={4} />
-                    <BarSeries
-                      dataKey="Spending"
-                      data={spendingChartData}
-                      xAccessor={(d) => d.month}
-                      yAccessor={(d) => d.expense}
-                    />
-                    <Tooltip
-                      renderTooltip={({ tooltipData }) => {
-                        const datum = tooltipData?.nearestDatum?.datum as {
-                          month: string
-                          expense: number
-                        } | undefined
+              {reportingQuery.isLoading ? (
+                <p className="muted">Loading chart data...</p>
+              ) : spendingChartData.length === 0 ? (
+                <p className="muted">No reporting data for selected filters.</p>
+              ) : (
+                <ParentSize>
+                  {({ width }) => (
+                    <XYChart
+                      height={320}
+                      width={width}
+                      xScale={{ type: "band" }}
+                      yScale={{ type: "linear", nice: true }}
+                    >
+                      <AnimatedAxis orientation="bottom" />
+                      <AnimatedAxis orientation="left" />
+                      <AnimatedGrid columns={false} numTicks={4} />
+                      <BarSeries
+                        dataKey="Spending"
+                        data={spendingChartData}
+                        xAccessor={(d) => d.month}
+                        yAccessor={(d) => d.expense}
+                      />
+                      <Tooltip
+                        renderTooltip={({ tooltipData }) => {
+                          const datum = tooltipData?.nearestDatum?.datum as {
+                            month: string
+                            expense: number
+                          } | undefined
 
-                        if (!datum) {
-                          return null
-                        }
+                          if (!datum) {
+                            return null
+                          }
 
-                        return (
-                          <div className="tooltip">
-                            <strong>{datum.month}</strong>
-                            <div>
-                              {formatMoney(Math.round(datum.expense * 100))}
+                          return (
+                            <div className="tooltip">
+                              <strong>{datum.month}</strong>
+                              <div>
+                                {formatMoney(Math.round(datum.expense * 100))}
+                              </div>
                             </div>
-                          </div>
-                        )
-                      }}
-                    />
-                  </XYChart>
-                )}
-              </ParentSize>
+                          )
+                        }}
+                      />
+                    </XYChart>
+                  )}
+                </ParentSize>
+              )}
             </div>
 
             <div className="table-wrap">
@@ -1114,18 +1230,33 @@ const App = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(reportingQuery.data?.incomeExpenseByMonth ?? []).map(
-                    (item) => (
-                      <tr key={item.month}>
-                        <td>{item.month}</td>
-                        <td className="amount-inflow">
-                          {formatMoney(item.incomeMinor)}
-                        </td>
-                        <td className="amount-outflow">
-                          {formatMoney(-item.expenseMinor)}
-                        </td>
-                      </tr>
-                    ),
+                  {reportingQuery.isLoading ? (
+                    <tr>
+                      <td colSpan={3} className="muted">
+                        Loading report table...
+                      </td>
+                    </tr>
+                  ) : (reportingQuery.data?.incomeExpenseByMonth.length ??
+                      0) === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="muted">
+                        No monthly data for selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    (reportingQuery.data?.incomeExpenseByMonth ?? []).map(
+                      (item) => (
+                        <tr key={item.month}>
+                          <td>{item.month}</td>
+                          <td className="amount-inflow">
+                            {formatMoney(item.incomeMinor)}
+                          </td>
+                          <td className="amount-outflow">
+                            {formatMoney(-item.expenseMinor)}
+                          </td>
+                        </tr>
+                      ),
+                    )
                   )}
                 </tbody>
               </table>
