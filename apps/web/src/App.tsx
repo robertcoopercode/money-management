@@ -515,6 +515,7 @@ const App = () => {
         rowsTotal: number
         rowsMatched: number
         rowsCreated: number
+        rowsSkipped: number
       }>("/api/imports/csv", {
         method: "POST",
         body: JSON.stringify({
@@ -527,7 +528,7 @@ const App = () => {
     },
     onSuccess: (result) => {
       toast.success(
-        `Imported ${result.rowsTotal} rows (${result.rowsMatched} matched).`,
+        `Imported ${result.rowsTotal} rows (${result.rowsMatched} matched, ${result.rowsCreated} created, ${result.rowsSkipped} skipped).`,
       )
       setSelectedCsvFile(null)
       setCsvPreview(null)

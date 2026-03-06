@@ -156,6 +156,7 @@ model ImportBatch {
   rowsTotal   Int                 @default(0)
   rowsMatched Int                 @default(0)
   rowsCreated Int                 @default(0)
+  rowsSkipped Int                 @default(0)
   account     Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
   matches     ImportRowMatch[]
   origins     TransactionOrigin[]

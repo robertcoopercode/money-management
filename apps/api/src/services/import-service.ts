@@ -72,6 +72,24 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
   Effect.tryPromise({
     try: async () => {
       const rows = parseCsvRecords(input.csvText)
+      const mappingColumns = [
+        input.mapping.date,
+        input.mapping.amount,
+        input.mapping.payee,
+        input.mapping.note,
+      ].filter((column): column is string => Boolean(column?.trim()))
+
+      const missingColumns = mappingColumns.filter(
+        (columnName) =>
+          rows.length > 0 && !Object.hasOwn(rows[0] ?? {}, columnName),
+      )
+
+      if (missingColumns.length > 0) {
+        throw new Error(
+          `CSV mapping columns not found: ${missingColumns.join(", ")}`,
+        )
+      }
+
       const importBatch = await prisma.importBatch.create({
         data: {
           accountId: input.accountId,
@@ -83,6 +101,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
 
       let rowsMatched = 0
       let rowsCreated = 0
+      let rowsSkipped = 0
       const matchedTransactionIds = new Set<string>()
 
       for (const [index, row] of rows.entries()) {
@@ -90,6 +109,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
         const date = parseDate(row[input.mapping.date] ?? "")
 
         if (amountMinor === null || date === null) {
+          rowsSkipped += 1
           await prisma.importRowMatch.create({
             data: {
               importBatchId: importBatch.id,
@@ -223,6 +243,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
           status: ImportBatchStatus.PROCESSED,
           rowsMatched,
           rowsCreated,
+          rowsSkipped,
         },
       })
 
@@ -231,6 +252,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
         rowsTotal: rows.length,
         rowsMatched,
         rowsCreated,
+        rowsSkipped,
       }
     },
     catch: (error) =>
