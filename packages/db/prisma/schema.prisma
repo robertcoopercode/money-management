@@ -127,6 +127,8 @@ model Transaction {
   matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
 
   @@index([accountId, date])
+  @@index([accountId, cleared, date])
+  @@index([isTransfer, date])
   @@index([categoryId, date])
   @@index([amountMinor, date])
   @@index([transferPairId])
