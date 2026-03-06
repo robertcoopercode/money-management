@@ -13,7 +13,6 @@ YNAB-inspired budgeting application built with:
 
 ```bash
 cp .env.example .env
-docker compose up -d
 pnpm install
 pnpm db:generate
 pnpm db:migrate
@@ -21,3 +20,16 @@ pnpm db:seed
 pnpm dev:api
 pnpm dev:web
 ```
+
+### Database options
+
+- **Option A (local Docker Postgres):**
+  - `docker compose up -d`
+- **Option B (Neon):**
+  - set `DATABASE_URL` in `.env` to your Neon connection string.
+
+If `DATABASE_URL` is missing, API database actions will fail.
+
+## Deployment
+
+See [docs/deployment-vercel-neon.md](docs/deployment-vercel-neon.md).

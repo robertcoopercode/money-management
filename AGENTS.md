@@ -41,6 +41,22 @@ pnpm dev:web
 
 Frontend runs on `http://localhost:5173`, API on `http://localhost:3001`.
 
+### Alternative DB setup (without Docker)
+
+If Docker is not available, use a Neon connection string in `.env`:
+
+```env
+DATABASE_URL="postgresql://..."
+```
+
+Then run:
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
+```
+
 ## Quality commands
 
 - `pnpm lint` — oxlint
@@ -53,3 +69,4 @@ Frontend runs on `http://localhost:5173`, API on `http://localhost:3001`.
 - CSV importer expects headers `date,amount,payee,note` in default flow.
 - Amounts are stored as integer cents (`amountMinor`) with positive inflow and negative outflow.
 - Budget planning uses month keys in `YYYY-MM` format.
+- Deployment notes live in `docs/deployment-vercel-neon.md`.
