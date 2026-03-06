@@ -70,3 +70,23 @@ pnpm db:seed
 - Amounts are stored as integer cents (`amountMinor`) with positive inflow and negative outflow.
 - Budget planning uses month keys in `YYYY-MM` format.
 - Deployment notes live in `docs/deployment-vercel-neon.md`.
+
+## Cursor Cloud specific instructions
+
+The cloud agent VM has Postgres installed natively (no Docker). The environment
+is configured via `.cursor/environment.json` which handles:
+
+1. Starting Postgres service and creating the `money_management` database
+2. Copying `.env.example` to `.env` (uses localhost connection string)
+3. Installing dependencies and running Prisma migrations + seed
+
+Dev servers (API on :3001, Web on :5173) launch automatically in tmux terminals.
+
+If you need to reset the database:
+
+```bash
+sudo -u postgres psql -c "DROP DATABASE money_management;"
+sudo -u postgres psql -c "CREATE DATABASE money_management;"
+pnpm db:migrate
+pnpm db:seed
+```
