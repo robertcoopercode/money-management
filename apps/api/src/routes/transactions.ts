@@ -27,6 +27,7 @@ export const registerTransactionRoutes = (app: Hono) => {
     const transaction = await runApiEffect(
       createTransaction({
         accountId: payload.accountId,
+        transferAccountId: payload.transferAccountId,
         date: payload.date,
         amountMinor: payload.amountMinor,
         payeeId: payload.payeeId,
@@ -47,6 +48,7 @@ export const registerTransactionRoutes = (app: Hono) => {
     const transaction = await runApiEffect(
       updateTransaction(transactionId, {
         accountId: payload.accountId,
+        transferAccountId: payload.transferAccountId,
         date: payload.date,
         amountMinor: payload.amountMinor,
         payeeId: payload.payeeId,

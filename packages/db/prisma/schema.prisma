@@ -46,6 +46,7 @@ model Account {
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   transactions        Transaction[]
+  incomingTransferLinks Transaction[] @relation("TransferTarget")
   importBatches       ImportBatch[]
   mortgageProfile     MortgageProfile?
 }
@@ -113,17 +114,22 @@ model Transaction {
   cleared        Boolean             @default(false)
   manualCreated  Boolean             @default(true)
   importLinked   Boolean             @default(false)
+  isTransfer     Boolean             @default(false)
+  transferAccountId String?
+  transferPairId String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   account        Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
   category       Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   payee          Payee?              @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  transferAccount Account?           @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
   origins        TransactionOrigin[]
   matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
 
   @@index([accountId, date])
   @@index([categoryId, date])
   @@index([amountMinor, date])
+  @@index([transferPairId])
 }
 
 model TransactionOrigin {

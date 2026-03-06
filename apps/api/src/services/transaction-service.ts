@@ -1,8 +1,21 @@
+import { randomUUID } from "node:crypto"
 import { OriginType, Prisma, prisma } from "@money/db"
 import type { TransactionFilterInput } from "@money/shared"
 import { Effect } from "effect"
+import {
+  buildMirrorTransferNote,
+  toMirrorTransferAmountMinor,
+} from "../domain/transfer.js"
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`)
+
+const transactionInclude = {
+  account: true,
+  payee: true,
+  category: { include: { group: true } },
+  transferAccount: true,
+  origins: true,
+} satisfies Prisma.TransactionInclude
 
 export const listTransactions = (filters: TransactionFilterInput) =>
   Effect.tryPromise({
@@ -22,10 +35,7 @@ export const listTransactions = (filters: TransactionFilterInput) =>
               : undefined,
         },
         include: {
-          account: true,
-          payee: true,
-          category: { include: { group: true } },
-          origins: true,
+          ...transactionInclude,
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: filters.limit,
@@ -36,6 +46,7 @@ export const listTransactions = (filters: TransactionFilterInput) =>
 
 export const createTransaction = (input: {
   accountId: string
+  transferAccountId?: string
   date: string
   amountMinor: number
   payeeId?: string
@@ -45,35 +56,73 @@ export const createTransaction = (input: {
 }) =>
   Effect.tryPromise({
     try: async () => {
-      const data: Prisma.TransactionUncheckedCreateInput = {
-        accountId: input.accountId,
-        date: toDate(input.date),
-        amountMinor: input.amountMinor,
-        payeeId: input.payeeId,
-        categoryId: input.categoryId,
-        note: input.note,
-        cleared: input.cleared,
-        manualCreated: true,
+      if (input.transferAccountId === input.accountId) {
+        throw new Error(
+          "Transfer account cannot be the same as source account.",
+        )
       }
 
-      const transaction = await prisma.transaction.create({
-        data,
-        include: {
-          account: true,
-          payee: true,
-          category: { include: { group: true } },
-          origins: true,
-        },
-      })
+      const transferPairId = input.transferAccountId ? randomUUID() : null
 
-      await prisma.transactionOrigin.create({
-        data: {
-          transactionId: transaction.id,
-          originType: OriginType.MANUAL,
-        },
-      })
+      const sourceTransaction = await prisma.$transaction(
+        async (transactionDb) => {
+          const source = await transactionDb.transaction.create({
+            data: {
+              accountId: input.accountId,
+              transferAccountId: input.transferAccountId,
+              transferPairId,
+              date: toDate(input.date),
+              amountMinor: input.amountMinor,
+              payeeId: input.payeeId,
+              categoryId: input.transferAccountId
+                ? undefined
+                : input.categoryId,
+              note: input.note,
+              cleared: input.cleared,
+              manualCreated: true,
+              isTransfer: Boolean(input.transferAccountId),
+            },
+          })
 
-      return transaction
+          await transactionDb.transactionOrigin.create({
+            data: {
+              transactionId: source.id,
+              originType: OriginType.MANUAL,
+            },
+          })
+
+          if (input.transferAccountId) {
+            const mirror = await transactionDb.transaction.create({
+              data: {
+                accountId: input.transferAccountId,
+                transferAccountId: input.accountId,
+                transferPairId,
+                date: toDate(input.date),
+                amountMinor: toMirrorTransferAmountMinor(input.amountMinor),
+                payeeId: input.payeeId,
+                note: buildMirrorTransferNote(input.note),
+                cleared: input.cleared,
+                manualCreated: true,
+                isTransfer: true,
+              },
+            })
+
+            await transactionDb.transactionOrigin.create({
+              data: {
+                transactionId: mirror.id,
+                originType: OriginType.MANUAL,
+              },
+            })
+          }
+
+          return transactionDb.transaction.findUniqueOrThrow({
+            where: { id: source.id },
+            include: transactionInclude,
+          })
+        },
+      )
+
+      return sourceTransaction
     },
     catch: (error) =>
       new Error(`Unable to create transaction: ${String(error)}`),
@@ -83,6 +132,7 @@ export const updateTransaction = (
   transactionId: string,
   input: {
     accountId?: string
+    transferAccountId?: string
     date?: string
     amountMinor?: number
     payeeId?: string
@@ -97,6 +147,11 @@ export const updateTransaction = (
         where: { id: transactionId },
         data: {
           accountId: input.accountId,
+          transferAccountId: input.transferAccountId,
+          isTransfer:
+            input.transferAccountId !== undefined
+              ? Boolean(input.transferAccountId)
+              : undefined,
           date: input.date ? toDate(input.date) : undefined,
           amountMinor: input.amountMinor,
           payeeId: input.payeeId,
@@ -105,10 +160,7 @@ export const updateTransaction = (
           cleared: input.cleared,
         },
         include: {
-          account: true,
-          payee: true,
-          category: { include: { group: true } },
-          origins: true,
+          ...transactionInclude,
         },
       }),
     catch: (error) =>
@@ -117,10 +169,32 @@ export const updateTransaction = (
 
 export const deleteTransaction = (transactionId: string) =>
   Effect.tryPromise({
-    try: () =>
-      prisma.transaction.delete({
+    try: async () => {
+      const existing = await prisma.transaction.findUnique({
         where: { id: transactionId },
-      }),
+        select: {
+          transferPairId: true,
+        },
+      })
+
+      if (!existing) {
+        return null
+      }
+
+      if (existing.transferPairId) {
+        await prisma.transaction.deleteMany({
+          where: {
+            transferPairId: existing.transferPairId,
+          },
+        })
+        return null
+      }
+
+      await prisma.transaction.delete({
+        where: { id: transactionId },
+      })
+      return null
+    },
     catch: (error) =>
       new Error(`Unable to delete transaction: ${String(error)}`),
   })

@@ -16,6 +16,7 @@ export const getReports = (filters: ReportFilters) =>
     try: async () => {
       const transactions = await prisma.transaction.findMany({
         where: {
+          isTransfer: false,
           date: {
             gte: filters.fromDate
               ? new Date(`${filters.fromDate}T00:00:00.000Z`)

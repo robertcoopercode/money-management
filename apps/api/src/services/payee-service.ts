@@ -80,6 +80,7 @@ export const listPayeeTransactions = (payeeId: string) =>
         where: { payeeId },
         include: {
           account: true,
+          transferAccount: true,
           category: { include: { group: true } },
           origins: true,
         },

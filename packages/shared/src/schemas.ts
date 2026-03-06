@@ -25,6 +25,7 @@ export const transactionIdSchema = z.string().min(1)
 
 export const createTransactionSchema = z.object({
   accountId: z.string().min(1),
+  transferAccountId: z.string().min(1).optional(),
   date: z.iso.date(),
   amountMinor: z.number().int(),
   payeeId: z.string().min(1).optional(),

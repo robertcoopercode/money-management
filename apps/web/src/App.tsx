@@ -46,7 +46,10 @@ type Transaction = {
   amountMinor: number
   note?: string | null
   cleared: boolean
+  isTransfer: boolean
+  transferAccountId?: string | null
   account: Account
+  transferAccount?: Account | null
   payee?: Payee | null
   category?: Category | null
   origins: Array<{ originType: "MANUAL" | "CSV_IMPORT" }>
@@ -185,6 +188,7 @@ const App = () => {
   })
   const [newTransaction, setNewTransaction] = useState({
     accountId: "",
+    transferAccountId: "",
     date: defaultTransactionDate,
     amount: "",
     payeeId: "",
@@ -345,6 +349,7 @@ const App = () => {
         method: "POST",
         body: JSON.stringify({
           accountId: newTransaction.accountId,
+          transferAccountId: newTransaction.transferAccountId || undefined,
           date: newTransaction.date,
           amountMinor: parseMoneyInputToMinor(newTransaction.amount),
           payeeId: newTransaction.payeeId || undefined,
@@ -627,6 +632,25 @@ const App = () => {
                   </option>
                 ))}
               </select>
+              <select
+                value={newTransaction.transferAccountId}
+                onChange={(event) =>
+                  setNewTransaction((current) => ({
+                    ...current,
+                    transferAccountId: event.target.value,
+                    categoryId: event.target.value ? "" : current.categoryId,
+                  }))
+                }
+              >
+                <option value="">Not a transfer</option>
+                {(accountsQuery.data ?? [])
+                  .filter((account) => account.id !== newTransaction.accountId)
+                  .map((account) => (
+                    <option key={account.id} value={account.id}>
+                      Transfer with {account.name}
+                    </option>
+                  ))}
+              </select>
               <input
                 type="date"
                 value={newTransaction.date}
@@ -674,6 +698,7 @@ const App = () => {
                     categoryId: event.target.value,
                   }))
                 }
+                disabled={Boolean(newTransaction.transferAccountId)}
               >
                 <option value="">Category</option>
                 {(categoriesQuery.data ?? []).flatMap((group) =>
@@ -751,7 +776,13 @@ const App = () => {
                         </td>
                         <td>{transaction.account.name}</td>
                         <td>{transaction.payee?.name ?? "—"}</td>
-                        <td>{transaction.category?.name ?? "—"}</td>
+                        <td>
+                          {transaction.isTransfer
+                            ? `Transfer → ${
+                                transaction.transferAccount?.name ?? "Account"
+                              }`
+                            : (transaction.category?.name ?? "—")}
+                        </td>
                         <td>{transaction.note ?? "—"}</td>
                         <td
                           className={
@@ -917,7 +948,13 @@ const App = () => {
                               .slice(0, 10)}
                           </td>
                           <td>{transaction.account.name}</td>
-                          <td>{transaction.category?.name ?? "—"}</td>
+                          <td>
+                            {transaction.isTransfer
+                              ? `Transfer → ${
+                                  transaction.transferAccount?.name ?? "Account"
+                                }`
+                              : (transaction.category?.name ?? "—")}
+                          </td>
                           <td>{transaction.note ?? "—"}</td>
                           <td
                             className={
