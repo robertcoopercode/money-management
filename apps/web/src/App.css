@@ -125,6 +125,66 @@
   font-size: 1.05rem;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.icon-button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(3 8 24 / 76%);
+  z-index: 24;
+}
+
+.dialog-card {
+  width: min(460px, 100%);
+  border-radius: 12px;
+  border: 1px solid rgb(95 117 171 / 34%);
+  background: rgb(8 16 41 / 98%);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 52%);
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dialog-close-button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
 .form-grid {
   display: grid;
   gap: 0.6rem;
