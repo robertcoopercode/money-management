@@ -182,6 +182,25 @@ button:disabled {
   padding: 0.65rem 0.75rem;
 }
 
+.account-item-main {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.account-name-form {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.account-item-meta {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.35rem;
+}
+
 .muted {
   color: rgb(188 205 240 / 66%);
   margin: 0;
