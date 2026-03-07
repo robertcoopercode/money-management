@@ -112,6 +112,11 @@ type UpdateTransactionMutationInput = {
   }
 }
 
+type UpdateAccountNameMutationInput = {
+  accountId: string
+  name: string
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -207,6 +212,10 @@ const App = () => {
     institution: "",
     startingBalance: "0",
   })
+  const [editingAccountId, setEditingAccountId] = useState("")
+  const [accountNameDrafts, setAccountNameDrafts] = useState<
+    Record<string, string>
+  >({})
   const [newPayee, setNewPayee] = useState("")
   const [payeeSearch, setPayeeSearch] = useState("")
   const [payeeSort, setPayeeSort] = useState<"name-asc" | "name-desc">(
@@ -322,6 +331,14 @@ const App = () => {
     void queryClient.invalidateQueries({ queryKey: ["reports"] })
   }
 
+  const clearAccountNameDraft = (accountId: string) => {
+    setAccountNameDrafts((current) => {
+      const next = { ...current }
+      delete next[accountId]
+      return next
+    })
+  }
+
   const createAccountMutation = useMutation({
     mutationFn: () =>
       apiFetch<Account>("/api/accounts", {
@@ -351,6 +368,23 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Failed to create account: ${error.message}`)
+    },
+  })
+
+  const updateAccountNameMutation = useMutation({
+    mutationFn: ({ accountId, name }: UpdateAccountNameMutationInput) =>
+      apiFetch<Account>(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (_, input) => {
+      toast.success("Account name updated")
+      setEditingAccountId("")
+      clearAccountNameDraft(input.accountId)
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to rename account: ${error.message}`)
     },
   })
 
@@ -702,14 +736,84 @@ const App = () => {
                 ) : (
                   (accountsQuery.data ?? []).map((account) => (
                     <div className="list-item" key={account.id}>
-                      <div>
-                        <strong>{account.name}</strong>
+                      <div className="account-item-main">
+                        {editingAccountId === account.id ? (
+                          <div className="account-name-form">
+                            <input
+                              value={accountNameDrafts[account.id] ?? account.name}
+                              onChange={(event) =>
+                                setAccountNameDrafts((current) => ({
+                                  ...current,
+                                  [account.id]: event.target.value,
+                                }))
+                              }
+                              aria-label={`Account name for ${account.name}`}
+                              disabled={updateAccountNameMutation.isPending}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextName = (
+                                  accountNameDrafts[account.id] ?? account.name
+                                ).trim()
+
+                                if (!nextName) {
+                                  toast.error("Account name cannot be blank.")
+                                  return
+                                }
+
+                                if (nextName === account.name) {
+                                  setEditingAccountId("")
+                                  clearAccountNameDraft(account.id)
+                                  return
+                                }
+
+                                updateAccountNameMutation.mutate({
+                                  accountId: account.id,
+                                  name: nextName,
+                                })
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAccountId("")
+                                clearAccountNameDraft(account.id)
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <strong>{account.name}</strong>
+                        )}
                         <p className="muted">
                           {account.type.replaceAll("_", " ")} ·{" "}
                           {account.institution ?? "No institution"}
                         </p>
                       </div>
-                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      <div className="account-item-meta">
+                        <strong>{formatMoney(account.balanceMinor)}</strong>
+                        {editingAccountId === account.id ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAccountId(account.id)
+                              setAccountNameDrafts((current) => ({
+                                ...current,
+                                [account.id]: account.name,
+                              }))
+                            }}
+                            disabled={updateAccountNameMutation.isPending}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
