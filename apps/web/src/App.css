@@ -17,6 +17,19 @@
   margin-bottom: 1.2rem;
 }
 
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.brand-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
+  box-shadow: 0 0 0 1px rgb(124 162 255 / 28%);
+}
+
 .app-header h1 {
   margin: 0;
   font-size: 1.9rem;
@@ -140,6 +153,20 @@ select {
   padding: 0.48rem 0.56rem;
 }
 
+input[type="date"] {
+  color-scheme: dark;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23e7f0ff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4.5' width='14' height='12.5' rx='2'/%3E%3Cpath d='M6 2.5v4M14 2.5v4M3 8.5h14'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.95rem 0.95rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  cursor: pointer;
+}
+
 button {
   border: 1px solid rgb(130 157 226 / 42%);
   background: linear-gradient(180deg, #334e9d, #2a3f7d);
@@ -169,6 +196,25 @@ button:disabled {
   padding: 0.65rem 0.75rem;
 }
 
+.account-item-main {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.account-name-form {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.account-item-meta {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.35rem;
+}
+
 .muted {
   color: rgb(188 205 240 / 66%);
   margin: 0;
@@ -188,52 +234,60 @@ button:disabled {
   margin-bottom: 0.8rem;
 }
 
-.payee-combobox {
+.category-autocomplete {
   position: relative;
 }
 
-.payee-combobox-menu {
+.category-autocomplete-input {
+  width: 100%;
+}
+
+.category-autocomplete-menu {
   position: absolute;
-  top: calc(100% + 0.3rem);
-  left: 0;
-  right: 0;
-  z-index: 5;
-  display: grid;
-  gap: 0.2rem;
-  max-height: 260px;
-  overflow: auto;
-  background: rgb(6 13 35 / 98%);
-  border: 1px solid rgb(95 117 171 / 35%);
-  border-radius: 10px;
+  z-index: 6;
+  width: 100%;
+  margin-top: 0.25rem;
   padding: 0.35rem;
-  box-shadow: 0 12px 24px rgb(0 0 0 / 35%);
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 10px;
+  background: rgb(6 13 35 / 98%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 35%);
+  max-height: 280px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.25rem;
 }
 
-.payee-combobox-option {
-  text-align: left;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #e7f0ff;
+.category-autocomplete-option {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
   border-radius: 8px;
-  padding: 0.45rem 0.55rem;
-  font-weight: 500;
+  padding: 0.45rem 0.5rem;
 }
 
-.payee-combobox-option:hover,
-.payee-combobox-option:focus-visible {
-  border-color: rgb(95 117 171 / 35%);
-  background: rgb(27 48 98 / 38%);
+.category-autocomplete-option small {
+  color: rgb(188 205 240 / 74%);
+  white-space: nowrap;
 }
 
-.payee-combobox-option-create {
-  color: #9eb8ff;
+.category-autocomplete-option:hover,
+.category-autocomplete-option.is-highlighted {
+  background: rgb(70 99 184 / 36%);
 }
 
-.payee-combobox-empty {
+.category-autocomplete-empty {
   margin: 0;
-  padding: 0.4rem 0.5rem;
-  color: rgb(188 205 240 / 66%);
-  font-size: 0.82rem;
+  color: rgb(188 205 240 / 74%);
+  font-size: 0.84rem;
+  padding: 0.25rem 0.2rem;
+}
+
+.category-autocomplete-create {
+  margin-top: 0.15rem;
 }
 
 .checkbox-inline {

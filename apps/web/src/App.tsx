@@ -11,6 +11,7 @@ import {
 } from "@visx/xychart"
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
+import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
@@ -117,6 +118,11 @@ type UpdateTransactionMutationInput = {
   }
 }
 
+type UpdateAccountNameMutationInput = {
+  accountId: string
+  name: string
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -212,6 +218,10 @@ const App = () => {
     institution: "",
     startingBalance: "0",
   })
+  const [editingAccountId, setEditingAccountId] = useState("")
+  const [accountNameDrafts, setAccountNameDrafts] = useState<
+    Record<string, string>
+  >({})
   const [newPayee, setNewPayee] = useState("")
   const [payeeSearch, setPayeeSearch] = useState("")
   const [payeeSort, setPayeeSort] = useState<"name-asc" | "name-desc">(
@@ -329,6 +339,14 @@ const App = () => {
     void queryClient.invalidateQueries({ queryKey: ["reports"] })
   }
 
+  const clearAccountNameDraft = (accountId: string) => {
+    setAccountNameDrafts((current) => {
+      const next = { ...current }
+      delete next[accountId]
+      return next
+    })
+  }
+
   const createAccountMutation = useMutation({
     mutationFn: () =>
       apiFetch<Account>("/api/accounts", {
@@ -361,6 +379,23 @@ const App = () => {
     },
   })
 
+  const updateAccountNameMutation = useMutation({
+    mutationFn: ({ accountId, name }: UpdateAccountNameMutationInput) =>
+      apiFetch<Account>(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (_, input) => {
+      toast.success("Account name updated")
+      setEditingAccountId("")
+      clearAccountNameDraft(input.accountId)
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to rename account: ${error.message}`)
+    },
+  })
+
   const createPayeeMutation = useMutation({
     mutationFn: () =>
       apiFetch<Payee>("/api/payees", {
@@ -374,6 +409,26 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Unable to add payee: ${error.message}`)
+    },
+  })
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (input: { name: string }) =>
+      apiFetch<Category>("/api/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (category) => {
+      toast.success("Category created")
+      setNewTransaction((current) => ({
+        ...current,
+        categoryId: category.id,
+      }))
+      void queryClient.invalidateQueries({ queryKey: ["categories"] })
+      void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    },
+    onError: (error) => {
+      toast.error(`Unable to create category: ${error.message}`)
     },
   })
 
@@ -613,11 +668,18 @@ const App = () => {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
-          <h1>Money Management</h1>
-          <p className="subtitle">
-            YNAB-inspired budgeting with keyboard-first transaction entry.
-          </p>
+        <div className="brand-block">
+          <img
+            className="brand-mark"
+            src="/flowvelope-favicon.svg"
+            alt="Flowvelope logo"
+          />
+          <div>
+            <h1>Flowvelope</h1>
+            <p className="subtitle">
+              Envelope-first budgeting with keyboard-first transaction entry.
+            </p>
+          </div>
         </div>
         <div className="ready-to-assign-card">
           <span>Ready to Assign</span>
@@ -743,14 +805,84 @@ const App = () => {
                 ) : (
                   (accountsQuery.data ?? []).map((account) => (
                     <div className="list-item" key={account.id}>
-                      <div>
-                        <strong>{account.name}</strong>
+                      <div className="account-item-main">
+                        {editingAccountId === account.id ? (
+                          <div className="account-name-form">
+                            <input
+                              value={accountNameDrafts[account.id] ?? account.name}
+                              onChange={(event) =>
+                                setAccountNameDrafts((current) => ({
+                                  ...current,
+                                  [account.id]: event.target.value,
+                                }))
+                              }
+                              aria-label={`Account name for ${account.name}`}
+                              disabled={updateAccountNameMutation.isPending}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextName = (
+                                  accountNameDrafts[account.id] ?? account.name
+                                ).trim()
+
+                                if (!nextName) {
+                                  toast.error("Account name cannot be blank.")
+                                  return
+                                }
+
+                                if (nextName === account.name) {
+                                  setEditingAccountId("")
+                                  clearAccountNameDraft(account.id)
+                                  return
+                                }
+
+                                updateAccountNameMutation.mutate({
+                                  accountId: account.id,
+                                  name: nextName,
+                                })
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAccountId("")
+                                clearAccountNameDraft(account.id)
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <strong>{account.name}</strong>
+                        )}
                         <p className="muted">
                           {account.type.replaceAll("_", " ")} ·{" "}
                           {account.institution ?? "No institution"}
                         </p>
                       </div>
-                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      <div className="account-item-meta">
+                        <strong>{formatMoney(account.balanceMinor)}</strong>
+                        {editingAccountId === account.id ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAccountId(account.id)
+                              setAccountNameDrafts((current) => ({
+                                ...current,
+                                [account.id]: account.name,
+                              }))
+                            }}
+                            disabled={updateAccountNameMutation.isPending}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -829,7 +961,7 @@ const App = () => {
                 required
               />
               <div
-                className="payee-combobox"
+                className="category-autocomplete"
                 onFocusCapture={() => setIsPayeeMenuOpen(true)}
                 onBlurCapture={(event) => {
                   const nextFocusedElement = event.relatedTarget as
@@ -845,6 +977,7 @@ const App = () => {
                 }}
               >
                 <input
+                  className="category-autocomplete-input"
                   value={payeeInput}
                   onChange={(event) => {
                     const nextValue = event.target.value
@@ -864,17 +997,40 @@ const App = () => {
                   aria-label="Payee"
                   aria-controls="payee-combobox-menu"
                   aria-expanded={isPayeeMenuOpen}
+                  aria-autocomplete="list"
                 />
                 {isPayeeMenuOpen ? (
                   <div
                     id="payee-combobox-menu"
                     role="listbox"
-                    className="payee-combobox-menu"
+                    className="category-autocomplete-menu"
                   >
+                    {payeeOptions.length > 0 ? (
+                      payeeOptions.map((payee) => (
+                        <button
+                          type="button"
+                          key={payee.id}
+                          className="category-autocomplete-option"
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                          }}
+                          onClick={() => {
+                            setPayeeInput(payee.name)
+                            setNewTransaction((current) => ({
+                              ...current,
+                              payeeId: payee.id,
+                            }))
+                            setIsPayeeMenuOpen(false)
+                          }}
+                        >
+                          <span>{payee.name}</span>
+                        </button>
+                      ))
+                    ) : null}
                     {shouldShowCreatePayeeOption ? (
                       <button
                         type="button"
-                        className="payee-combobox-option payee-combobox-option-create"
+                        className="category-autocomplete-create"
                         onMouseDown={(event) => {
                           event.preventDefault()
                         }}
@@ -890,54 +1046,29 @@ const App = () => {
                         Create "{trimmedPayeeInput}" Payee
                       </button>
                     ) : null}
-                    {payeeOptions.length > 0 ? (
-                      payeeOptions.map((payee) => (
-                        <button
-                          type="button"
-                          key={payee.id}
-                          className="payee-combobox-option"
-                          onMouseDown={(event) => {
-                            event.preventDefault()
-                          }}
-                          onClick={() => {
-                            setPayeeInput(payee.name)
-                            setNewTransaction((current) => ({
-                              ...current,
-                              payeeId: payee.id,
-                            }))
-                            setIsPayeeMenuOpen(false)
-                          }}
-                        >
-                          {payee.name}
-                        </button>
-                      ))
-                    ) : !shouldShowCreatePayeeOption ? (
-                      <p className="payee-combobox-empty">
-                        No matching payees. Press Enter to save with a new payee.
+                    {payeeOptions.length === 0 && !shouldShowCreatePayeeOption ? (
+                      <p className="category-autocomplete-empty">
+                        No matching payees.
                       </p>
                     ) : null}
                   </div>
                 ) : null}
               </div>
-              <select
+              <CategoryAutocomplete
                 value={newTransaction.categoryId}
-                onChange={(event) =>
+                categoryGroups={categoriesQuery.data ?? []}
+                onChange={(categoryId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    categoryId: event.target.value,
+                    categoryId,
                   }))
                 }
                 disabled={Boolean(newTransaction.transferAccountId)}
-              >
-                <option value="">Category</option>
-                {(categoriesQuery.data ?? []).flatMap((group) =>
-                  group.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {group.name} · {category.name}
-                    </option>
-                  )),
-                )}
-              </select>
+                onCreateCategory={(name) => {
+                  createCategoryMutation.mutate({ name })
+                }}
+                isCreating={createCategoryMutation.isPending}
+              />
               <input
                 value={newTransaction.note}
                 onChange={(event) =>
