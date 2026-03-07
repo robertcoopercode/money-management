@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Tabs } from "@base-ui/react/tabs"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ParentSize } from "@visx/responsive"
@@ -157,6 +157,32 @@ const shiftMonth = (current: string, amount: number) => {
 
 const defaultTransactionDate = new Date().toISOString().slice(0, 10)
 const TRANSACTION_PAGE_SIZE = 100
+const APP_TAB_VALUES = [
+  "accounts",
+  "transactions",
+  "payees",
+  "imports",
+  "planning",
+  "reports",
+  "mortgage",
+] as const
+type AppTab = (typeof APP_TAB_VALUES)[number]
+
+const isAppTab = (value: string): value is AppTab =>
+  APP_TAB_VALUES.includes(value as AppTab)
+
+const getInitialAppTab = (): AppTab => {
+  if (typeof window === "undefined") {
+    return "accounts"
+  }
+
+  const tabParam = new URLSearchParams(window.location.search).get("tab")
+  if (tabParam && isAppTab(tabParam)) {
+    return tabParam
+  }
+
+  return "accounts"
+}
 
 const parseCsvFile = async (file: File) => {
   return file.text()
@@ -188,6 +214,9 @@ const App = () => {
   const queryClient = useQueryClient()
   const amountRef = useRef<HTMLInputElement | null>(null)
 
+  const [activeTab, setActiveTab] = useState<AppTab>(getInitialAppTab)
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] =
+    useState(false)
   const [month, setMonth] = useState(formatMonth(new Date()))
   const [selectedCsvFile, setSelectedCsvFile] = useState<File | null>(null)
   const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null)
@@ -245,6 +274,18 @@ const App = () => {
     principal: "450000",
     linkedCategoryId: "",
   })
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.get("tab") === activeTab) {
+      return
+    }
+
+    searchParams.set("tab", activeTab)
+    const nextQuery = searchParams.toString()
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`
+    window.history.replaceState(null, "", nextUrl)
+  }, [activeTab])
 
   const accountsQuery = useQuery({
     queryKey: ["accounts"],
@@ -360,6 +401,7 @@ const App = () => {
       }),
     onSuccess: (account) => {
       toast.success("Account created")
+      setIsCreateAccountDialogOpen(false)
       setNewAccount({
         name: "",
         type: "CHEQUING",
@@ -653,10 +695,21 @@ const App = () => {
         </div>
       </header>
 
-      <Tabs.Root className="tabs-root" defaultValue="accounts">
+      <Tabs.Root
+        className="tabs-root"
+        value={activeTab}
+        onValueChange={(value) => {
+          if (isAppTab(value)) {
+            setActiveTab(value)
+          }
+        }}
+      >
         <Tabs.List className="tabs-list">
           <Tabs.Tab className="tabs-tab" value="accounts">
-            Accounts & Transactions
+            Accounts
+          </Tabs.Tab>
+          <Tabs.Tab className="tabs-tab" value="transactions">
+            Transactions
           </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="payees">
             Payees
@@ -677,183 +730,226 @@ const App = () => {
         </Tabs.List>
 
         <Tabs.Panel className="panel" value="accounts">
-          <section className="grid-two">
-            <article className="card">
-              <h2>Create account</h2>
-              <form
-                className="form-grid"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  createAccountMutation.mutate()
-                }}
-              >
-                <label>
-                  Name
-                  <input
-                    value={newAccount.name}
-                    onChange={(event) =>
-                      setNewAccount((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Type
-                  <select
-                    value={newAccount.type}
-                    onChange={(event) =>
-                      setNewAccount((current) => ({
-                        ...current,
-                        type: event.target.value as Account["type"],
-                      }))
-                    }
-                  >
-                    <option value="CHEQUING">Chequing</option>
-                    <option value="CREDIT_CARD">Credit Card</option>
-                    <option value="MORTGAGE">Mortgage</option>
-                  </select>
-                </label>
-                <label>
-                  Institution
-                  <input
-                    value={newAccount.institution}
-                    onChange={(event) =>
-                      setNewAccount((current) => ({
-                        ...current,
-                        institution: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Starting Balance
-                  <input
-                    value={newAccount.startingBalance}
-                    onChange={(event) =>
-                      setNewAccount((current) => ({
-                        ...current,
-                        startingBalance: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={createAccountMutation.isPending}
-                >
-                  Add Account
-                </button>
-              </form>
-            </article>
-
-            <article className="card">
+          <section className="card">
+            <div className="section-header">
               <h2>Accounts</h2>
-              {accountsQuery.isError ? (
-                <p className="error-text">
-                  {toDisplayErrorMessage(
-                    accountsQuery.error,
-                    "Failed to load accounts.",
-                  )}
-                </p>
-              ) : null}
-              <div className="list">
-                {accountsQuery.isLoading ? (
-                  <p className="muted">Loading accounts...</p>
-                ) : (accountsQuery.data?.length ?? 0) === 0 ? (
-                  <p className="muted">
-                    No accounts yet. Add one to get started.
-                  </p>
-                ) : (
-                  (accountsQuery.data ?? []).map((account) => (
-                    <div className="list-item" key={account.id}>
-                      <div className="account-item-main">
-                        {editingAccountId === account.id ? (
-                          <div className="account-name-form">
-                            <input
-                              value={accountNameDrafts[account.id] ?? account.name}
-                              onChange={(event) =>
-                                setAccountNameDrafts((current) => ({
-                                  ...current,
-                                  [account.id]: event.target.value,
-                                }))
-                              }
-                              aria-label={`Account name for ${account.name}`}
-                              disabled={updateAccountNameMutation.isPending}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextName = (
-                                  accountNameDrafts[account.id] ?? account.name
-                                ).trim()
-
-                                if (!nextName) {
-                                  toast.error("Account name cannot be blank.")
-                                  return
-                                }
-
-                                if (nextName === account.name) {
-                                  setEditingAccountId("")
-                                  clearAccountNameDraft(account.id)
-                                  return
-                                }
-
-                                updateAccountNameMutation.mutate({
-                                  accountId: account.id,
-                                  name: nextName,
-                                })
-                              }}
-                              disabled={updateAccountNameMutation.isPending}
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingAccountId("")
-                                clearAccountNameDraft(account.id)
-                              }}
-                              disabled={updateAccountNameMutation.isPending}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <strong>{account.name}</strong>
-                        )}
-                        <p className="muted">
-                          {account.type.replaceAll("_", " ")} ·{" "}
-                          {account.institution ?? "No institution"}
-                        </p>
-                      </div>
-                      <div className="account-item-meta">
-                        <strong>{formatMoney(account.balanceMinor)}</strong>
-                        {editingAccountId === account.id ? null : (
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setIsCreateAccountDialogOpen(true)}
+                aria-label="Create account"
+                aria-haspopup="dialog"
+                aria-expanded={isCreateAccountDialogOpen}
+              >
+                +
+              </button>
+            </div>
+            {accountsQuery.isError ? (
+              <p className="error-text">
+                {toDisplayErrorMessage(
+                  accountsQuery.error,
+                  "Failed to load accounts.",
+                )}
+              </p>
+            ) : null}
+            <div className="list" style={{ marginTop: "0.85rem" }}>
+              {accountsQuery.isLoading ? (
+                <p className="muted">Loading accounts...</p>
+              ) : (accountsQuery.data?.length ?? 0) === 0 ? (
+                <p className="muted">No accounts yet. Add one to get started.</p>
+              ) : (
+                (accountsQuery.data ?? []).map((account) => (
+                  <div className="list-item" key={account.id}>
+                    <div className="account-item-main">
+                      {editingAccountId === account.id ? (
+                        <div className="account-name-form">
+                          <input
+                            value={accountNameDrafts[account.id] ?? account.name}
+                            onChange={(event) =>
+                              setAccountNameDrafts((current) => ({
+                                ...current,
+                                [account.id]: event.target.value,
+                              }))
+                            }
+                            aria-label={`Account name for ${account.name}`}
+                            disabled={updateAccountNameMutation.isPending}
+                          />
                           <button
                             type="button"
                             onClick={() => {
-                              setEditingAccountId(account.id)
-                              setAccountNameDrafts((current) => ({
-                                ...current,
-                                [account.id]: account.name,
-                              }))
+                              const nextName = (
+                                accountNameDrafts[account.id] ?? account.name
+                              ).trim()
+
+                              if (!nextName) {
+                                toast.error("Account name cannot be blank.")
+                                return
+                              }
+
+                              if (nextName === account.name) {
+                                setEditingAccountId("")
+                                clearAccountNameDraft(account.id)
+                                return
+                              }
+
+                              updateAccountNameMutation.mutate({
+                                accountId: account.id,
+                                name: nextName,
+                              })
                             }}
                             disabled={updateAccountNameMutation.isPending}
                           >
-                            Edit
+                            Save
                           </button>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAccountId("")
+                              clearAccountNameDraft(account.id)
+                            }}
+                            disabled={updateAccountNameMutation.isPending}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <strong>{account.name}</strong>
+                      )}
+                      <p className="muted">
+                        {account.type.replaceAll("_", " ")} ·{" "}
+                        {account.institution ?? "No institution"}
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
-            </article>
+                    <div className="account-item-meta">
+                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      {editingAccountId === account.id ? null : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAccountId(account.id)
+                            setAccountNameDrafts((current) => ({
+                              ...current,
+                              [account.id]: account.name,
+                            }))
+                          }}
+                          disabled={updateAccountNameMutation.isPending}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </section>
 
+          {isCreateAccountDialogOpen ? (
+            <div
+              className="dialog-backdrop"
+              role="presentation"
+              onClick={() => setIsCreateAccountDialogOpen(false)}
+            >
+              <div
+                className="dialog-card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-account-dialog-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="section-header">
+                  <h2 id="create-account-dialog-title">Create account</h2>
+                  <button
+                    type="button"
+                    className="dialog-close-button"
+                    onClick={() => setIsCreateAccountDialogOpen(false)}
+                    aria-label="Close account dialog"
+                  >
+                    ×
+                  </button>
+                </div>
+                <form
+                  className="form-grid"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    createAccountMutation.mutate()
+                  }}
+                >
+                  <label>
+                    Name
+                    <input
+                      value={newAccount.name}
+                      onChange={(event) =>
+                        setNewAccount((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Type
+                    <select
+                      value={newAccount.type}
+                      onChange={(event) =>
+                        setNewAccount((current) => ({
+                          ...current,
+                          type: event.target.value as Account["type"],
+                        }))
+                      }
+                    >
+                      <option value="CHEQUING">Chequing</option>
+                      <option value="CREDIT_CARD">Credit Card</option>
+                      <option value="MORTGAGE">Mortgage</option>
+                    </select>
+                  </label>
+                  <label>
+                    Institution
+                    <input
+                      value={newAccount.institution}
+                      onChange={(event) =>
+                        setNewAccount((current) => ({
+                          ...current,
+                          institution: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Starting Balance
+                    <input
+                      value={newAccount.startingBalance}
+                      onChange={(event) =>
+                        setNewAccount((current) => ({
+                          ...current,
+                          startingBalance: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className="dialog-actions">
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateAccountDialogOpen(false)}
+                      disabled={createAccountMutation.isPending}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={createAccountMutation.isPending}
+                    >
+                      Add Account
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+        </Tabs.Panel>
+
+        <Tabs.Panel className="panel" value="transactions">
           <section className="card">
             <h2>Quick transaction entry (Enter to save, auto-focus next)</h2>
             <form
