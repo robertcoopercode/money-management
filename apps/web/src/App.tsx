@@ -572,11 +572,18 @@ const App = () => {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
-          <h1>Money Management</h1>
-          <p className="subtitle">
-            YNAB-inspired budgeting with keyboard-first transaction entry.
-          </p>
+        <div className="brand-block">
+          <img
+            className="brand-mark"
+            src="/flowvelope-favicon.svg"
+            alt="Flowvelope logo"
+          />
+          <div>
+            <h1>Flowvelope</h1>
+            <p className="subtitle">
+              Envelope-first budgeting with keyboard-first transaction entry.
+            </p>
+          </div>
         </div>
         <div className="ready-to-assign-card">
           <span>Ready to Assign</span>
