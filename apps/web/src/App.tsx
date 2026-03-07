@@ -12,6 +12,7 @@ import {
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { Toaster, toast } from "sonner"
 import { CategoryAutocomplete } from "./components/category-autocomplete.js"
+import { PayeeAutocomplete } from "./components/payee-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
@@ -427,6 +428,26 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Unable to create category: ${error.message}`)
+    },
+  })
+
+  const createTransactionPayeeMutation = useMutation({
+    mutationFn: (input: { name: string }) =>
+      apiFetch<Payee>("/api/payees", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (payee) => {
+      toast.success("Payee created")
+      setNewTransaction((current) => ({
+        ...current,
+        payeeId: payee.id,
+      }))
+      void queryClient.invalidateQueries({ queryKey: ["payees"] })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+    },
+    onError: (error) => {
+      toast.error(`Unable to add payee: ${error.message}`)
     },
   })
 
@@ -924,22 +945,20 @@ const App = () => {
                 placeholder="Amount"
                 required
               />
-              <select
+              <PayeeAutocomplete
                 value={newTransaction.payeeId}
-                onChange={(event) =>
+                payees={payeesQuery.data ?? []}
+                onChange={(payeeId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    payeeId: event.target.value,
+                    payeeId,
                   }))
                 }
-              >
-                <option value="">Payee</option>
-                {(payeesQuery.data ?? []).map((payee) => (
-                  <option key={payee.id} value={payee.id}>
-                    {payee.name}
-                  </option>
-                ))}
-              </select>
+                onCreatePayee={(name) => {
+                  createTransactionPayeeMutation.mutate({ name })
+                }}
+                isCreating={createTransactionPayeeMutation.isPending}
+              />
               <CategoryAutocomplete
                 value={newTransaction.categoryId}
                 categoryGroups={categoriesQuery.data ?? []}
