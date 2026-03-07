@@ -3,7 +3,7 @@ import {
   ImportRowAction,
   OriginType,
   prisma,
-} from "@money/db"
+} from "@ledgr/db"
 import { Effect } from "effect"
 import { findMissingMappedColumns, parseCsvRecords } from "../domain/csv.js"
 import { findBestImportCandidate } from "../domain/import-matching.js"

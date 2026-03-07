@@ -1,4 +1,4 @@
-import { prisma } from "@money/db"
+import { prisma } from "@ledgr/db"
 import { Effect } from "effect"
 import { calculateMonthlyPaymentMinor } from "../domain/mortgage.js"
 import {

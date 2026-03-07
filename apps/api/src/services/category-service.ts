@@ -1,4 +1,4 @@
-import { prisma } from "@money/db"
+import { prisma } from "@ledgr/db"
 import { Effect } from "effect"
 
 const DEFAULT_CATEGORY_GROUP_NAME = "Uncategorized"

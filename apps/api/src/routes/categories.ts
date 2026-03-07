@@ -1,5 +1,5 @@
 import type { Hono } from "hono"
-import { createCategorySchema } from "@money/shared"
+import { createCategorySchema } from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"

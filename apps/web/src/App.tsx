@@ -9,7 +9,7 @@ import {
   Tooltip,
   XYChart,
 } from "@visx/xychart"
-import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
+import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { Toaster, toast } from "sonner"
 import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
@@ -270,11 +270,16 @@ const App = () => {
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions", newTransaction.accountId, transactionOffset],
-    queryFn: () =>
-      apiFetch<Transaction[]>(
-        `/api/transactions?limit=${TRANSACTION_PAGE_SIZE}&offset=${transactionOffset}&accountId=${newTransaction.accountId}`,
-      ),
-    enabled: Boolean(newTransaction.accountId),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        limit: String(TRANSACTION_PAGE_SIZE),
+        offset: String(transactionOffset),
+      })
+      if (newTransaction.accountId) {
+        params.set("accountId", newTransaction.accountId)
+      }
+      return apiFetch<Transaction[]>(`/api/transactions?${params}`)
+    },
   })
 
   const planningQuery = useQuery({
@@ -630,11 +635,11 @@ const App = () => {
         <div className="brand-block">
           <img
             className="brand-mark"
-            src="/flowvelope-favicon.svg"
-            alt="Flowvelope logo"
+            src="/ledgr-favicon.svg"
+            alt="Ledgr logo"
           />
           <div>
-            <h1>Flowvelope</h1>
+            <h1>Ledgr</h1>
             <p className="subtitle">
               Envelope-first budgeting with keyboard-first transaction entry.
             </p>

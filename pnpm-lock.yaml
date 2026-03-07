@@ -35,10 +35,10 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.6
         version: 1.19.11(hono@4.12.5)
-      '@money/db':
+      '@ledgr/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@money/shared':
+      '@ledgr/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       csv-parse:
@@ -69,7 +69,7 @@ importers:
       '@base-ui/react':
         specifier: ^1.2.0
         version: 1.2.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@money/shared':
+      '@ledgr/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tanstack/react-query':

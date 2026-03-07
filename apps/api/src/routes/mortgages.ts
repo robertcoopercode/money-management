@@ -1,5 +1,5 @@
 import type { Hono } from "hono"
-import { mortgageProfileSchema } from "@money/shared"
+import { mortgageProfileSchema } from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"

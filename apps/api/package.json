@@ -1,5 +1,5 @@
 {
-  "name": "@money/api",
+  "name": "@ledgr/api",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
-    "@money/db": "workspace:*",
-    "@money/shared": "workspace:*",
+    "@ledgr/db": "workspace:*",
+    "@ledgr/shared": "workspace:*",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
     "effect": "^3.19.3",

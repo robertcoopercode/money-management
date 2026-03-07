@@ -1,5 +1,5 @@
 import type { Hono } from "hono"
-import { createAccountSchema, updateAccountSchema } from "@money/shared"
+import { createAccountSchema, updateAccountSchema } from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"

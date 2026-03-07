@@ -1,5 +1,5 @@
 import type { Hono } from "hono"
-import { reportFilterSchema } from "@money/shared"
+import { reportFilterSchema } from "@ledgr/shared"
 
 import { parseQuery } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"

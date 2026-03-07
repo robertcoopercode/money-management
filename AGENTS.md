@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Money Management is a YNAB-inspired budgeting app built as a pnpm workspace monorepo:
+Ledgr is a YNAB-inspired budgeting app built as a pnpm workspace monorepo:
 
 - `apps/web`: React + Vite frontend
 - `apps/api`: Hono + Effect backend
@@ -94,8 +94,8 @@ transaction entry dropdown.
 If you need to reset the database:
 
 ```bash
-sudo -u postgres psql -c "DROP DATABASE money_management;"
-sudo -u postgres psql -c "CREATE DATABASE money_management;"
+sudo -u postgres psql -c "DROP DATABASE ledgr;"
+sudo -u postgres psql -c "CREATE DATABASE ledgr;"
 pnpm db:migrate
 pnpm db:seed
 ```

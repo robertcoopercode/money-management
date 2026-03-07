@@ -1,5 +1,5 @@
-import type { Account, Prisma } from "@money/db"
-import { prisma } from "@money/db"
+import type { Account, Prisma } from "@ledgr/db"
+import { prisma } from "@ledgr/db"
 import { Effect } from "effect"
 
 export const listAccounts = Effect.tryPromise({

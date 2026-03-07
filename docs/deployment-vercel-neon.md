@@ -30,7 +30,7 @@ Before production traffic, run migrations once against Neon:
 ```bash
 pnpm install
 pnpm db:generate
-pnpm --filter @money/db exec prisma migrate deploy
+pnpm --filter @ledgr/db exec prisma migrate deploy
 pnpm db:seed
 ```
 
@@ -45,7 +45,7 @@ Create a Vercel project pointing to `apps/api`.
 Suggested settings:
 
 - Framework preset: **Other**
-- Build command: `pnpm --filter @money/api build`
+- Build command: `pnpm --filter @ledgr/api build`
 - Output directory: _(none required for node runtime)_
 - Install command: `pnpm install`
 
@@ -64,7 +64,7 @@ Create a second Vercel project pointing to `apps/web`.
 Suggested settings:
 
 - Framework preset: **Vite**
-- Build command: `pnpm --filter @money/web build`
+- Build command: `pnpm --filter @ledgr/web build`
 - Output directory: `apps/web/dist`
 - Install command: `pnpm install`
 

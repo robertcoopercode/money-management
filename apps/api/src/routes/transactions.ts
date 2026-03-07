@@ -4,7 +4,7 @@ import {
   transactionFilterSchema,
   transactionIdSchema,
   updateTransactionSchema,
-} from "@money/shared"
+} from "@ledgr/shared"
 
 import { parseJson, parseQuery } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"

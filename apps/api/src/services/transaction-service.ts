@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { OriginType, Prisma, prisma } from "@money/db"
-import type { TransactionFilterInput } from "@money/shared"
+import { OriginType, Prisma, prisma } from "@ledgr/db"
+import type { TransactionFilterInput } from "@ledgr/shared"
 import { Effect } from "effect"
 import {
   buildMirrorTransferNote,

@@ -1,4 +1,4 @@
-# money-management
+# Ledgr
 
 YNAB-inspired budgeting application built with:
 
