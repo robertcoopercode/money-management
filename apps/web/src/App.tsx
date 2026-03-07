@@ -11,6 +11,7 @@ import {
 } from "@visx/xychart"
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
+import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
@@ -401,6 +402,26 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Unable to add payee: ${error.message}`)
+    },
+  })
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (input: { name: string }) =>
+      apiFetch<Category>("/api/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (category) => {
+      toast.success("Category created")
+      setNewTransaction((current) => ({
+        ...current,
+        categoryId: category.id,
+      }))
+      void queryClient.invalidateQueries({ queryKey: ["categories"] })
+      void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    },
+    onError: (error) => {
+      toast.error(`Unable to create category: ${error.message}`)
     },
   })
 
@@ -914,25 +935,21 @@ const App = () => {
                   </option>
                 ))}
               </select>
-              <select
+              <CategoryAutocomplete
                 value={newTransaction.categoryId}
-                onChange={(event) =>
+                categoryGroups={categoriesQuery.data ?? []}
+                onChange={(categoryId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    categoryId: event.target.value,
+                    categoryId,
                   }))
                 }
                 disabled={Boolean(newTransaction.transferAccountId)}
-              >
-                <option value="">Category</option>
-                {(categoriesQuery.data ?? []).flatMap((group) =>
-                  group.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {group.name} · {category.name}
-                    </option>
-                  )),
-                )}
-              </select>
+                onCreateCategory={(name) => {
+                  createCategoryMutation.mutate({ name })
+                }}
+                isCreating={createCategoryMutation.isPending}
+              />
               <input
                 value={newTransaction.note}
                 onChange={(event) =>

@@ -234,6 +234,62 @@ button:disabled {
   margin-bottom: 0.8rem;
 }
 
+.category-autocomplete {
+  position: relative;
+}
+
+.category-autocomplete-input {
+  width: 100%;
+}
+
+.category-autocomplete-menu {
+  position: absolute;
+  z-index: 6;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.35rem;
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 10px;
+  background: rgb(6 13 35 / 98%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 35%);
+  max-height: 280px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.category-autocomplete-option {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem;
+}
+
+.category-autocomplete-option small {
+  color: rgb(188 205 240 / 74%);
+  white-space: nowrap;
+}
+
+.category-autocomplete-option:hover,
+.category-autocomplete-option.is-highlighted {
+  background: rgb(70 99 184 / 36%);
+}
+
+.category-autocomplete-empty {
+  margin: 0;
+  color: rgb(188 205 240 / 74%);
+  font-size: 0.84rem;
+  padding: 0.25rem 0.2rem;
+}
+
+.category-autocomplete-create {
+  margin-top: 0.15rem;
+}
+
 .checkbox-inline {
   display: inline-flex;
   align-items: center;
