@@ -73,15 +73,23 @@ pnpm db:seed
 
 ## Cursor Cloud specific instructions
 
-The cloud agent VM has Postgres installed natively (no Docker) via a pre-built
-snapshot. Environment variables (including `DATABASE_URL`) are configured as
-secrets in the Cursor Cloud UI — no `.env` file is needed.
+The cloud agent VM has Postgres installed natively (no Docker) via the
+snapshot. Environment variables (including `DATABASE_URL`) are injected as
+secrets — no `.env` file is needed.
 
-The environment is configured via `.cursor/environment.json` which handles:
+The snapshot update script handles `pnpm install` and `pnpm db:generate`.
+Before starting dev servers, you must apply migrations and seed:
 
-1. **start**: Starts the Postgres service (already installed in the snapshot)
-2. **install**: Installs dependencies and runs Prisma generate, migrate, and seed
-3. **terminals**: Launches API (:3001) and Web (:5173) dev servers in tmux
+```bash
+sudo service postgresql start   # usually already running from snapshot
+pnpm db:migrate                 # apply any pending schema migrations
+pnpm db:seed                    # idempotent — safe to re-run
+pnpm dev:api                    # API on :3001
+pnpm dev:web                    # Web on :5173
+```
+
+Payees must be created (via the Payees tab) before they appear in the
+transaction entry dropdown.
 
 If you need to reset the database:
 
