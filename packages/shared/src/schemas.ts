@@ -16,6 +16,11 @@ export const createPayeeSchema = z.object({
   name: z.string().min(1).max(160),
 })
 
+export const createCategorySchema = z.object({
+  name: z.string().min(1).max(160),
+  groupName: z.string().min(1).max(120).optional(),
+})
+
 export const mergePayeesSchema = z.object({
   sourcePayeeId: z.string().min(1),
   targetPayeeId: z.string().min(1),
@@ -88,6 +93,7 @@ export const mortgageProfileSchema = z.object({
 export type CreateAccountInput = z.infer<typeof createAccountSchema>
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>
 export type CreatePayeeInput = z.infer<typeof createPayeeSchema>
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>
 export type MergePayeesInput = z.infer<typeof mergePayeesSchema>
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>

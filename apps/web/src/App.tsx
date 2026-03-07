@@ -11,6 +11,7 @@ import {
 } from "@visx/xychart"
 import { formatMoney, parseMoneyInputToMinor } from "@money/shared"
 import { Toaster, toast } from "sonner"
+import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
@@ -111,6 +112,11 @@ type UpdateTransactionMutationInput = {
   }
 }
 
+type UpdateAccountNameMutationInput = {
+  accountId: string
+  name: string
+}
+
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
     headers: {
@@ -205,6 +211,10 @@ const App = () => {
     type: "CHEQUING" as Account["type"],
     startingBalance: "0",
   })
+  const [editingAccountId, setEditingAccountId] = useState("")
+  const [accountNameDrafts, setAccountNameDrafts] = useState<
+    Record<string, string>
+  >({})
   const [newPayee, setNewPayee] = useState("")
   const [payeeSearch, setPayeeSearch] = useState("")
   const [payeeSort, setPayeeSort] = useState<"name-asc" | "name-desc">(
@@ -320,6 +330,14 @@ const App = () => {
     void queryClient.invalidateQueries({ queryKey: ["reports"] })
   }
 
+  const clearAccountNameDraft = (accountId: string) => {
+    setAccountNameDrafts((current) => {
+      const next = { ...current }
+      delete next[accountId]
+      return next
+    })
+  }
+
   const createAccountMutation = useMutation({
     mutationFn: () =>
       apiFetch<Account>("/api/accounts", {
@@ -350,6 +368,23 @@ const App = () => {
     },
   })
 
+  const updateAccountNameMutation = useMutation({
+    mutationFn: ({ accountId, name }: UpdateAccountNameMutationInput) =>
+      apiFetch<Account>(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (_, input) => {
+      toast.success("Account name updated")
+      setEditingAccountId("")
+      clearAccountNameDraft(input.accountId)
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to rename account: ${error.message}`)
+    },
+  })
+
   const createPayeeMutation = useMutation({
     mutationFn: () =>
       apiFetch<Payee>("/api/payees", {
@@ -363,6 +398,26 @@ const App = () => {
     },
     onError: (error) => {
       toast.error(`Unable to add payee: ${error.message}`)
+    },
+  })
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (input: { name: string }) =>
+      apiFetch<Category>("/api/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (category) => {
+      toast.success("Category created")
+      setNewTransaction((current) => ({
+        ...current,
+        categoryId: category.id,
+      }))
+      void queryClient.invalidateQueries({ queryKey: ["categories"] })
+      void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    },
+    onError: (error) => {
+      toast.error(`Unable to create category: ${error.message}`)
     },
   })
 
@@ -686,11 +741,81 @@ const App = () => {
                 ) : (
                   (accountsQuery.data ?? []).map((account) => (
                     <div className="list-item" key={account.id}>
-                      <div>
-                        <strong>{account.name}</strong>
+                      <div className="account-item-main">
+                        {editingAccountId === account.id ? (
+                          <div className="account-name-form">
+                            <input
+                              value={accountNameDrafts[account.id] ?? account.name}
+                              onChange={(event) =>
+                                setAccountNameDrafts((current) => ({
+                                  ...current,
+                                  [account.id]: event.target.value,
+                                }))
+                              }
+                              aria-label={`Account name for ${account.name}`}
+                              disabled={updateAccountNameMutation.isPending}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextName = (
+                                  accountNameDrafts[account.id] ?? account.name
+                                ).trim()
+
+                                if (!nextName) {
+                                  toast.error("Account name cannot be blank.")
+                                  return
+                                }
+
+                                if (nextName === account.name) {
+                                  setEditingAccountId("")
+                                  clearAccountNameDraft(account.id)
+                                  return
+                                }
+
+                                updateAccountNameMutation.mutate({
+                                  accountId: account.id,
+                                  name: nextName,
+                                })
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAccountId("")
+                                clearAccountNameDraft(account.id)
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <strong>{account.name}</strong>
+                        )}
                         <p className="muted">{account.type.replaceAll("_", " ")}</p>
                       </div>
-                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      <div className="account-item-meta">
+                        <strong>{formatMoney(account.balanceMinor)}</strong>
+                        {editingAccountId === account.id ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAccountId(account.id)
+                              setAccountNameDrafts((current) => ({
+                                ...current,
+                                [account.id]: account.name,
+                              }))
+                            }}
+                            disabled={updateAccountNameMutation.isPending}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -787,25 +912,21 @@ const App = () => {
                   </option>
                 ))}
               </select>
-              <select
+              <CategoryAutocomplete
                 value={newTransaction.categoryId}
-                onChange={(event) =>
+                categoryGroups={categoriesQuery.data ?? []}
+                onChange={(categoryId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    categoryId: event.target.value,
+                    categoryId,
                   }))
                 }
                 disabled={Boolean(newTransaction.transferAccountId)}
-              >
-                <option value="">Category</option>
-                {(categoriesQuery.data ?? []).flatMap((group) =>
-                  group.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {group.name} · {category.name}
-                    </option>
-                  )),
-                )}
-              </select>
+                onCreateCategory={(name) => {
+                  createCategoryMutation.mutate({ name })
+                }}
+                isCreating={createCategoryMutation.isPending}
+              />
               <input
                 value={newTransaction.note}
                 onChange={(event) =>
