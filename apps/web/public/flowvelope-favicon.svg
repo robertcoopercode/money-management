@@ -1,0 +1,43 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 256 256"
+  role="img"
+  aria-label="Flowvelope logo"
+>
+  <defs>
+    <linearGradient id="flowvelope-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14254f" />
+      <stop offset="100%" stop-color="#070d23" />
+    </linearGradient>
+    <linearGradient id="flowvelope-accent" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#35f2c5" />
+      <stop offset="100%" stop-color="#6ea7ff" />
+    </linearGradient>
+  </defs>
+
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#flowvelope-bg)" />
+
+  <path
+    d="M60 86h136c10 0 18 8 18 18v48c0 10-8 18-18 18H60c-10 0-18-8-18-18v-48c0-10 8-18 18-18Z"
+    fill="#0d1534"
+    stroke="#2d4d9d"
+    stroke-width="8"
+  />
+
+  <path
+    d="M52 103L128 156L204 103"
+    fill="none"
+    stroke="url(#flowvelope-accent)"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="12"
+  />
+
+  <path
+    d="M86 70v22M128 58v34M170 66v26"
+    fill="none"
+    stroke="url(#flowvelope-accent)"
+    stroke-linecap="round"
+    stroke-width="12"
+  />
+</svg>

@@ -17,6 +17,19 @@
   margin-bottom: 1.2rem;
 }
 
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.brand-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
+  box-shadow: 0 0 0 1px rgb(124 162 255 / 28%);
+}
+
 .app-header h1 {
   margin: 0;
   font-size: 1.9rem;
