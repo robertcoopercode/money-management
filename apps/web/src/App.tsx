@@ -14,6 +14,11 @@ import { Toaster, toast } from "sonner"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
+import {
+  filterPayeesByName,
+  findPayeeByExactName,
+  shouldSuggestPayeeCreation,
+} from "./lib/payee-entry.js"
 import { buildNextTransactionDraft } from "./lib/transaction-entry.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
 
@@ -227,6 +232,8 @@ const App = () => {
     note: "",
     cleared: false,
   })
+  const [payeeInput, setPayeeInput] = useState("")
+  const [isPayeeMenuOpen, setIsPayeeMenuOpen] = useState(false)
   const [transactionOffset, setTransactionOffset] = useState(0)
   const [mortgageInput, setMortgageInput] = useState({
     accountId: "",
@@ -387,23 +394,47 @@ const App = () => {
   })
 
   const createTransactionMutation = useMutation({
-    mutationFn: () =>
-      apiFetch<Transaction>("/api/transactions", {
+    mutationFn: async () => {
+      const trimmedPayeeName = payeeInput.trim()
+      let payeeId = newTransaction.payeeId || undefined
+
+      if (trimmedPayeeName) {
+        const matchingPayee = findPayeeByExactName(
+          payeesQuery.data ?? [],
+          trimmedPayeeName,
+        )
+        if (matchingPayee) {
+          payeeId = matchingPayee.id
+        } else {
+          const createdPayee = await apiFetch<Payee>("/api/payees", {
+            method: "POST",
+            body: JSON.stringify({ name: trimmedPayeeName }),
+          })
+          payeeId = createdPayee.id
+        }
+      } else {
+        payeeId = undefined
+      }
+
+      return apiFetch<Transaction>("/api/transactions", {
         method: "POST",
         body: JSON.stringify({
           accountId: newTransaction.accountId,
           transferAccountId: newTransaction.transferAccountId || undefined,
           date: newTransaction.date,
           amountMinor: parseMoneyInputToMinor(newTransaction.amount),
-          payeeId: newTransaction.payeeId || undefined,
+          payeeId,
           categoryId: newTransaction.categoryId || undefined,
           note: newTransaction.note || undefined,
           cleared: newTransaction.cleared,
         }),
-      }),
+      })
+    },
     onSuccess: () => {
       toast.success("Transaction saved")
       setNewTransaction((current) => buildNextTransactionDraft(current))
+      setPayeeInput("")
+      setIsPayeeMenuOpen(false)
       refetchCoreData()
       window.setTimeout(() => amountRef.current?.focus(), 0)
     },
@@ -568,6 +599,16 @@ const App = () => {
 
     return filtered
   }, [payeesQuery.data, payeeSearch, payeeSort])
+
+  const payeeOptions = useMemo(
+    () => filterPayeesByName(payeesQuery.data ?? [], payeeInput),
+    [payeesQuery.data, payeeInput],
+  )
+  const shouldShowCreatePayeeOption = shouldSuggestPayeeCreation(
+    payeesQuery.data ?? [],
+    payeeInput,
+  )
+  const trimmedPayeeInput = payeeInput.trim()
 
   return (
     <div className="app-shell">
@@ -787,22 +828,97 @@ const App = () => {
                 placeholder="Amount"
                 required
               />
-              <select
-                value={newTransaction.payeeId}
-                onChange={(event) =>
-                  setNewTransaction((current) => ({
-                    ...current,
-                    payeeId: event.target.value,
-                  }))
-                }
+              <div
+                className="payee-combobox"
+                onFocusCapture={() => setIsPayeeMenuOpen(true)}
+                onBlurCapture={(event) => {
+                  const nextFocusedElement = event.relatedTarget as
+                    | Node
+                    | null
+                  if (
+                    nextFocusedElement &&
+                    event.currentTarget.contains(nextFocusedElement)
+                  ) {
+                    return
+                  }
+                  setIsPayeeMenuOpen(false)
+                }}
               >
-                <option value="">Payee</option>
-                {(payeesQuery.data ?? []).map((payee) => (
-                  <option key={payee.id} value={payee.id}>
-                    {payee.name}
-                  </option>
-                ))}
-              </select>
+                <input
+                  value={payeeInput}
+                  onChange={(event) => {
+                    const nextValue = event.target.value
+                    const exactMatch = findPayeeByExactName(
+                      payeesQuery.data ?? [],
+                      nextValue,
+                    )
+                    setPayeeInput(nextValue)
+                    setNewTransaction((current) => ({
+                      ...current,
+                      payeeId: exactMatch?.id ?? "",
+                    }))
+                  }}
+                  placeholder="Payee"
+                  autoComplete="off"
+                  role="combobox"
+                  aria-label="Payee"
+                  aria-controls="payee-combobox-menu"
+                  aria-expanded={isPayeeMenuOpen}
+                />
+                {isPayeeMenuOpen ? (
+                  <div
+                    id="payee-combobox-menu"
+                    role="listbox"
+                    className="payee-combobox-menu"
+                  >
+                    {shouldShowCreatePayeeOption ? (
+                      <button
+                        type="button"
+                        className="payee-combobox-option payee-combobox-option-create"
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                        }}
+                        onClick={() => {
+                          setPayeeInput(trimmedPayeeInput)
+                          setNewTransaction((current) => ({
+                            ...current,
+                            payeeId: "",
+                          }))
+                          setIsPayeeMenuOpen(false)
+                        }}
+                      >
+                        Create "{trimmedPayeeInput}" Payee
+                      </button>
+                    ) : null}
+                    {payeeOptions.length > 0 ? (
+                      payeeOptions.map((payee) => (
+                        <button
+                          type="button"
+                          key={payee.id}
+                          className="payee-combobox-option"
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                          }}
+                          onClick={() => {
+                            setPayeeInput(payee.name)
+                            setNewTransaction((current) => ({
+                              ...current,
+                              payeeId: payee.id,
+                            }))
+                            setIsPayeeMenuOpen(false)
+                          }}
+                        >
+                          {payee.name}
+                        </button>
+                      ))
+                    ) : !shouldShowCreatePayeeOption ? (
+                      <p className="payee-combobox-empty">
+                        No matching payees. Press Enter to save with a new payee.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
               <select
                 value={newTransaction.categoryId}
                 onChange={(event) =>

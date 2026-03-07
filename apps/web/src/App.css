@@ -188,6 +188,54 @@ button:disabled {
   margin-bottom: 0.8rem;
 }
 
+.payee-combobox {
+  position: relative;
+}
+
+.payee-combobox-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.2rem;
+  max-height: 260px;
+  overflow: auto;
+  background: rgb(6 13 35 / 98%);
+  border: 1px solid rgb(95 117 171 / 35%);
+  border-radius: 10px;
+  padding: 0.35rem;
+  box-shadow: 0 12px 24px rgb(0 0 0 / 35%);
+}
+
+.payee-combobox-option {
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #e7f0ff;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-weight: 500;
+}
+
+.payee-combobox-option:hover,
+.payee-combobox-option:focus-visible {
+  border-color: rgb(95 117 171 / 35%);
+  background: rgb(27 48 98 / 38%);
+}
+
+.payee-combobox-option-create {
+  color: #9eb8ff;
+}
+
+.payee-combobox-empty {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  color: rgb(188 205 240 / 66%);
+  font-size: 0.82rem;
+}
+
 .checkbox-inline {
   display: inline-flex;
   align-items: center;
