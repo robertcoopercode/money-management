@@ -23,7 +23,6 @@ type Account = {
   id: string
   name: string
   type: "CHEQUING" | "CREDIT_CARD" | "MORTGAGE"
-  institution?: string | null
   startingBalanceMinor: number
   balanceMinor: number
 }
@@ -204,7 +203,6 @@ const App = () => {
   const [newAccount, setNewAccount] = useState({
     name: "",
     type: "CHEQUING" as Account["type"],
-    institution: "",
     startingBalance: "0",
   })
   const [newPayee, setNewPayee] = useState("")
@@ -329,7 +327,6 @@ const App = () => {
         body: JSON.stringify({
           name: newAccount.name,
           type: newAccount.type,
-          institution: newAccount.institution || undefined,
           startingBalanceMinor: parseMoneyInputToMinor(
             newAccount.startingBalance,
           ),
@@ -340,7 +337,6 @@ const App = () => {
       setNewAccount({
         name: "",
         type: "CHEQUING",
-        institution: "",
         startingBalance: "0",
       })
       setNewTransaction((current) => ({
@@ -574,9 +570,6 @@ const App = () => {
       <header className="app-header">
         <div>
           <h1>Money Management</h1>
-          <p className="subtitle">
-            YNAB-inspired budgeting with keyboard-first transaction entry.
-          </p>
         </div>
         <div className="ready-to-assign-card">
           <span>Ready to Assign</span>
@@ -589,7 +582,10 @@ const App = () => {
       <Tabs.Root className="tabs-root" defaultValue="accounts">
         <Tabs.List className="tabs-list">
           <Tabs.Tab className="tabs-tab" value="accounts">
-            Accounts & Transactions
+            Accounts
+          </Tabs.Tab>
+          <Tabs.Tab className="tabs-tab" value="transactions">
+            Transactions
           </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="payees">
             Payees
@@ -650,18 +646,6 @@ const App = () => {
                   </select>
                 </label>
                 <label>
-                  Institution
-                  <input
-                    value={newAccount.institution}
-                    onChange={(event) =>
-                      setNewAccount((current) => ({
-                        ...current,
-                        institution: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
                   Starting Balance
                   <input
                     value={newAccount.startingBalance}
@@ -704,10 +688,7 @@ const App = () => {
                     <div className="list-item" key={account.id}>
                       <div>
                         <strong>{account.name}</strong>
-                        <p className="muted">
-                          {account.type.replaceAll("_", " ")} ·{" "}
-                          {account.institution ?? "No institution"}
-                        </p>
+                        <p className="muted">{account.type.replaceAll("_", " ")}</p>
                       </div>
                       <strong>{formatMoney(account.balanceMinor)}</strong>
                     </div>
@@ -717,6 +698,9 @@ const App = () => {
             </article>
           </section>
 
+        </Tabs.Panel>
+
+        <Tabs.Panel className="panel" value="transactions">
           <section className="card">
             <h2>Quick transaction entry (Enter to save, auto-focus next)</h2>
             <form
