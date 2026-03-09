@@ -7,7 +7,7 @@ import { PayeeAutocomplete } from "./payee-autocomplete.js"
 const payees = [
   { id: "hydro", name: "Hydro One" },
   { id: "grocery", name: "Fresh Grocery" },
-  { id: "mortgage", name: "City Mortgage" },
+  { id: "rent", name: "City Rent" },
 ]
 
 afterEach(() => {
@@ -37,9 +37,9 @@ describe("PayeeAutocomplete", () => {
     const input = screen.getByRole("combobox")
     await user.click(input)
     await user.type(input, "city")
-    await user.click(screen.getByRole("option", { name: /City Mortgage/i }))
+    await user.click(screen.getByRole("option", { name: /City Rent/i }))
 
-    expect(onChange).toHaveBeenLastCalledWith("mortgage")
+    expect(onChange).toHaveBeenLastCalledWith("rent")
   })
 
   it("shows create button only when no payee matches", async () => {

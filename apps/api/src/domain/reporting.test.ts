@@ -25,17 +25,17 @@ describe("aggregateReportingMetrics", () => {
         {
           date: new Date("2026-02-05T00:00:00.000Z"),
           amountMinor: -50_000,
-          categoryId: "mortgage",
-          category: { name: "Mortgage", group: { name: "Fixed / Annual" } },
+          categoryId: "rent",
+          category: { name: "Rent", group: { name: "Fixed / Annual" } },
         },
       ],
     })
 
     expect(result.spendingByCategory).toEqual([
       {
-        categoryId: "mortgage",
+        categoryId: "rent",
         groupName: "Fixed / Annual",
-        categoryName: "Mortgage",
+        categoryName: "Rent",
         totalMinor: 50_000,
       },
       {

@@ -9,7 +9,7 @@ const categoryGroups = [
     id: "group-fixed",
     name: "Fixed / Annual",
     categories: [
-      { id: "mortgage", name: "Mortgage" },
+      { id: "rent", name: "Rent" },
       { id: "hydro", name: "Hydro" },
     ],
   },
@@ -41,7 +41,7 @@ describe("CategoryAutocomplete", () => {
     await user.type(input, "hydr")
 
     expect(screen.getByRole("option", { name: /Hydro/i })).toBeTruthy()
-    expect(screen.queryByRole("option", { name: /Mortgage/i })).toBeNull()
+    expect(screen.queryByRole("option", { name: /Rent/i })).toBeNull()
   })
 
   it("selects an existing category from filtered results", async () => {
@@ -58,10 +58,10 @@ describe("CategoryAutocomplete", () => {
 
     const input = screen.getByRole("combobox")
     await user.click(input)
-    await user.type(input, "mort")
-    await user.click(screen.getByRole("option", { name: /Mortgage/i }))
+    await user.type(input, "ren")
+    await user.click(screen.getByRole("option", { name: /Rent/i }))
 
-    expect(onChange).toHaveBeenLastCalledWith("mortgage")
+    expect(onChange).toHaveBeenLastCalledWith("rent")
   })
 
   it("shows create button only when no category matches", async () => {

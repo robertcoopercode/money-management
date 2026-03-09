@@ -8,7 +8,6 @@ import { registerAccountRoutes } from "./routes/accounts.js"
 import { registerCategoryRoutes } from "./routes/categories.js"
 import { registerHealthRoutes } from "./routes/health.js"
 import { registerImportRoutes } from "./routes/imports.js"
-import { registerMortgageRoutes } from "./routes/mortgages.js"
 import { registerPayeeRoutes } from "./routes/payees.js"
 import { registerPlanningRoutes } from "./routes/planning.js"
 import { registerReportRoutes } from "./routes/reports.js"
@@ -79,4 +78,3 @@ registerTransactionRoutes(app)
 registerImportRoutes(app)
 registerPlanningRoutes(app)
 registerReportRoutes(app)
-registerMortgageRoutes(app)
