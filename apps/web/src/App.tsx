@@ -24,7 +24,7 @@ import "./App.css"
 type Account = {
   id: string
   name: string
-  type: "CHEQUING" | "CREDIT_CARD" | "MORTGAGE"
+  type: "CHEQUING" | "CREDIT_CARD"
   institution?: string | null
   startingBalanceMinor: number
   balanceMinor: number
@@ -75,13 +75,6 @@ type PlanningResponse = {
   month: string
   readyToAssignMinor: number
   categories: PlanningCategory[]
-  mortgageTargets: Array<{
-    accountId: string
-    accountName: string
-    linkedCategoryId: string | null
-    linkedCategoryName: string | null
-    requiredMonthlyPaymentMinor: number
-  }>
 }
 
 type ReportingResponse = {
@@ -165,9 +158,8 @@ const APP_TAB_VALUES = [
   "imports",
   "planning",
   "reports",
-  "mortgage",
 ] as const
-type AppTab = (typeof APP_TAB_VALUES)[number]
+type AppTab = typeof APP_TAB_VALUES[number]
 
 const isAppTab = (value: string): value is AppTab =>
   APP_TAB_VALUES.includes(value as AppTab)
@@ -244,9 +236,8 @@ const App = () => {
     startingBalance: "0",
   })
   const [editingAccountId, setEditingAccountId] = useState("")
-  const [accountNameDrafts, setAccountNameDrafts] = useState<
-    Record<string, string>
-  >({})
+  const [accountNameDrafts, setAccountNameDrafts] =
+    useState<Record<string, string>>({})
   const [newPayee, setNewPayee] = useState("")
   const [payeeSearch, setPayeeSearch] = useState("")
   const [payeeSort, setPayeeSort] = useState<"name-asc" | "name-desc">(
@@ -268,13 +259,6 @@ const App = () => {
     cleared: false,
   })
   const [transactionOffset, setTransactionOffset] = useState(0)
-  const [mortgageInput, setMortgageInput] = useState({
-    accountId: "",
-    interestRateAnnual: "0.055",
-    amortizationMonths: "300",
-    principal: "450000",
-    linkedCategoryId: "",
-  })
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -284,7 +268,9 @@ const App = () => {
 
     searchParams.set("tab", activeTab)
     const nextQuery = searchParams.toString()
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`
+    const nextUrl = `${window.location.pathname}${
+      nextQuery ? `?${nextQuery}` : ""
+    }${window.location.hash}`
     window.history.replaceState(null, "", nextUrl)
   }, [activeTab])
 
@@ -358,17 +344,6 @@ const App = () => {
 
       return apiFetch<ReportingResponse>(`/api/reports?${query.toString()}`)
     },
-  })
-
-  const mortgageQuery = useQuery({
-    queryKey: ["mortgage", mortgageInput.accountId],
-    queryFn: () =>
-      apiFetch<{
-        monthlyPaymentMinor: number
-        principalMinor: number
-        amortizationMonths: number
-      }>(`/api/mortgages/${mortgageInput.accountId}`),
-    enabled: Boolean(mortgageInput.accountId),
   })
 
   const refetchCoreData = () => {
@@ -618,27 +593,6 @@ const App = () => {
     },
   })
 
-  const saveMortgageMutation = useMutation({
-    mutationFn: () =>
-      apiFetch("/api/mortgages", {
-        method: "POST",
-        body: JSON.stringify({
-          accountId: mortgageInput.accountId,
-          interestRateAnnual: Number(mortgageInput.interestRateAnnual),
-          amortizationMonths: Number(mortgageInput.amortizationMonths),
-          principalMinor: parseMoneyInputToMinor(mortgageInput.principal),
-          linkedCategoryId: mortgageInput.linkedCategoryId || undefined,
-        }),
-      }),
-    onSuccess: () => {
-      toast.success("Mortgage profile saved")
-      void queryClient.invalidateQueries({ queryKey: ["mortgage"] })
-    },
-    onError: (error) => {
-      toast.error(`Unable to save mortgage profile: ${error.message}`)
-    },
-  })
-
   const groupedPlanningRows = useMemo(() => {
     const groups = new Map<string, PlanningCategory[]>()
     for (const category of planningQuery.data?.categories ?? []) {
@@ -663,17 +617,6 @@ const App = () => {
     })) ?? []
   const transactionsHasNextPage =
     (transactionsQuery.data?.length ?? 0) >= TRANSACTION_PAGE_SIZE
-
-  const planningCategoryById = useMemo(
-    () =>
-      new Map(
-        (planningQuery.data?.categories ?? []).map((category) => [
-          category.categoryId,
-          category,
-        ]),
-      ),
-    [planningQuery.data?.categories],
-  )
 
   const visiblePayees = useMemo(() => {
     const normalizedSearch = payeeSearch.trim().toLowerCase()
@@ -744,9 +687,6 @@ const App = () => {
           <Tabs.Tab className="tabs-tab" value="reports">
             Reporting
           </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="mortgage">
-            Mortgage
-          </Tabs.Tab>
           <Tabs.Indicator className="tabs-indicator" />
         </Tabs.List>
 
@@ -777,7 +717,9 @@ const App = () => {
               {accountsQuery.isLoading ? (
                 <p className="muted">Loading accounts...</p>
               ) : (accountsQuery.data?.length ?? 0) === 0 ? (
-                <p className="muted">No accounts yet. Add one to get started.</p>
+                <p className="muted">
+                  No accounts yet. Add one to get started.
+                </p>
               ) : (
                 (accountsQuery.data ?? []).map((account) => (
                   <div className="list-item" key={account.id}>
@@ -785,7 +727,9 @@ const App = () => {
                       {editingAccountId === account.id ? (
                         <div className="account-name-form">
                           <input
-                            value={accountNameDrafts[account.id] ?? account.name}
+                            value={
+                              accountNameDrafts[account.id] ?? account.name
+                            }
                             onChange={(event) =>
                               setAccountNameDrafts((current) => ({
                                 ...current,
@@ -922,7 +866,6 @@ const App = () => {
                     >
                       <option value="CHEQUING">Chequing</option>
                       <option value="CREDIT_CARD">Credit Card</option>
-                      <option value="MORTGAGE">Mortgage</option>
                     </select>
                   </label>
                   <label>
@@ -1567,52 +1510,6 @@ const App = () => {
               </p>
             ) : null}
 
-            {(planningQuery.data?.mortgageTargets.length ?? 0) > 0 ? (
-              <div className="table-wrap" style={{ marginBottom: "0.8rem" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Mortgage Account</th>
-                      <th>Linked Category</th>
-                      <th>Required Payment</th>
-                      <th>Assigned This Month</th>
-                      <th>To Go</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(planningQuery.data?.mortgageTargets ?? []).map(
-                      (target) => {
-                        const linkedCategory = target.linkedCategoryId
-                          ? planningCategoryById.get(target.linkedCategoryId)
-                          : undefined
-                        const assignedMinor = linkedCategory?.assignedMinor ?? 0
-                        const toGoMinor = Math.max(
-                          target.requiredMonthlyPaymentMinor - assignedMinor,
-                          0,
-                        )
-
-                        return (
-                          <tr key={target.accountId}>
-                            <td>{target.accountName}</td>
-                            <td>{target.linkedCategoryName ?? "Unlinked"}</td>
-                            <td>
-                              {formatMoney(target.requiredMonthlyPaymentMinor)}
-                            </td>
-                            <td>{formatMoney(assignedMinor)}</td>
-                            <td
-                              className={toGoMinor > 0 ? "amount-outflow" : ""}
-                            >
-                              {formatMoney(toGoMinor)}
-                            </td>
-                          </tr>
-                        )
-                      },
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
             {planningQuery.isLoading ? (
               <p className="muted">Loading planning data...</p>
             ) : groupedPlanningRows.length === 0 ? (
@@ -1963,139 +1860,6 @@ const App = () => {
                 </tbody>
               </table>
             </div>
-          </section>
-        </Tabs.Panel>
-
-        <Tabs.Panel className="panel" value="mortgage">
-          <section className="grid-two">
-            <article className="card">
-              <h2>Mortgage profile</h2>
-              <form
-                className="form-grid"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  saveMortgageMutation.mutate()
-                }}
-              >
-                <label>
-                  Mortgage account
-                  <select
-                    value={mortgageInput.accountId}
-                    onChange={(event) =>
-                      setMortgageInput((current) => ({
-                        ...current,
-                        accountId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Select account</option>
-                    {(accountsQuery.data ?? [])
-                      .filter((account) => account.type === "MORTGAGE")
-                      .map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  Interest rate (annual decimal)
-                  <input
-                    value={mortgageInput.interestRateAnnual}
-                    onChange={(event) =>
-                      setMortgageInput((current) => ({
-                        ...current,
-                        interestRateAnnual: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Amortization (months)
-                  <input
-                    value={mortgageInput.amortizationMonths}
-                    onChange={(event) =>
-                      setMortgageInput((current) => ({
-                        ...current,
-                        amortizationMonths: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Principal
-                  <input
-                    value={mortgageInput.principal}
-                    onChange={(event) =>
-                      setMortgageInput((current) => ({
-                        ...current,
-                        principal: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Linked category
-                  <select
-                    value={mortgageInput.linkedCategoryId}
-                    onChange={(event) =>
-                      setMortgageInput((current) => ({
-                        ...current,
-                        linkedCategoryId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Unlinked</option>
-                    {(categoriesQuery.data ?? []).flatMap((group) =>
-                      group.categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {group.name} · {category.name}
-                        </option>
-                      )),
-                    )}
-                  </select>
-                </label>
-                <button type="submit">Save Mortgage Profile</button>
-              </form>
-            </article>
-            <article className="card">
-              <h2>Mortgage summary</h2>
-              {mortgageQuery.isLoading ? (
-                <p className="muted">Loading mortgage profile...</p>
-              ) : mortgageQuery.isError ? (
-                <p className="error-text">
-                  {toDisplayErrorMessage(
-                    mortgageQuery.error,
-                    "Failed to load mortgage profile.",
-                  )}
-                </p>
-              ) : mortgageQuery.data ? (
-                <div className="summary-block">
-                  <div className="summary-row">
-                    <span>Principal</span>
-                    <strong>
-                      {formatMoney(mortgageQuery.data.principalMinor)}
-                    </strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Amortization</span>
-                    <strong>
-                      {mortgageQuery.data.amortizationMonths} months
-                    </strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Required Monthly Payment</span>
-                    <strong>
-                      {formatMoney(mortgageQuery.data.monthlyPaymentMinor)}
-                    </strong>
-                  </div>
-                </div>
-              ) : (
-                <p className="muted">
-                  Save a mortgage profile to view payment estimates.
-                </p>
-              )}
-            </article>
           </section>
         </Tabs.Panel>
       </Tabs.Root>

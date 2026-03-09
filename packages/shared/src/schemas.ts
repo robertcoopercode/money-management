@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const accountTypeSchema = z.enum(["CHEQUING", "CREDIT_CARD", "MORTGAGE"])
+export const accountTypeSchema = z.enum(["CHEQUING", "CREDIT_CARD"])
 
 export const createAccountSchema = z.object({
   name: z.string().min(1).max(120),
@@ -81,15 +81,6 @@ export const reportFilterSchema = z.object({
   cleared: z.coerce.boolean().optional(),
 })
 
-export const mortgageProfileSchema = z.object({
-  accountId: z.string().min(1),
-  interestRateAnnual: z.number().positive(),
-  amortizationMonths: z.number().int().positive(),
-  principalMinor: z.number().int().positive(),
-  paymentFrequency: z.enum(["MONTHLY", "BIWEEKLY"]).optional(),
-  linkedCategoryId: z.string().min(1).optional(),
-})
-
 export type CreateAccountInput = z.infer<typeof createAccountSchema>
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>
 export type CreatePayeeInput = z.infer<typeof createPayeeSchema>
@@ -99,4 +90,3 @@ export type CreateTransactionInput = z.infer<typeof createTransactionSchema>
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>
 export type TransactionFilterInput = z.infer<typeof transactionFilterSchema>
 export type UpdateCategoryAssignmentInput = z.infer<typeof updateCategoryAssignmentSchema>
-export type MortgageProfileInput = z.infer<typeof mortgageProfileSchema>
