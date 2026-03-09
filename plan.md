@@ -51,17 +51,16 @@ The current entry point (`apps/api/src/index.ts`) uses `@hono/node-server` with 
 
 **Create `apps/api/src/index.ts` (replace current):**
 ```ts
-import { handle } from "hono/vercel"
 import { app } from "./app.js"
 
-export default handle(app)
+export default app
 ```
 
-The entry point uses `hono/vercel`'s `handle()` adapter. The app is bundled with `tsup` at build time to resolve workspace `.ts` imports (Prisma 7 and workspace packages export raw TypeScript which Node.js can't import directly). Prisma runtime deps are externalized since they ship as JS in `node_modules`.
+The entry point uses Hono's zero-config Vercel support (just `export default app`). The app is bundled with `tsdown` at build time to resolve workspace `.ts` imports (Prisma 7 and workspace packages export raw TypeScript which Node.js can't import directly). Prisma runtime deps are externalized since they ship as JS in `node_modules`.
 
-**Create `apps/api/tsup.config.ts`:**
+**Create `apps/api/tsdown.config.ts`:**
 ```ts
-import { defineConfig } from "tsup"
+import { defineConfig } from "tsdown"
 
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -70,8 +69,10 @@ export default defineConfig({
   platform: "node",
   outDir: "dist",
   clean: true,
-  noExternal: ["@ledgr/db", "@ledgr/shared"],
-  external: [/^@prisma\/client/, /^@prisma\/adapter-pg/, /^pg$/],
+  deps: {
+    alwaysBundle: ["@ledgr/db", "@ledgr/shared"],
+    neverBundle: [/^@prisma\/client/, /^@prisma\/adapter-pg/, /^pg$/],
+  },
 })
 ```
 
@@ -80,12 +81,10 @@ export default defineConfig({
 {
   "buildCommand": "cd ../.. && pnpm --filter @ledgr/db db:generate && pnpm --filter @ledgr/api build",
   "functions": {
-    "dist/index.js": {
-      "runtime": "@vercel/node@latest"
-    }
+    "dist/index.mjs": {}
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/dist/index.js" }
+    { "source": "/(.*)", "destination": "/dist/index.mjs" }
   ]
 }
 ```
@@ -111,7 +110,7 @@ serve(
 ```json
 "scripts": {
   "dev": "tsx watch src/dev.ts",
-  "build": "tsup",
+  "build": "tsdown",
   "start": "tsx src/dev.ts"
 }
 ```
@@ -190,7 +189,7 @@ AUTH_ORIGIN=https://ledgr.app
    - **Project Name:** `ledgr-api`
    - **Root Directory:** `apps/api`
    - **Framework Preset:** Other
-   - **Build Command:** configured in `vercel.json` (runs Prisma generate + tsup)
+   - **Build Command:** configured in `vercel.json` (runs Prisma generate + tsdown)
    - **Install Command:** leave default (`pnpm install` auto-detected)
 4. Set environment variables:
    - `DATABASE_URL` — Neon pooled connection string
@@ -245,10 +244,10 @@ Then use `@vercel/related-projects` in a build plugin or update the rewrite dest
 
 | File | Change |
 |------|--------|
-| `apps/api/src/index.ts` | Replace `serve()` with `handle(app)` using `hono/vercel` adapter |
+| `apps/api/src/index.ts` | Replace `serve()` with `export default app` (Hono zero-config) |
 | `apps/api/src/dev.ts` | New file — local dev server using `@hono/node-server` |
-| `apps/api/package.json` | Update `dev`/`start` scripts to `dev.ts`, `build` to `tsup` |
-| `apps/api/tsup.config.ts` | New file — bundles API with workspace packages inlined |
+| `apps/api/package.json` | Update `dev`/`start` scripts to `dev.ts`, `build` to `tsdown` |
+| `apps/api/tsdown.config.ts` | New file — bundles API with workspace packages inlined |
 | `apps/api/vercel.json` | New file — build command, serverless function config, rewrites |
 | `apps/api/src/env.ts` | Conditionally load dotenv (skip in production) |
 | `apps/web/vercel.json` | New file — rewrites for API proxy + SPA catch-all |

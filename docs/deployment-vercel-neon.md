@@ -44,11 +44,11 @@ Create a Vercel project pointing to `apps/api`.
 
 Suggested settings:
 
-- Framework preset: **Hono** (auto-detected)
-- Build command: leave default (zero-config Hono)
+- Framework preset: **Other**
+- Build command: configured in `apps/api/vercel.json` (runs Prisma generate + tsdown)
 - Install command: leave default (`pnpm install`)
 
-The API entry point (`src/index.ts`) exports the Hono app as a default export. Vercel deploys it as a serverless function automatically.
+The API entry point (`src/index.ts`) exports the Hono app as a default export. The app is bundled with tsdown at build time to resolve workspace `.ts` imports (Prisma 7 and workspace packages export raw TypeScript). The built output (`dist/index.mjs`) is deployed as a serverless function.
 
 For local development, use `pnpm dev` which runs `src/dev.ts` (a long-running server using `@hono/node-server`).
 

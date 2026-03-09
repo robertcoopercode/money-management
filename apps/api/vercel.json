@@ -1,11 +1,9 @@
 {
   "buildCommand": "cd ../.. && pnpm --filter @ledgr/db db:generate && pnpm --filter @ledgr/api build",
   "functions": {
-    "dist/index.js": {
-      "runtime": "@vercel/node@latest"
-    }
+    "dist/index.mjs": {}
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/dist/index.js" }
+    { "source": "/(.*)", "destination": "/dist/index.mjs" }
   ]
 }

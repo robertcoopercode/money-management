@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/dev.ts",
-    "build": "tsup",
+    "build": "tsdown",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run",
     "start": "tsx src/dev.ts"
@@ -24,6 +24,6 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "tsup": "^8.5.1"
+    "tsdown": "^0.21.0"
   }
 }
