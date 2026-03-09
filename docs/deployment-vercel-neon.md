@@ -5,7 +5,7 @@ This project is split into:
 - `apps/web` (Vite frontend)
 - `apps/api` (Hono API)
 
-Both can be deployed to Vercel. The database is expected to run on Neon Postgres.
+Both are deployed to Vercel as separate projects from the same repo. The database runs on Neon Postgres. The web project owns the custom domain and proxies `/api/*` requests to the API project via Vercel rewrites.
 
 ---
 
@@ -13,7 +13,7 @@ Both can be deployed to Vercel. The database is expected to run on Neon Postgres
 
 1. Create a new Neon project and database.
 2. Copy the pooled connection string (recommended for serverless).
-3. Set `DATABASE_URL` in Vercel to that connection string.
+3. Set `DATABASE_URL` in the **API** Vercel project to that connection string.
 
 Example:
 
@@ -44,15 +44,19 @@ Create a Vercel project pointing to `apps/api`.
 
 Suggested settings:
 
-- Framework preset: **Other**
-- Build command: `pnpm --filter @ledgr/api build`
-- Output directory: _(none required for node runtime)_
-- Install command: `pnpm install`
+- Framework preset: **Hono** (auto-detected)
+- Build command: leave default (zero-config Hono)
+- Install command: leave default (`pnpm install`)
+
+The API entry point (`src/index.ts`) exports the Hono app as a default export. Vercel deploys it as a serverless function automatically.
+
+For local development, use `pnpm dev` which runs `src/dev.ts` (a long-running server using `@hono/node-server`).
 
 Environment variables:
 
-- `DATABASE_URL`
-- `API_PORT` (optional on Vercel)
+- `DATABASE_URL` — Neon pooled connection string
+- `AUTH_PASSWORD_HASH` — argon2 hash (generate with `pnpm hash-password`)
+- `AUTH_ORIGIN` — your custom domain (e.g. `https://ledgr.app`)
 - `LOG_LEVEL` (optional, e.g. `info`)
 
 ---
@@ -63,29 +67,40 @@ Create a second Vercel project pointing to `apps/web`.
 
 Suggested settings:
 
-- Framework preset: **Vite**
-- Build command: `pnpm --filter @ledgr/web build`
-- Output directory: `apps/web/dist`
-- Install command: `pnpm install`
+- Framework preset: **Vite** (auto-detected)
+- Build command: leave default
+- Output directory: `dist` (auto-detected)
+- Install command: leave default
 
-Environment variables:
-
-- `VITE_API_URL` set to deployed API URL (e.g. `https://money-api.vercel.app`)
+No environment variables needed. The web app calls relative `/api/*` paths, which are rewritten to the API project via `apps/web/vercel.json`.
 
 ---
 
-## 5) Verify production health
+## 5) Domain setup
+
+The web project owns the custom domain. Add your domain in the web project's Vercel settings. The API project does not need a custom domain — it is accessed through the web project's rewrites.
+
+After the API project deploys, update the rewrite destination in `apps/web/vercel.json` with the actual Vercel-assigned URL of the API project.
+
+---
+
+## 6) Verify production health
 
 After deployment:
 
 1. Open `<api-url>/health` and confirm `status: ok`.
-2. Create a test account from the web app.
-3. Create a transaction and confirm it appears in the ledger.
-4. Import a sample CSV and verify matched transactions show the imported/matched indicators.
+2. Open your custom domain and confirm the login page loads.
+3. Log in with your password and verify the session cookie is set.
+4. Create a test account from the web app.
+5. Create a transaction and confirm it appears in the ledger.
+6. Import a sample CSV and verify matched transactions show the imported/matched indicators.
 
 ---
 
 ## Notes
 
-- The API now logs request IDs and includes them in error payloads for easier production debugging.
-- If your API and web are in separate domains, keep CORS configured accordingly.
+- The API entry point (`src/index.ts`) is a Vercel-compatible default export. Local development uses `src/dev.ts` instead.
+- `dotenv` and `loadEnvFile` are only loaded when `NODE_ENV !== "production"`. Vercel injects env vars automatically.
+- `packages/db` has a `postinstall` script that runs `prisma generate` during `pnpm install`.
+- The in-memory login rate limiter won't persist across serverless invocations. Consider Vercel KV or Upstash Redis for stricter rate limiting.
+- Use Neon's pooled connection string to avoid exhausting database connections from serverless instances.

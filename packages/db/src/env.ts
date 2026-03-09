@@ -1,8 +1,10 @@
-import path from "node:path"
-import { loadEnvFile } from "node:process"
+if (process.env.NODE_ENV !== "production") {
+  const path = await import("node:path")
+  const { loadEnvFile } = await import("node:process")
 
-const envPath = path.resolve(import.meta.dirname, "../../../.env")
+  const envPath = path.resolve(import.meta.dirname, "../../../.env")
 
-try {
-  loadEnvFile(envPath)
-} catch {}
+  try {
+    loadEnvFile(envPath)
+  } catch {}
+}
