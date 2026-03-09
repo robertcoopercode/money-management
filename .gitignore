@@ -11,3 +11,5 @@ apps/api/dist
 packages/db/src/generated
 packages/db/prisma/dev.db*
 *.tsbuildinfo
+.vercel
+.env*.local
