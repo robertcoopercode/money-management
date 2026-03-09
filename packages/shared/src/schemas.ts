@@ -5,7 +5,6 @@ export const accountTypeSchema = z.enum(["CHEQUING", "CREDIT_CARD"])
 export const createAccountSchema = z.object({
   name: z.string().min(1).max(120),
   type: accountTypeSchema,
-  institution: z.string().max(120).optional(),
   startingBalanceMinor: z.number().int(),
   openedAt: z.iso.datetime().optional(),
 })

@@ -26,7 +26,6 @@ type Account = {
   id: string
   name: string
   type: "CHEQUING" | "CREDIT_CARD"
-  institution?: string | null
   startingBalanceMinor: number
   balanceMinor: number
 }
@@ -269,7 +268,6 @@ const AuthenticatedApp = () => {
   const [newAccount, setNewAccount] = useState({
     name: "",
     type: "CHEQUING" as Account["type"],
-    institution: "",
     startingBalance: "0",
   })
   const [editingAccountId, setEditingAccountId] = useState("")
@@ -406,7 +404,6 @@ const AuthenticatedApp = () => {
         body: JSON.stringify({
           name: newAccount.name,
           type: newAccount.type,
-          institution: newAccount.institution || undefined,
           startingBalanceMinor: parseMoneyInputToMinor(
             newAccount.startingBalance,
           ),
@@ -418,7 +415,6 @@ const AuthenticatedApp = () => {
       setNewAccount({
         name: "",
         type: "CHEQUING",
-        institution: "",
         startingBalance: "0",
       })
       setNewTransaction((current) => ({
@@ -827,8 +823,7 @@ const AuthenticatedApp = () => {
                         <strong>{account.name}</strong>
                       )}
                       <p className="muted">
-                        {account.type.replaceAll("_", " ")} ·{" "}
-                        {account.institution ?? "No institution"}
+                        {account.type.replaceAll("_", " ")}
                       </p>
                     </div>
                     <div className="account-item-meta">
@@ -913,18 +908,6 @@ const AuthenticatedApp = () => {
                       <option value="CHEQUING">Chequing</option>
                       <option value="CREDIT_CARD">Credit Card</option>
                     </select>
-                  </label>
-                  <label>
-                    Institution
-                    <input
-                      value={newAccount.institution}
-                      onChange={(event) =>
-                        setNewAccount((current) => ({
-                          ...current,
-                          institution: event.target.value,
-                        }))
-                      }
-                    />
                   </label>
                   <label>
                     Starting Balance
