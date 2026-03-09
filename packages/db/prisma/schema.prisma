@@ -58,21 +58,9 @@ model Payee {
   isArchived     Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  aliases        PayeeAlias[]
   transactions   Transaction[]
 
   @@index([normalizedName])
-}
-
-model PayeeAlias {
-  id        String   @id @default(cuid())
-  payeeId   String
-  aliasName String
-  source    String?
-  createdAt DateTime @default(now())
-  payee     Payee    @relation(fields: [payeeId], references: [id], onDelete: Cascade)
-
-  @@unique([payeeId, aliasName])
 }
 
 model CategoryGroup {

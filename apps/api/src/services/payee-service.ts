@@ -48,20 +48,6 @@ export const mergePayees = (sourcePayeeId: string, targetPayeeId: string) =>
           where: { payeeId: sourcePayeeId },
           data: { payeeId: targetPayeeId },
         }),
-        prisma.payeeAlias.upsert({
-          where: {
-            payeeId_aliasName: {
-              payeeId: targetPayeeId,
-              aliasName: source.name,
-            },
-          },
-          update: {},
-          create: {
-            payeeId: targetPayeeId,
-            aliasName: source.name,
-            source: "merge",
-          },
-        }),
         prisma.payee.update({
           where: { id: sourcePayeeId },
           data: { isArchived: true },
