@@ -40,7 +40,6 @@ model Account {
   id                  String        @id @default(cuid())
   name                String
   type                AccountType
-  institution         String?
   startingBalanceMinor Int          @default(0)
   openedAt            DateTime?
   isActive            Boolean       @default(true)

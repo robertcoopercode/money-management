@@ -23,7 +23,6 @@ export const registerAccountRoutes = (app: Hono) => {
       createAccount({
         name: payload.name,
         type: payload.type,
-        institution: payload.institution,
         startingBalanceMinor: payload.startingBalanceMinor,
         openedAt: payload.openedAt ? new Date(payload.openedAt) : undefined,
       }),
@@ -40,7 +39,6 @@ export const registerAccountRoutes = (app: Hono) => {
       updateAccount(accountId, {
         name: payload.name,
         type: payload.type,
-        institution: payload.institution,
         startingBalanceMinor: payload.startingBalanceMinor,
         openedAt: payload.openedAt ? new Date(payload.openedAt) : undefined,
       }),

@@ -47,13 +47,11 @@ const accounts = [
   {
     name: "TD Chequing",
     type: "CHEQUING" as const,
-    institution: "TD Bank",
     startingBalanceMinor: 450000,
   },
   {
     name: "Visa Infinite",
     type: "CREDIT_CARD" as const,
-    institution: "TD Bank",
     startingBalanceMinor: -128500,
   },
 ]
