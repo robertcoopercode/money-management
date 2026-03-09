@@ -2,7 +2,7 @@
   "buildCommand": "cd ../.. && pnpm --filter @ledgr/db db:generate && pnpm --filter @ledgr/api build",
   "functions": {
     "dist/index.mjs": {
-      "runtime": "@vercel/node@latest"
+      "maxDuration": 30
     }
   },
   "rewrites": [
