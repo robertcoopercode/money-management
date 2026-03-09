@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ledgr-api.vercel.app/api/:path*"
+      "destination": "https://ledgr-api-mu.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
