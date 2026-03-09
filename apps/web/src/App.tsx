@@ -207,7 +207,6 @@ const TransactionBadge = ({ transaction }: { transaction: Transaction }) => {
 
 const App = () => {
   const queryClient = useQueryClient()
-  const amountRef = useRef<HTMLInputElement | null>(null)
 
   const authQuery = useQuery({
     queryKey: ["auth"],
@@ -215,6 +214,27 @@ const App = () => {
       apiFetch<{ authenticated: boolean }>("/api/auth/me"),
     retry: false,
   })
+
+  if (authQuery.isLoading) {
+    return null
+  }
+
+  if (authQuery.isError || !authQuery.data?.authenticated) {
+    return (
+      <LoginPage
+        onSuccess={() =>
+          void queryClient.invalidateQueries({ queryKey: ["auth"] })
+        }
+      />
+    )
+  }
+
+  return <AuthenticatedApp />
+}
+
+const AuthenticatedApp = () => {
+  const queryClient = useQueryClient()
+  const amountRef = useRef<HTMLInputElement | null>(null)
 
   const logoutMutation = useMutation({
     mutationFn: () =>
@@ -651,20 +671,6 @@ const App = () => {
 
     return filtered
   }, [payeesQuery.data, payeeSearch, payeeSort])
-
-  if (authQuery.isLoading) {
-    return null
-  }
-
-  if (authQuery.isError || !authQuery.data?.authenticated) {
-    return (
-      <LoginPage
-        onSuccess={() =>
-          void queryClient.invalidateQueries({ queryKey: ["auth"] })
-        }
-      />
-    )
-  }
 
   return (
     <div className="app-shell">
