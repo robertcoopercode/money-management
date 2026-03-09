@@ -29,6 +29,13 @@ enum ImportRowAction {
   SKIPPED
 }
 
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 model Account {
   id                  String        @id @default(cuid())
   name                String

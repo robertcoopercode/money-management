@@ -81,6 +81,11 @@ export const reportFilterSchema = z.object({
   cleared: z.coerce.boolean().optional(),
 })
 
+export const loginSchema = z.object({
+  password: z.string().min(1).max(256),
+})
+
+export type LoginInput = z.infer<typeof loginSchema>
 export type CreateAccountInput = z.infer<typeof createAccountSchema>
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>
 export type CreatePayeeInput = z.infer<typeof createPayeeSchema>

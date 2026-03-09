@@ -4,7 +4,10 @@ import { cors } from "hono/cors"
 import { ZodError } from "zod"
 
 import { apiLogger } from "./lib/logger.js"
+import { authMiddleware } from "./middleware/auth.js"
+import { csrfMiddleware } from "./middleware/csrf.js"
 import { registerAccountRoutes } from "./routes/accounts.js"
+import { registerAuthRoutes } from "./routes/auth.js"
 import { registerCategoryRoutes } from "./routes/categories.js"
 import { registerHealthRoutes } from "./routes/health.js"
 import { registerImportRoutes } from "./routes/imports.js"
@@ -15,7 +18,18 @@ import { registerTransactionRoutes } from "./routes/transactions.js"
 
 export const app = new Hono()
 
-app.use("*", cors())
+const allowedOrigin = process.env.AUTH_ORIGIN ?? "http://localhost:5173"
+
+app.use(
+  "*",
+  cors({
+    origin: allowedOrigin,
+    credentials: true,
+  }),
+)
+
+app.use("*", csrfMiddleware)
+app.use("/api/*", authMiddleware)
 app.use("*", async (context, next) => {
   const requestId = context.req.header("x-request-id") ?? randomUUID()
   context.header("x-request-id", requestId)
@@ -70,6 +84,7 @@ app.onError((error, context) => {
   )
 })
 
+registerAuthRoutes(app)
 registerHealthRoutes(app)
 registerAccountRoutes(app)
 registerPayeeRoutes(app)

@@ -15,7 +15,8 @@
     "db:generate": "pnpm --filter @ledgr/db db:generate",
     "db:migrate": "pnpm --filter @ledgr/db db:migrate",
     "db:seed": "pnpm --filter @ledgr/db db:seed",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "hash-password": "tsx scripts/hash-password.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["prisma", "@prisma/engines", "@prisma/client", "esbuild"]

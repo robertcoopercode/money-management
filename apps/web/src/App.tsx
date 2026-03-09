@@ -11,6 +11,7 @@ import {
 } from "@visx/xychart"
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { Toaster, toast } from "sonner"
+import { LoginPage } from "./pages/login.js"
 import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeAutocomplete } from "./components/payee-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
@@ -114,6 +115,7 @@ type UpdateAccountNameMutationInput = {
 
 const apiFetch = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -206,6 +208,21 @@ const TransactionBadge = ({ transaction }: { transaction: Transaction }) => {
 const App = () => {
   const queryClient = useQueryClient()
   const amountRef = useRef<HTMLInputElement | null>(null)
+
+  const authQuery = useQuery({
+    queryKey: ["auth"],
+    queryFn: () =>
+      apiFetch<{ authenticated: boolean }>("/api/auth/me"),
+    retry: false,
+  })
+
+  const logoutMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["auth"] })
+    },
+  })
 
   const [activeTab, setActiveTab] = useState<AppTab>(getInitialAppTab)
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] =
@@ -635,6 +652,20 @@ const App = () => {
     return filtered
   }, [payeesQuery.data, payeeSearch, payeeSort])
 
+  if (authQuery.isLoading) {
+    return null
+  }
+
+  if (authQuery.isError || !authQuery.data?.authenticated) {
+    return (
+      <LoginPage
+        onSuccess={() =>
+          void queryClient.invalidateQueries({ queryKey: ["auth"] })
+        }
+      />
+    )
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -651,11 +682,20 @@ const App = () => {
             </p>
           </div>
         </div>
-        <div className="ready-to-assign-card">
-          <span>Ready to Assign</span>
-          <strong>
-            {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
-          </strong>
+        <div className="header-right">
+          <div className="ready-to-assign-card">
+            <span>Ready to Assign</span>
+            <strong>
+              {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
+            </strong>
+          </div>
+          <button
+            className="logout-button"
+            type="button"
+            onClick={() => logoutMutation.mutate()}
+          >
+            Log out
+          </button>
         </div>
       </header>
 
