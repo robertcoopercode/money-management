@@ -142,7 +142,8 @@ export const PayeeAutocomplete = ({
 
           if (event.key === "Enter" && highlightedIndex >= 0) {
             event.preventDefault()
-            selectOption(filteredOptions[highlightedIndex])
+            const option = filteredOptions[highlightedIndex]
+            if (option) selectOption(option)
             return
           }
 
