@@ -1,11 +1,4 @@
 {
   "buildCommand": "cd ../.. && pnpm --filter @ledgr/db db:generate && pnpm --filter @ledgr/api build",
-  "functions": {
-    "dist/index.mjs": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/dist/index.mjs" }
-  ]
+  "outputDirectory": "dist"
 }
