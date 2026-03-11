@@ -767,7 +767,28 @@ const AuthenticatedApp = () => {
                   <div className="list-item" key={account.id}>
                     <div className="account-item-main">
                       {editingAccountId === account.id ? (
-                        <div className="account-name-form">
+                        <form className="account-name-form" onSubmit={(e) => {
+                          e.preventDefault()
+                          const nextName = (
+                            accountNameDrafts[account.id] ?? account.name
+                          ).trim()
+
+                          if (!nextName) {
+                            toast.error("Account name cannot be blank.")
+                            return
+                          }
+
+                          if (nextName === account.name) {
+                            setEditingAccountId("")
+                            clearAccountNameDraft(account.id)
+                            return
+                          }
+
+                          updateAccountNameMutation.mutate({
+                            accountId: account.id,
+                            name: nextName,
+                          })
+                        }}>
                           <input
                             value={
                               accountNameDrafts[account.id] ?? account.name
@@ -781,8 +802,21 @@ const AuthenticatedApp = () => {
                             aria-label={`Account name for ${account.name}`}
                             disabled={updateAccountNameMutation.isPending}
                           />
+                        </form>
+                      ) : (
+                        <strong>{account.name}</strong>
+                      )}
+                    </div>
+                    <div className="account-item-meta">
+                      <span className="muted">
+                        {account.type.replaceAll("_", " ")}
+                      </span>
+                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      {editingAccountId === account.id ? (
+                        <>
                           <button
-                            type="button"
+                            type="submit"
+                            className="edit-icon-button button-success"
                             onClick={() => {
                               const nextName = (
                                 accountNameDrafts[account.id] ?? account.name
@@ -805,32 +839,27 @@ const AuthenticatedApp = () => {
                               })
                             }}
                             disabled={updateAccountNameMutation.isPending}
+                            aria-label="Save account name"
                           >
-                            Save
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                           </button>
                           <button
                             type="button"
+                            className="edit-icon-button button-danger"
                             onClick={() => {
                               setEditingAccountId("")
                               clearAccountNameDraft(account.id)
                             }}
                             disabled={updateAccountNameMutation.isPending}
+                            aria-label="Cancel editing"
                           >
-                            Cancel
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                           </button>
-                        </div>
+                        </>
                       ) : (
-                        <strong>{account.name}</strong>
-                      )}
-                      <p className="muted">
-                        {account.type.replaceAll("_", " ")}
-                      </p>
-                    </div>
-                    <div className="account-item-meta">
-                      <strong>{formatMoney(account.balanceMinor)}</strong>
-                      {editingAccountId === account.id ? null : (
                         <button
                           type="button"
+                          className="edit-icon-button"
                           onClick={() => {
                             setEditingAccountId(account.id)
                             setAccountNameDrafts((current) => ({
@@ -839,8 +868,9 @@ const AuthenticatedApp = () => {
                             }))
                           }}
                           disabled={updateAccountNameMutation.isPending}
+                          aria-label={`Edit ${account.name}`}
                         >
-                          Edit
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                         </button>
                       )}
                     </div>

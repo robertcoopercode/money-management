@@ -249,16 +249,22 @@ button:disabled {
 .list-item {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 1rem;
   border-radius: 8px;
   border: 1px solid rgb(95 117 171 / 18%);
   background: rgb(5 11 30 / 70%);
-  padding: 0.65rem 0.75rem;
+  padding: 0.5rem 0.75rem;
 }
 
 .account-item-main {
-  display: grid;
-  gap: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-item-main .muted {
+  font-size: 0.75rem;
 }
 
 .account-name-form {
@@ -268,11 +274,30 @@ button:disabled {
   align-items: center;
 }
 
+.account-name-form input {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.88rem;
+  margin: -2px 0;
+}
+
 .account-item-meta {
-  display: grid;
-  justify-items: end;
-  align-content: start;
-  gap: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.edit-icon-button {
+  background: none;
+  border: none;
+  color: rgb(188 205 240 / 66%);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.edit-icon-button:hover {
+  color: rgb(188 205 240 / 100%);
 }
 
 .muted {
@@ -366,6 +391,11 @@ button:disabled {
 .button-danger {
   background: linear-gradient(180deg, #8f2839, #6f1d2b);
   border-color: rgb(248 150 161 / 45%);
+}
+
+.button-success {
+  background: linear-gradient(180deg, #28794a, #1e5c38);
+  border-color: rgb(130 226 160 / 45%);
 }
 
 .table-wrap {
