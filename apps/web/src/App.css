@@ -14,25 +14,28 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
-  margin-bottom: 1.2rem;
+  margin-bottom: 0;
+  padding-bottom: 1rem;
 }
 
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.65rem;
 }
 
 .brand-mark {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.7rem;
-  box-shadow: 0 0 0 1px rgb(124 162 255 / 28%);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 1px rgb(124 162 255 / 20%);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.9rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
@@ -40,27 +43,28 @@
   color: rgb(194 208 241 / 75%);
 }
 
-.ready-to-assign-card {
+.ready-to-assign-pill {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-  background: linear-gradient(135deg, #2f581f, #477124);
-  border: 1px solid rgb(139 196 95 / 40%);
-  border-radius: 12px;
-  padding: 0.8rem 1rem;
-  min-width: 200px;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgb(39 70 30 / 55%);
+  border: 1px solid rgb(120 180 80 / 30%);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
 }
 
-.ready-to-assign-card span {
-  color: rgb(226 255 210 / 85%);
-  font-size: 0.78rem;
+.ready-to-assign-label {
+  color: rgb(180 220 160 / 85%);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  font-weight: 600;
 }
 
-.ready-to-assign-card strong {
-  font-size: 1.25rem;
+.ready-to-assign-amount {
+  color: rgb(210 250 180);
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .tabs-root {
@@ -76,25 +80,38 @@
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.15rem;
   border-bottom: 1px solid rgb(95 117 171 / 25%);
   background: rgb(8 16 41 / 92%);
-  padding: 0.7rem;
+  padding: 0.45rem 0.5rem;
 }
 
 .tabs-tab {
   all: unset;
-  border-radius: 8px;
-  padding: 0.5rem 0.8rem;
-  color: rgb(217 230 255 / 80%);
-  font-size: 0.9rem;
+  border-radius: 6px;
+  padding: 0.42rem 0.75rem;
+  color: rgb(180 195 230 / 65%);
+  font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-.tabs-tab[data-selected] {
-  background: rgb(70 99 184 / 42%);
-  color: rgb(244 248 255);
+.tabs-tab:hover:not([data-active]),
+.tabs-tab:focus-visible:not([data-active]) {
+  color: rgb(220 230 255 / 90%);
+  background: rgb(70 99 184 / 15%);
+}
+
+.tabs-tab:focus-visible {
+  outline: 1.5px solid rgb(140 170 255 / 50%);
+  outline-offset: -1.5px;
+}
+
+.tabs-tab[data-active] {
+  background: rgb(70 99 184 / 22%);
+  color: rgb(240 245 255);
+  font-weight: 600;
 }
 
 .tabs-indicator {
@@ -300,6 +317,16 @@ button:disabled {
   color: rgb(188 205 240 / 100%);
 }
 
+.edit-icon-button:focus-visible {
+  outline: 2px solid rgb(140 170 255 / 60%);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.edit-icon-button.button-success:focus-visible {
+  outline-color: rgb(130 226 160 / 60%);
+}
+
 .muted {
   color: rgb(188 205 240 / 66%);
   margin: 0;
@@ -312,15 +339,38 @@ button:disabled {
   font-size: 0.86rem;
 }
 
+.transaction-entry-card {
+  margin-bottom: 0;
+  border-bottom: none;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  padding-bottom: 0.75rem;
+}
+
+.transaction-entry-card + .card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: 1px solid rgb(95 117 171 / 35%);
+}
+
 .transaction-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.55rem;
-  margin-bottom: 0.8rem;
+}
+
+.transaction-form > input,
+.transaction-form > select,
+.transaction-form > .amount-input-group,
+.transaction-form > .payee-autocomplete,
+.transaction-form > .category-autocomplete {
+  min-width: 110px;
+  flex: 1 1 120px;
 }
 
 .category-autocomplete {
-  position: relative;
 }
 
 .category-autocomplete-input {
@@ -328,10 +378,6 @@ button:disabled {
 }
 
 .category-autocomplete-menu {
-  position: absolute;
-  z-index: 6;
-  width: 100%;
-  margin-top: 0.25rem;
   padding: 0.35rem;
   border: 1px solid rgb(95 117 171 / 36%);
   border-radius: 10px;
@@ -344,8 +390,8 @@ button:disabled {
 }
 
 .category-autocomplete-option {
-  all: unset;
   cursor: pointer;
+  color: rgb(225 232 250);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -360,7 +406,7 @@ button:disabled {
 }
 
 .category-autocomplete-option:hover,
-.category-autocomplete-option.is-highlighted {
+.category-autocomplete-option[data-highlighted] {
   background: rgb(70 99 184 / 36%);
 }
 
@@ -375,17 +421,98 @@ button:disabled {
   margin-top: 0.15rem;
 }
 
+.payee-group-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(188 205 240 / 60%);
+  padding: 0.4rem 0.5rem 0.15rem;
+}
+
 .checkbox-inline {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
 }
 
+.cleared-toggle {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 120ms ease;
+}
+
+.cleared-toggle:hover {
+  transform: scale(1.1);
+}
+
+.cleared-toggle:focus-visible {
+  outline: 2px solid rgb(140 170 255 / 60%);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.cleared-toggle-circle {
+  stroke: rgb(120 140 180 / 60%);
+  fill: none;
+  transition: fill 150ms ease, stroke 150ms ease;
+}
+
+.cleared-toggle-letter {
+  fill: rgb(120 140 180 / 60%);
+  transition: fill 150ms ease;
+}
+
+.cleared-toggle[data-pressed] .cleared-toggle-circle {
+  fill: #4ade20;
+  stroke: #4ade20;
+}
+
+.cleared-toggle[data-pressed] .cleared-toggle-letter {
+  fill: #0a1628;
+}
+
+.cleared-toggle[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .row-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.45rem;
   flex-wrap: wrap;
+}
+
+.icon-button-danger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 6px;
+  color: rgb(248 150 161 / 66%);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.icon-button-danger:hover {
+  color: rgb(248 150 161);
+}
+
+.icon-button-danger:focus-visible {
+  outline: 2px solid rgb(248 150 161 / 60%);
+  outline-offset: 2px;
+}
+
+.icon-button-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .button-danger {
@@ -398,29 +525,108 @@ button:disabled {
   border-color: rgb(130 226 160 / 45%);
 }
 
+.amount-input-group {
+  display: flex;
+}
+
+.sign-toggle {
+  width: 2rem;
+  font-weight: bold;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: white;
+}
+
+.sign-toggle-minus {
+  background: rgb(5 11 30 / 78%);
+  border-color: rgb(255 255 255 / 12%);
+}
+
+.sign-toggle-plus {
+  background: linear-gradient(180deg, #28794a, #1e5c38);
+  border-color: rgb(130 226 160 / 45%);
+}
+
+.amount-input-group input {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  flex: 1;
+  min-width: 0;
+}
+
 .table-wrap {
   overflow: auto;
   max-height: 420px;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.transaction-list {
+  display: grid;
+  grid-template-columns:
+    8%
+    12%
+    14%
+    14%
+    14%
+    10%
+    14%
+    14%;
   min-width: 680px;
 }
 
-thead th {
+.transaction-header {
+  display: contents;
+}
+
+.transaction-header .transaction-cell {
   position: sticky;
   top: 0;
   background: rgb(4 11 30 / 98%);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-weight: bold;
+  z-index: 1;
 }
 
-th,
-td {
+.transaction-row {
+  display: contents;
+}
+
+.transaction-cell {
   text-align: left;
+  padding: 0.48rem 0.52rem;
+  border-bottom: 1px solid rgb(95 117 171 / 18%);
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+}
+
+.clickable-cell {
+  cursor: pointer;
+}
+
+.clickable-cell:hover {
+  background: rgb(70 99 184 / 10%);
+}
+
+.transaction-edit-row .transaction-cell input,
+.transaction-edit-row .transaction-cell .category-autocomplete-input {
+  width: 100%;
+}
+
+.transaction-edit-row .transaction-cell {
+  padding: 0.3rem 0.35rem;
+}
+
+.transaction-list-full-row {
+  grid-column: 1 / -1;
   padding: 0.48rem 0.52rem;
   border-bottom: 1px solid rgb(95 117 171 / 18%);
   font-size: 0.88rem;
@@ -476,6 +682,51 @@ td {
   flex-wrap: wrap;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.pagination-button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: rgb(188 205 240 / 80%);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: rgb(70 99 184 / 30%);
+  color: rgb(244 248 255);
+}
+
+.pagination-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pagination-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgb(70 99 184 / 25%);
+  color: rgb(244 248 255);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 0.4rem;
+}
+
 .planning-group + .planning-group {
   margin-top: 0.8rem;
 }
@@ -521,22 +772,36 @@ td {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
-.logout-button {
-  background: transparent;
-  border: 1px solid rgb(95 117 171 / 35%);
-  color: rgb(194 208 241 / 75%);
-  padding: 0.4rem 0.8rem;
+.logout-icon-button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
   border-radius: 8px;
+  color: rgb(180 195 230 / 50%);
   cursor: pointer;
-  font-size: 0.82rem;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
-.logout-button:hover {
-  background: rgb(95 117 171 / 15%);
-  color: #e7f0ff;
+.logout-icon-button:hover {
+  color: rgb(230 240 255 / 90%);
+  background: rgb(95 117 171 / 18%);
+}
+
+.logout-tooltip {
+  background: rgb(15 22 48 / 96%);
+  border: 1px solid rgb(95 117 171 / 35%);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  color: rgb(210 225 255 / 90%);
+  font-size: 0.75rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
 }
 
 .login-page {

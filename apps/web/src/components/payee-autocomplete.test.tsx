@@ -10,6 +10,19 @@ const payees = [
   { id: "rent", name: "City Rent" },
 ]
 
+const accounts = [
+  { id: "chequing", name: "RBC Chequing" },
+  { id: "credit", name: "Rogers MasterCard" },
+]
+
+const defaultProps = {
+  payees,
+  accounts,
+  currentAccountId: "chequing",
+  value: null,
+  onChange: vi.fn(),
+}
+
 afterEach(() => {
   cleanup()
 })
@@ -18,7 +31,7 @@ describe("PayeeAutocomplete", () => {
   it("filters payees while typing", async () => {
     const user = userEvent.setup()
 
-    render(<PayeeAutocomplete payees={payees} value="" onChange={vi.fn()} />)
+    render(<PayeeAutocomplete {...defaultProps} />)
 
     const input = screen.getByRole("combobox")
     await user.click(input)
@@ -32,14 +45,18 @@ describe("PayeeAutocomplete", () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
 
-    render(<PayeeAutocomplete payees={payees} value="" onChange={onChange} />)
+    render(<PayeeAutocomplete {...defaultProps} onChange={onChange} />)
 
     const input = screen.getByRole("combobox")
     await user.click(input)
     await user.type(input, "city")
     await user.click(screen.getByRole("option", { name: /City Rent/i }))
 
-    expect(onChange).toHaveBeenLastCalledWith("rent")
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: "payee",
+      id: "rent",
+      name: "City Rent",
+    })
   })
 
   it("shows create button only when no payee matches", async () => {
@@ -48,9 +65,7 @@ describe("PayeeAutocomplete", () => {
 
     render(
       <PayeeAutocomplete
-        payees={payees}
-        value=""
-        onChange={vi.fn()}
+        {...defaultProps}
         onCreatePayee={onCreatePayee}
       />,
     )
@@ -65,5 +80,41 @@ describe("PayeeAutocomplete", () => {
     await user.click(createButton)
 
     expect(onCreatePayee).toHaveBeenCalledWith("Coffee Shop")
+  })
+
+  it("shows transfer accounts excluding current account", async () => {
+    const user = userEvent.setup()
+
+    render(<PayeeAutocomplete {...defaultProps} />)
+
+    const input = screen.getByRole("combobox")
+    await user.click(input)
+
+    expect(
+      screen.getByRole("option", { name: /Rogers MasterCard/i }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole("option", { name: /RBC Chequing/i }),
+    ).toBeNull()
+  })
+
+  it("calls onChange with transfer option when selecting a transfer account", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(<PayeeAutocomplete {...defaultProps} onChange={onChange} />)
+
+    const input = screen.getByRole("combobox")
+    await user.click(input)
+    await user.click(
+      screen.getByRole("option", { name: /Rogers MasterCard/i }),
+    )
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: "transfer",
+      id: "transfer:credit",
+      name: "Rogers MasterCard",
+      accountId: "credit",
+    })
   })
 })

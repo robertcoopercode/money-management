@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Tabs } from "@base-ui/react/tabs"
+import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ParentSize } from "@visx/responsive"
 import {
@@ -12,12 +13,21 @@ import {
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { Toaster, toast } from "sonner"
 import { LoginPage } from "./pages/login.js"
+import { AccountCombobox } from "./components/account-combobox.js"
 import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeAutocomplete } from "./components/payee-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
+import { ClearedToggle } from "./components/cleared-toggle.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
-import { buildNextTransactionDraft } from "./lib/transaction-entry.js"
+import {
+  buildNextTransactionDraft,
+  transactionToEditDraft,
+  derivePayeeSelection,
+  type TransactionDraft,
+  type EditableField,
+} from "./lib/transaction-entry.js"
+import { TransactionEditRow } from "./components/transaction-edit-row.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
 
 import "./App.css"
@@ -103,8 +113,21 @@ type AssignmentMutationInput = {
 type UpdateTransactionMutationInput = {
   transactionId: string
   patch: {
+    accountId?: string
+    transferAccountId?: string
+    date?: string
+    amountMinor?: number
+    payeeId?: string
+    categoryId?: string
+    note?: string
     cleared?: boolean
   }
+}
+
+type EditingTransaction = {
+  transactionId: string
+  draft: TransactionDraft
+  focusField: EditableField | null
 }
 
 type UpdateAccountNameMutationInput = {
@@ -150,7 +173,13 @@ const shiftMonth = (current: string, amount: number) => {
   return formatMonth(date)
 }
 
-const defaultTransactionDate = new Date().toISOString().slice(0, 10)
+const defaultTransactionDate = (() => {
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, "0")
+  const dd = String(now.getDate()).padStart(2, "0")
+  return `${yyyy}-${mm}-${dd}`
+})()
 const TRANSACTION_PAGE_SIZE = 100
 const APP_TAB_VALUES = [
   "accounts",
@@ -292,6 +321,7 @@ const AuthenticatedApp = () => {
     categoryId: "",
     note: "",
     cleared: false,
+    isExpense: true,
   })
   const [transactionOffset, setTransactionOffset] = useState(0)
 
@@ -332,15 +362,12 @@ const AuthenticatedApp = () => {
   })
 
   const transactionsQuery = useQuery({
-    queryKey: ["transactions", newTransaction.accountId, transactionOffset],
+    queryKey: ["transactions", transactionOffset],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(TRANSACTION_PAGE_SIZE),
         offset: String(transactionOffset),
       })
-      if (newTransaction.accountId) {
-        params.set("accountId", newTransaction.accountId)
-      }
       return apiFetch<Transaction[]>(`/api/transactions?${params}`)
     },
   })
@@ -387,6 +414,53 @@ const AuthenticatedApp = () => {
     void queryClient.invalidateQueries({ queryKey: ["payees"] })
     void queryClient.invalidateQueries({ queryKey: ["planning"] })
     void queryClient.invalidateQueries({ queryKey: ["reports"] })
+  }
+
+  const payeeSelection = useMemo(
+    () =>
+      derivePayeeSelection(
+        newTransaction.payeeId,
+        newTransaction.transferAccountId,
+        accountsQuery.data ?? [],
+        payeesQuery.data ?? [],
+      ),
+    [
+      newTransaction.payeeId,
+      newTransaction.transferAccountId,
+      accountsQuery.data,
+      payeesQuery.data,
+    ],
+  )
+
+  const [editingTransaction, setEditingTransaction] =
+    useState<EditingTransaction | null>(null)
+
+  const startEditing = (transaction: Transaction, field: EditableField) => {
+    setEditingTransaction({
+      transactionId: transaction.id,
+      draft: transactionToEditDraft(transaction),
+      focusField: field,
+    })
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingTransaction) return
+    const { draft, transactionId } = editingTransaction
+    updateTransactionMutation.mutate({
+      transactionId,
+      patch: {
+        accountId: draft.accountId || undefined,
+        transferAccountId: draft.transferAccountId || undefined,
+        date: draft.date,
+        amountMinor: draft.isExpense
+          ? -Math.abs(parseMoneyInputToMinor(draft.amount))
+          : Math.abs(parseMoneyInputToMinor(draft.amount)),
+        payeeId: draft.payeeId || undefined,
+        categoryId: draft.categoryId || undefined,
+        note: draft.note || undefined,
+        cleared: draft.cleared,
+      },
+    })
   }
 
   const clearAccountNameDraft = (accountId: string) => {
@@ -525,7 +599,9 @@ const AuthenticatedApp = () => {
           accountId: newTransaction.accountId,
           transferAccountId: newTransaction.transferAccountId || undefined,
           date: newTransaction.date,
-          amountMinor: parseMoneyInputToMinor(newTransaction.amount),
+          amountMinor: newTransaction.isExpense
+            ? -Math.abs(parseMoneyInputToMinor(newTransaction.amount))
+            : Math.abs(parseMoneyInputToMinor(newTransaction.amount)),
           payeeId: newTransaction.payeeId || undefined,
           categoryId: newTransaction.categoryId || undefined,
           note: newTransaction.note || undefined,
@@ -551,6 +627,7 @@ const AuthenticatedApp = () => {
       }),
     onSuccess: () => {
       toast.success("Transaction updated")
+      setEditingTransaction(null)
       refetchCoreData()
     },
     onError: (error) => {
@@ -679,25 +756,45 @@ const AuthenticatedApp = () => {
           />
           <div>
             <h1>Ledgr</h1>
-            <p className="subtitle">
-              Envelope-first budgeting with keyboard-first transaction entry.
-            </p>
           </div>
         </div>
         <div className="header-right">
-          <div className="ready-to-assign-card">
-            <span>Ready to Assign</span>
-            <strong>
+          <div className="ready-to-assign-pill">
+            <span className="ready-to-assign-label">Ready to Assign</span>
+            <span className="ready-to-assign-amount">
               {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
-            </strong>
+            </span>
           </div>
-          <button
-            className="logout-button"
-            type="button"
-            onClick={() => logoutMutation.mutate()}
-          >
-            Log out
-          </button>
+          <BaseTooltip.Provider>
+            <BaseTooltip.Root>
+              <BaseTooltip.Trigger
+                className="logout-icon-button"
+                onClick={() => logoutMutation.mutate()}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </BaseTooltip.Trigger>
+              <BaseTooltip.Portal>
+                <BaseTooltip.Positioner sideOffset={8}>
+                  <BaseTooltip.Popup className="logout-tooltip">
+                    Log out
+                  </BaseTooltip.Popup>
+                </BaseTooltip.Positioner>
+              </BaseTooltip.Portal>
+            </BaseTooltip.Root>
+          </BaseTooltip.Provider>
         </div>
       </header>
 
@@ -811,7 +908,7 @@ const AuthenticatedApp = () => {
                       <span className="muted">
                         {account.type.replaceAll("_", " ")}
                       </span>
-                      <strong>{formatMoney(account.balanceMinor)}</strong>
+                      <strong>{formatMoney(account.type === "CREDIT_CARD" ? -account.balanceMinor : account.balanceMinor)}</strong>
                       {editingAccountId === account.id ? (
                         <>
                           <button
@@ -973,8 +1070,7 @@ const AuthenticatedApp = () => {
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="transactions">
-          <section className="card">
-            <h2>Quick transaction entry (Enter to save, auto-focus next)</h2>
+          <section className="card transaction-entry-card">
             <form
               className="transaction-form"
               onSubmit={(event) => {
@@ -982,44 +1078,17 @@ const AuthenticatedApp = () => {
                 createTransactionMutation.mutate()
               }}
             >
-              <select
+              <AccountCombobox
+                accounts={accountsQuery.data ?? []}
                 value={newTransaction.accountId}
-                onChange={(event) => {
-                  const nextAccountId = event.target.value
-                  setTransactionOffset(0)
+                onChange={(accountId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    accountId: nextAccountId,
-                  }))
-                }}
-                required
-              >
-                <option value="">Select account</option>
-                {(accountsQuery.data ?? []).map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={newTransaction.transferAccountId}
-                onChange={(event) =>
-                  setNewTransaction((current) => ({
-                    ...current,
-                    transferAccountId: event.target.value,
-                    categoryId: event.target.value ? "" : current.categoryId,
+                    accountId,
                   }))
                 }
-              >
-                <option value="">Not a transfer</option>
-                {(accountsQuery.data ?? [])
-                  .filter((account) => account.id !== newTransaction.accountId)
-                  .map((account) => (
-                    <option key={account.id} value={account.id}>
-                      Transfer with {account.name}
-                    </option>
-                  ))}
-              </select>
+                placeholder="Select account"
+              />
               <input
                 type="date"
                 value={newTransaction.date}
@@ -1031,27 +1100,61 @@ const AuthenticatedApp = () => {
                 }
                 required
               />
-              <input
-                ref={amountRef}
-                value={newTransaction.amount}
-                onChange={(event) =>
-                  setNewTransaction((current) => ({
-                    ...current,
-                    amount: event.target.value,
-                  }))
-                }
-                placeholder="Amount"
-                required
-              />
+              <div className="amount-input-group">
+                <button
+                  type="button"
+                  className={`sign-toggle ${newTransaction.isExpense ? "sign-toggle-minus" : "sign-toggle-plus"}`}
+                  onClick={() =>
+                    setNewTransaction((current) => ({
+                      ...current,
+                      isExpense: !current.isExpense,
+                    }))
+                  }
+                >
+                  {newTransaction.isExpense ? "\u2212" : "+"}
+                </button>
+                <input
+                  ref={amountRef}
+                  value={newTransaction.amount}
+                  onChange={(event) =>
+                    setNewTransaction((current) => ({
+                      ...current,
+                      amount: event.target.value,
+                    }))
+                  }
+                  placeholder="Amount"
+                  required
+                />
+              </div>
               <PayeeAutocomplete
-                value={newTransaction.payeeId}
                 payees={payeesQuery.data ?? []}
-                onChange={(payeeId) =>
-                  setNewTransaction((current) => ({
-                    ...current,
-                    payeeId,
-                  }))
-                }
+                accounts={accountsQuery.data ?? []}
+                currentAccountId={newTransaction.accountId}
+                value={payeeSelection}
+                onChange={(selection) => {
+                  setNewTransaction((current) => {
+                    if (!selection) {
+                      return {
+                        ...current,
+                        payeeId: "",
+                        transferAccountId: "",
+                      }
+                    }
+                    if (selection.kind === "transfer") {
+                      return {
+                        ...current,
+                        payeeId: "",
+                        transferAccountId: selection.accountId,
+                        categoryId: "",
+                      }
+                    }
+                    return {
+                      ...current,
+                      payeeId: selection.id,
+                      transferAccountId: "",
+                    }
+                  })
+                }}
                 onCreatePayee={(name) => {
                   createTransactionPayeeMutation.mutate({ name })
                 }}
@@ -1082,134 +1185,192 @@ const AuthenticatedApp = () => {
                 }
                 placeholder="Note"
               />
-              <label className="checkbox-inline">
-                <input
-                  type="checkbox"
-                  checked={newTransaction.cleared}
-                  onChange={(event) =>
-                    setNewTransaction((current) => ({
-                      ...current,
-                      cleared: event.target.checked,
-                    }))
-                  }
-                />
-                Cleared
-              </label>
+              <ClearedToggle
+                pressed={newTransaction.cleared}
+                onPressedChange={(pressed) =>
+                  setNewTransaction((current) => ({
+                    ...current,
+                    cleared: pressed,
+                  }))
+                }
+              />
               <button
                 type="submit"
+                className="edit-icon-button button-success"
                 disabled={createTransactionMutation.isPending}
+                aria-label="Save transaction"
               >
-                Save
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5"/>
+                </svg>
               </button>
             </form>
+          </section>
 
+          <section className="card">
             <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Account</th>
-                    <th>Payee</th>
-                    <th>Category</th>
-                    <th>Note</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactionsQuery.isError ? (
-                    <tr>
-                      <td colSpan={8} className="error-text">
-                        {toDisplayErrorMessage(
-                          transactionsQuery.error,
-                          "Failed to load transactions.",
-                        )}
-                      </td>
-                    </tr>
-                  ) : null}
-                  {transactionsQuery.isLoading ? (
-                    <tr>
-                      <td colSpan={8} className="muted">
-                        Loading transactions...
-                      </td>
-                    </tr>
-                  ) : (transactionsQuery.data?.length ?? 0) === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="muted">
-                        No transactions in this account yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    (transactionsQuery.data ?? []).map((transaction) => (
-                      <tr key={transaction.id}>
-                        <td>
+              <div className="transaction-list" role="table">
+                <div className="transaction-header" role="row">
+                  <div className="transaction-cell" role="columnheader">Date</div>
+                  <div className="transaction-cell" role="columnheader">Account</div>
+                  <div className="transaction-cell" role="columnheader">Payee</div>
+                  <div className="transaction-cell" role="columnheader">Category</div>
+                  <div className="transaction-cell" role="columnheader">Note</div>
+                  <div className="transaction-cell" role="columnheader">Amount</div>
+                  <div className="transaction-cell" role="columnheader">Status</div>
+                  <div className="transaction-cell" role="columnheader"></div>
+                </div>
+                {transactionsQuery.isError ? (
+                  <div className="transaction-list-full-row error-text">
+                    {toDisplayErrorMessage(
+                      transactionsQuery.error,
+                      "Failed to load transactions.",
+                    )}
+                  </div>
+                ) : null}
+                {transactionsQuery.isLoading ? (
+                  <div className="transaction-list-full-row muted">
+                    Loading transactions...
+                  </div>
+                ) : (transactionsQuery.data?.length ?? 0) === 0 ? (
+                  <div className="transaction-list-full-row muted">
+                    No transactions in this account yet.
+                  </div>
+                ) : (
+                  (transactionsQuery.data ?? []).map((transaction) =>
+                    editingTransaction?.transactionId === transaction.id ? (
+                      <TransactionEditRow
+                        key={transaction.id}
+                        draft={editingTransaction.draft}
+                        onDraftChange={(draft) =>
+                          setEditingTransaction((prev) =>
+                            prev ? { ...prev, draft } : null,
+                          )
+                        }
+                        focusField={editingTransaction.focusField}
+                        accounts={accountsQuery.data ?? []}
+                        payees={payeesQuery.data ?? []}
+                        categoryGroups={categoriesQuery.data ?? []}
+                        onSave={handleSaveEdit}
+                        onCancel={() => setEditingTransaction(null)}
+                        isSaving={updateTransactionMutation.isPending}
+                        onCreatePayee={(name) =>
+                          createTransactionPayeeMutation.mutate({ name })
+                        }
+                        isCreatingPayee={createTransactionPayeeMutation.isPending}
+                        onCreateCategory={(name) =>
+                          createCategoryMutation.mutate({ name })
+                        }
+                        isCreatingCategory={createCategoryMutation.isPending}
+                      />
+                    ) : (
+                      <div key={transaction.id} className="transaction-row" role="row">
+                        <div
+                          className="transaction-cell clickable-cell"
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "date")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "date") }}
+                        >
                           {new Date(transaction.date)
                             .toISOString()
                             .slice(0, 10)}
-                        </td>
-                        <td>{transaction.account.name}</td>
-                        <td>{transaction.payee?.name ?? "—"}</td>
-                        <td>
+                        </div>
+                        <div
+                          className="transaction-cell clickable-cell"
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "account")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "account") }}
+                        >
+                          {transaction.account.name}
+                        </div>
+                        <div
+                          className="transaction-cell clickable-cell"
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "payee")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "payee") }}
+                        >
+                          {transaction.payee?.name ?? "—"}
+                        </div>
+                        <div
+                          className="transaction-cell clickable-cell"
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "category")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "category") }}
+                        >
                           {transaction.isTransfer
                             ? `Transfer → ${
                                 transaction.transferAccount?.name ?? "Account"
                               }`
                             : (transaction.category?.name ?? "—")}
-                        </td>
-                        <td>{transaction.note ?? "—"}</td>
-                        <td
-                          className={
+                        </div>
+                        <div
+                          className="transaction-cell clickable-cell"
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "note")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "note") }}
+                        >
+                          {transaction.note ?? "—"}
+                        </div>
+                        <div
+                          className={`transaction-cell clickable-cell ${
                             transaction.amountMinor >= 0
                               ? "amount-inflow"
                               : "amount-outflow"
-                          }
+                          }`}
+                          role="cell"
+                          tabIndex={0}
+                          onClick={() => startEditing(transaction, "amount")}
+                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "amount") }}
                         >
                           {formatMoney(transaction.amountMinor)}
-                        </td>
-                        <td>
+                        </div>
+                        <div className="transaction-cell" role="cell">
                           <TransactionBadge transaction={transaction} />
-                        </td>
-                        <td>
+                        </div>
+                        <div className="transaction-cell" role="cell">
                           <div className="row-actions">
-                            <label className="checkbox-inline">
-                              <input
-                                type="checkbox"
-                                checked={transaction.cleared}
-                                onChange={() =>
-                                  updateTransactionMutation.mutate({
-                                    transactionId: transaction.id,
-                                    patch: { cleared: !transaction.cleared },
-                                  })
-                                }
-                                disabled={updateTransactionMutation.isPending}
-                              />
-                              Cleared
-                            </label>
+                            <ClearedToggle
+                              pressed={transaction.cleared}
+                              onPressedChange={(pressed) =>
+                                updateTransactionMutation.mutate({
+                                  transactionId: transaction.id,
+                                  patch: { cleared: pressed },
+                                })
+                              }
+                              disabled={updateTransactionMutation.isPending}
+                            />
                             <button
                               type="button"
-                              className="button-danger"
+                              className="icon-button-danger"
                               onClick={() =>
                                 deleteTransactionMutation.mutate(transaction.id)
                               }
                               disabled={deleteTransactionMutation.isPending}
+                              aria-label="Delete transaction"
                             >
-                              Delete
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                              </svg>
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                        </div>
+                      </div>
+                    ),
+                  )
+                )}
+              </div>
             </div>
-            <div className="inline-controls" style={{ marginTop: "0.75rem" }}>
-              <span className="muted">
-                Page {Math.floor(transactionOffset / TRANSACTION_PAGE_SIZE) + 1}
-              </span>
+            <nav className="pagination">
               <button
                 type="button"
+                className="pagination-button"
                 onClick={() =>
                   setTransactionOffset((current) =>
                     Math.max(current - TRANSACTION_PAGE_SIZE, 0),
@@ -1218,11 +1379,18 @@ const AuthenticatedApp = () => {
                 disabled={
                   transactionOffset === 0 || transactionsQuery.isLoading
                 }
+                aria-label="Previous page"
               >
-                Previous Page
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
               </button>
+              <span className="pagination-page">
+                {Math.floor(transactionOffset / TRANSACTION_PAGE_SIZE) + 1}
+              </span>
               <button
                 type="button"
+                className="pagination-button"
                 onClick={() =>
                   setTransactionOffset(
                     (current) => current + TRANSACTION_PAGE_SIZE,
@@ -1231,10 +1399,13 @@ const AuthenticatedApp = () => {
                 disabled={
                   !transactionsHasNextPage || transactionsQuery.isLoading
                 }
+                aria-label="Next page"
               >
-                Next Page
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
               </button>
-            </div>
+            </nav>
           </section>
         </Tabs.Panel>
 
@@ -1462,24 +1633,17 @@ const AuthenticatedApp = () => {
               />
             </div>
             <div className="transaction-form">
-              <select
+              <AccountCombobox
+                accounts={accountsQuery.data ?? []}
                 value={newTransaction.accountId}
-                onChange={(event) => {
-                  const nextAccountId = event.target.value
-                  setTransactionOffset(0)
+                onChange={(accountId) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    accountId: nextAccountId,
+                    accountId,
                   }))
-                }}
-              >
-                <option value="">Select account</option>
-                {(accountsQuery.data ?? []).map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
+                }
+                placeholder="Select account"
+              />
               <input
                 type="file"
                 accept=".csv,text/csv"

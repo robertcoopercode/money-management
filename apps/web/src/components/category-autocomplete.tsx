@@ -1,30 +1,31 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
+import { Combobox } from "@base-ui/react/combobox"
 
-type CategoryAutocompleteProps = {
-  categoryGroups: Array<{
+type CategoryGroup = {
+  id: string
+  name: string
+  categories: Array<{
     id: string
     name: string
-    categories: Array<{
-      id: string
-      name: string
-    }>
   }>
+}
+
+type CategoryAutocompleteProps = {
+  categoryGroups: CategoryGroup[]
   value: string
   onChange: (categoryId: string) => void
   onCreateCategory?: (name: string) => void
   disabled?: boolean
   isCreating?: boolean
   placeholder?: string
+  initialInputValue?: string
 }
 
 type CategoryOption = {
   id: string
   name: string
   groupName: string
-  searchText: string
 }
-
-const normalizeSearchText = (text: string) => text.trim().toLowerCase()
 
 export const CategoryAutocomplete = ({
   categoryGroups,
@@ -34,182 +35,98 @@ export const CategoryAutocomplete = ({
   disabled = false,
   isCreating = false,
   placeholder = "Category",
+  initialInputValue = "",
 }: CategoryAutocompleteProps) => {
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  const listboxId = useId()
-  const [query, setQuery] = useState("")
-  const [isOpen, setIsOpen] = useState(false)
-  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [inputValue, setInputValue] = useState(initialInputValue)
+  const [open, setOpen] = useState(false)
 
-  const options = useMemo<CategoryOption[]>(
+  const allOptions = useMemo<CategoryOption[]>(
     () =>
       categoryGroups.flatMap((group) =>
-        group.categories.map((category) => ({
-          id: category.id,
-          name: category.name,
+        group.categories.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
           groupName: group.name,
-          searchText: `${group.name} ${category.name}`.toLowerCase(),
         })),
       ),
     [categoryGroups],
   )
 
-  const selectedOption = useMemo(
-    () => options.find((option) => option.id === value) ?? null,
-    [options, value],
+  const selectedCategory = useMemo(
+    () => allOptions.find((o) => o.id === value) ?? null,
+    [allOptions, value],
   )
 
-  useEffect(() => {
-    setQuery(selectedOption?.name ?? "")
-  }, [selectedOption])
-
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current) {
-        return
-      }
-
-      if (!rootRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-        setHighlightedIndex(-1)
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown)
-    }
-  }, [])
-
-  const normalizedQuery = normalizeSearchText(query)
-  const filteredOptions = useMemo(() => {
-    if (!normalizedQuery) {
-      return options
-    }
-
-    return options.filter((option) =>
-      option.searchText.includes(normalizedQuery),
-    )
-  }, [normalizedQuery, options])
-
   const showCreateButton =
-    Boolean(onCreateCategory) &&
-    normalizedQuery.length > 0 &&
-    filteredOptions.length === 0
-
-  const selectOption = (option: CategoryOption) => {
-    onChange(option.id)
-    setQuery(option.name)
-    setIsOpen(false)
-    setHighlightedIndex(-1)
-  }
+    Boolean(onCreateCategory) && inputValue.trim().length > 0
 
   return (
-    <div className="category-autocomplete" ref={rootRef}>
-      <input
+    <Combobox.Root<CategoryOption>
+      value={selectedCategory}
+      onValueChange={(category) => {
+        onChange(category?.id ?? "")
+      }}
+      inputValue={inputValue}
+      onInputValueChange={(newInputValue, details) => {
+        setInputValue(newInputValue)
+        if (details.reason === "input-change" && value) {
+          onChange("")
+        }
+      }}
+      open={open}
+      onOpenChange={(nextOpen) => setOpen(nextOpen)}
+      disabled={disabled}
+      items={allOptions}
+      itemToStringLabel={(c) => c.name}
+      isItemEqualToValue={(a, b) => a.id === b.id}
+      filter={(item, query) =>
+        `${item.groupName} ${item.name}`
+          .toLowerCase()
+          .includes(query.toLowerCase())
+      }
+    >
+      <Combobox.Input
         className="category-autocomplete-input"
-        type="text"
-        value={query}
         placeholder={placeholder}
-        disabled={disabled}
-        onFocus={() => {
-          if (!disabled) {
-            setIsOpen(true)
-          }
-        }}
-        onChange={(event) => {
-          setQuery(event.target.value)
-          setIsOpen(true)
-          setHighlightedIndex(-1)
-
-          if (value) {
-            onChange("")
-          }
-        }}
-        onKeyDown={(event) => {
-          if (!isOpen || filteredOptions.length === 0) {
-            if (event.key === "Escape") {
-              setIsOpen(false)
-            }
-            return
-          }
-
-          if (event.key === "ArrowDown") {
-            event.preventDefault()
-            setHighlightedIndex((current) =>
-              Math.min(current + 1, filteredOptions.length - 1),
-            )
-            return
-          }
-
-          if (event.key === "ArrowUp") {
-            event.preventDefault()
-            setHighlightedIndex((current) => Math.max(current - 1, 0))
-            return
-          }
-
-          if (event.key === "Enter" && highlightedIndex >= 0) {
-            event.preventDefault()
-            const option = filteredOptions[highlightedIndex]
-            if (option) selectOption(option)
-            return
-          }
-
-          if (event.key === "Escape") {
-            setIsOpen(false)
-          }
-        }}
-        role="combobox"
-        aria-expanded={isOpen}
-        aria-autocomplete="list"
-        aria-controls={listboxId}
       />
-
-      {isOpen && !disabled ? (
-        <div
-          className="category-autocomplete-menu"
-          role="listbox"
-          id={listboxId}
-        >
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((option, index) => (
+      <Combobox.Portal>
+        <Combobox.Positioner sideOffset={4}>
+          <Combobox.Popup className="category-autocomplete-menu">
+            <Combobox.List>
+              {(category: CategoryOption) => (
+                <Combobox.Item
+                  key={category.id}
+                  value={category}
+                  className="category-autocomplete-option"
+                >
+                  <span>{category.name}</span>
+                  <small>{category.groupName}</small>
+                </Combobox.Item>
+              )}
+            </Combobox.List>
+            <Combobox.Empty>
+              <p className="category-autocomplete-empty">
+                No matching categories.
+              </p>
+            </Combobox.Empty>
+            {showCreateButton && (
               <button
-                key={option.id}
                 type="button"
-                className={`category-autocomplete-option ${
-                  highlightedIndex === index ? "is-highlighted" : ""
-                }`}
-                onClick={() => selectOption(option)}
-                role="option"
-                aria-selected={selectedOption?.id === option.id}
+                className="category-autocomplete-create"
+                onClick={() => {
+                  onCreateCategory?.(inputValue.trim())
+                  setOpen(false)
+                }}
+                disabled={isCreating}
               >
-                <span>{option.name}</span>
-                <small>{option.groupName}</small>
+                {isCreating
+                  ? "Creating category..."
+                  : `New category "${inputValue.trim()}"`}
               </button>
-            ))
-          ) : (
-            <p className="category-autocomplete-empty">
-              No matching categories.
-            </p>
-          )}
-
-          {showCreateButton ? (
-            <button
-              type="button"
-              className="category-autocomplete-create"
-              onClick={() => {
-                onCreateCategory?.(query.trim())
-                setIsOpen(false)
-              }}
-              disabled={isCreating}
-            >
-              {isCreating
-                ? "Creating category..."
-                : `New category "${query.trim()}"`}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+            )}
+          </Combobox.Popup>
+        </Combobox.Positioner>
+      </Combobox.Portal>
+    </Combobox.Root>
   )
 }
