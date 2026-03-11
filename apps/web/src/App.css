@@ -569,15 +569,15 @@ button:disabled {
 .transaction-list {
   display: grid;
   grid-template-columns:
-    8%
-    12%
-    14%
-    14%
-    14%
-    10%
-    14%
-    14%;
-  min-width: 680px;
+    minmax(9.5rem, 1.1fr)
+    1.2fr
+    1.4fr
+    1.4fr
+    1.4fr
+    1fr
+    1fr
+    minmax(6rem, 1fr);
+  min-width: 780px;
 }
 
 .transaction-header {
@@ -624,6 +624,7 @@ button:disabled {
 .transaction-edit-row .transaction-cell {
   padding: 0.3rem 0.35rem;
 }
+
 
 .transaction-list-full-row {
   grid-column: 1 / -1;
