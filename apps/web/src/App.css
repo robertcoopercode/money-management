@@ -1,5 +1,7 @@
 .app-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
   padding: 1.5rem;
   background:
     radial-gradient(140% 140% at 100% 0%, rgb(45 22 88 / 40%) 0%, transparent 50%),
@@ -72,6 +74,10 @@
   border: 1px solid rgb(95 117 171 / 25%);
   border-radius: 14px;
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tabs-list {
@@ -120,6 +126,11 @@
 
 .panel {
   padding: 1rem;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .grid-two {
@@ -347,6 +358,10 @@ button:disabled {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   border-top: 1px solid rgb(95 117 171 / 35%);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .transaction-form {
@@ -674,7 +689,8 @@ button:disabled {
 
 .table-wrap {
   overflow: auto;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
 }
 
 .transaction-list {
@@ -1170,4 +1186,75 @@ button:disabled {
 
 .transaction-list .split-remaining-label {
   grid-column: 4 / -1;
+}
+
+/* ── Split chevron (read-only expand/collapse) ── */
+
+.split-chevron {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.split-chevron:hover {
+  color: inherit;
+}
+
+.split-chevron svg {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.split-chevron-expanded {
+  transform: rotate(90deg);
+}
+
+/* ── Read-only split detail rows ── */
+
+.split-detail-row {
+  display: contents;
+}
+
+.split-detail-row > .transaction-cell {
+  background: rgb(15 25 55 / 40%);
+}
+
+.split-detail-row > .clickable-cell:hover {
+  background: rgb(70 99 184 / 18%);
+}
+
+.split-detail-row > .clickable-cell:focus-visible {
+  background: rgb(70 99 184 / 18%);
+  outline: 2px solid rgb(120 160 255 / 60%);
+  outline-offset: -2px;
+}
+
+.split-detail-leading {
+  grid-column: 1 / 4;
+}
+
+.split-detail-category {
+  grid-column: 4;
+}
+
+.split-detail-note {
+  grid-column: 5;
+}
+
+.split-detail-amount {
+  grid-column: 6;
+}
+
+.split-detail-trailing {
+  grid-column: 7 / -1;
 }

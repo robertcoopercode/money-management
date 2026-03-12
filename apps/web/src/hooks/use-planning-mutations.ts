@@ -1,0 +1,30 @@
+import { useMutation } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { apiFetch } from "../lib/api.js"
+import type { AssignmentMutationInput } from "../types.js"
+
+export const usePlanningMutations = (opts: {
+  month: string
+  refetchCoreData: () => void
+}) => {
+  const assignMutation = useMutation({
+    mutationFn: (input: AssignmentMutationInput) =>
+      apiFetch("/api/planning/assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          month: opts.month,
+          categoryId: input.categoryId,
+          assignedMinor: input.assignedMinor,
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Category assignment updated")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to update assignment: ${error.message}`)
+    },
+  })
+
+  return { assignMutation }
+}

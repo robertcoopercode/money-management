@@ -23,6 +23,7 @@ type TransactionEditRowProps = {
   draft: TransactionDraft
   onDraftChange: (draft: TransactionDraft) => void
   focusField: EditableField | null
+  focusSplitIndex?: number
   accounts: Array<{ id: string; name: string; type: string }>
   payees: Array<{ id: string; name: string }>
   categoryGroups: CategoryGroup[]
@@ -50,6 +51,7 @@ export const TransactionEditRow = ({
   draft,
   onDraftChange,
   focusField,
+  focusSplitIndex,
   accounts,
   payees,
   categoryGroups,
@@ -98,7 +100,27 @@ export const TransactionEditRow = ({
   }, [])
 
   useEffect(() => {
-    if (!focusField || !formRef.current) return
+    if (!formRef.current) return
+    if (focusSplitIndex != null) {
+      const splitRows = formRef.current.querySelectorAll<HTMLElement>(
+        ":scope > .split-row",
+      )
+      const splitRow = splitRows[focusSplitIndex]
+      if (splitRow) {
+        const splitFieldClass =
+          focusField === "note"
+            ? ".split-cell-note"
+            : focusField === "amount"
+              ? ".split-cell-amount"
+              : ".split-cell-category"
+        const input = splitRow.querySelector<HTMLElement>(
+          `${splitFieldClass} input`,
+        )
+        input?.focus()
+        return
+      }
+    }
+    if (!focusField) return
     const colIndex = FIELD_TO_COLUMN[focusField]
     const cells = formRef.current.querySelectorAll<HTMLElement>(
       ":scope > .transaction-cell",

@@ -27,6 +27,10 @@ export const splitCsvLine = (line: string) => {
   return values
 }
 
+export const parseCsvFile = async (file: File) => {
+  return file.text()
+}
+
 export const buildCsvPreview = (csvText: string): CsvPreview | null => {
   const lines = csvText
     .split(/\r?\n/u)

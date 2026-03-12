@@ -111,6 +111,9 @@ export const SplitEditor = ({
                 })
               }}
               placeholder="Payee"
+              initialInputValue={
+                payees.find((p) => p.id === split.payeeId)?.name ?? ""
+              }
             />
           </div>
           <div className="split-cell split-cell-category">
@@ -121,6 +124,11 @@ export const SplitEditor = ({
               onCreateCategory={onCreateCategory}
               isCreating={isCreatingCategory}
               placeholder="Category"
+              initialInputValue={
+                categoryGroups
+                  .flatMap((g) => g.categories)
+                  .find((c) => c.id === split.categoryId)?.name ?? ""
+              }
             />
           </div>
           <div className="split-cell split-cell-note">
