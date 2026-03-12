@@ -1,5 +1,5 @@
 export const formatMoney = (amountMinor: number, currency = "CAD"): string => {
-  const amount = amountMinor / 100
+  const amount = (amountMinor || 0) / 100
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency,

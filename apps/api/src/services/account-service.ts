@@ -13,13 +13,14 @@ export const listAccounts = Effect.tryPromise({
             amountMinor: true,
           },
         },
+        loanProfile: true,
       },
     }),
   catch: (error) => new Error(`Unable to list accounts: ${String(error)}`),
 }).pipe(
   Effect.map((accounts) =>
     accounts.map((account) => {
-      const { transactions, ...rest } = account
+      const { transactions, loanProfile, ...rest } = account
       const transactionTotal = transactions.reduce(
         (sum, item) => sum + item.amountMinor,
         0,
@@ -28,14 +29,22 @@ export const listAccounts = Effect.tryPromise({
       return {
         ...rest,
         balanceMinor: account.startingBalanceMinor + transactionTotal,
+        loanProfile: loanProfile
+          ? {
+              loanType: loanProfile.loanType,
+              interestRateAnnual: Number(loanProfile.interestRateAnnual),
+              minimumPaymentMinor: loanProfile.minimumPaymentMinor,
+            }
+          : null,
       }
     }),
   ),
 )
 
-export const createAccount = (input: Prisma.AccountUncheckedCreateInput) =>
+export const createAccount = (input: Prisma.AccountCreateInput) =>
   Effect.tryPromise({
-    try: () => prisma.account.create({ data: input }),
+    try: () =>
+      prisma.account.create({ data: input, include: { loanProfile: true } }),
     catch: (error) => new Error(`Unable to create account: ${String(error)}`),
   })
 

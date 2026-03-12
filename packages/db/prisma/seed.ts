@@ -46,12 +46,12 @@ const groups: CategoryGroupSeed[] = [
 const accounts = [
   {
     name: "TD Chequing",
-    type: "CHEQUING" as const,
+    type: "CASH" as const,
     startingBalanceMinor: 450000,
   },
   {
     name: "Visa Infinite",
-    type: "CREDIT_CARD" as const,
+    type: "CREDIT" as const,
     startingBalanceMinor: -128500,
   },
 ]

@@ -39,11 +39,7 @@ export const LoginPage = ({ onSuccess }: LoginPageProps) => {
   return (
     <div className="login-page">
       <div className="login-card">
-        <img
-          className="brand-mark"
-          src="/ledgr-favicon.svg"
-          alt="Ledgr logo"
-        />
+        <img className="brand-mark" src="/ledgr-favicon.svg" alt="Ledgr logo" />
         <h1>Ledgr</h1>
         <form onSubmit={handleSubmit}>
           <input

@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { OriginType, Prisma, prisma } from "@ledgr/db"
-import type { TransactionFilterInput } from "@ledgr/shared"
+import type {
+  TransactionFilterInput,
+  TransactionSplitInput,
+} from "@ledgr/shared"
 import { Effect } from "effect"
 import {
   buildMirrorTransferNote,
@@ -15,6 +18,13 @@ const transactionInclude = {
   category: { include: { group: true } },
   transferAccount: true,
   origins: true,
+  splits: {
+    include: {
+      category: { include: { group: true } },
+      payee: true,
+    },
+    orderBy: { sortOrder: "asc" as const },
+  },
 } satisfies Prisma.TransactionInclude
 
 export const listTransactions = (filters: TransactionFilterInput) =>
@@ -54,6 +64,7 @@ export const createTransaction = (input: {
   categoryId?: string
   note?: string
   cleared: boolean
+  splits?: TransactionSplitInput[]
 }) =>
   Effect.tryPromise({
     try: async () => {
@@ -63,7 +74,25 @@ export const createTransaction = (input: {
         )
       }
 
+      const hasSplits = input.splits && input.splits.length > 0
       const transferPairId = input.transferAccountId ? randomUUID() : null
+
+      // Check if this is a loan transfer (category allowed)
+      let isLoanTransfer = false
+      if (input.transferAccountId) {
+        const [sourceAccount, targetAccount] = await Promise.all([
+          prisma.account.findUnique({
+            where: { id: input.accountId },
+            select: { type: true },
+          }),
+          prisma.account.findUnique({
+            where: { id: input.transferAccountId },
+            select: { type: true },
+          }),
+        ])
+        isLoanTransfer =
+          sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+      }
 
       const sourceTransaction = await prisma.$transaction(
         async (transactionDb) => {
@@ -75,15 +104,29 @@ export const createTransaction = (input: {
               date: toDate(input.date),
               amountMinor: input.amountMinor,
               payeeId: input.payeeId,
-              categoryId: input.transferAccountId
-                ? undefined
-                : input.categoryId,
+              categoryId:
+                (input.transferAccountId && !isLoanTransfer) || hasSplits
+                  ? undefined
+                  : input.categoryId,
               note: input.note,
               cleared: input.cleared,
               manualCreated: true,
               isTransfer: Boolean(input.transferAccountId),
             },
           })
+
+          if (hasSplits) {
+            await transactionDb.transactionSplit.createMany({
+              data: input.splits!.map((split, index) => ({
+                transactionId: source.id,
+                categoryId: split.categoryId,
+                payeeId: split.payeeId,
+                note: split.note,
+                amountMinor: split.amountMinor,
+                sortOrder: index,
+              })),
+            })
+          }
 
           await transactionDb.transactionOrigin.create({
             data: {
@@ -101,6 +144,7 @@ export const createTransaction = (input: {
                 date: toDate(input.date),
                 amountMinor: toMirrorTransferAmountMinor(input.amountMinor),
                 payeeId: input.payeeId,
+                categoryId: isLoanTransfer ? input.categoryId : undefined,
                 note: buildMirrorTransferNote(input.note),
                 cleared: input.cleared,
                 manualCreated: true,
@@ -140,6 +184,7 @@ export const updateTransaction = (
     categoryId?: string
     note?: string
     cleared?: boolean
+    splits?: TransactionSplitInput[]
   },
 ) =>
   Effect.tryPromise({
@@ -149,6 +194,9 @@ export const updateTransaction = (
         select: {
           id: true,
           transferPairId: true,
+          isTransfer: true,
+          account: { select: { type: true } },
+          transferAccount: { select: { type: true } },
         },
       })
 
@@ -156,37 +204,70 @@ export const updateTransaction = (
         throw new Error("Transaction not found.")
       }
 
+      if (input.splits && input.splits.length > 0 && existing.isTransfer) {
+        throw new Error("Split transactions cannot be transfers.")
+      }
+
+      const existingIsLoanTransfer =
+        existing.account.type === "LOAN" ||
+        existing.transferAccount?.type === "LOAN"
+
       if (
         existing.transferPairId &&
         (input.accountId !== undefined ||
           input.transferAccountId !== undefined ||
-          input.categoryId !== undefined)
+          (input.categoryId !== undefined && !existingIsLoanTransfer))
       ) {
         throw new Error(
           "Changing transfer accounts/categories requires recreating the transfer.",
         )
       }
 
+      const hasSplits = input.splits !== undefined && input.splits.length > 0
+
       if (!existing.transferPairId) {
-        return prisma.transaction.update({
-          where: { id: transactionId },
-          data: {
-            accountId: input.accountId,
-            transferAccountId: input.transferAccountId,
-            isTransfer:
-              input.transferAccountId !== undefined
-                ? Boolean(input.transferAccountId)
-                : undefined,
-            date: input.date ? toDate(input.date) : undefined,
-            amountMinor: input.amountMinor,
-            payeeId: input.payeeId,
-            categoryId: input.categoryId,
-            note: input.note,
-            cleared: input.cleared,
-          },
-          include: {
-            ...transactionInclude,
-          },
+        return prisma.$transaction(async (transactionDb) => {
+          await transactionDb.transaction.update({
+            where: { id: transactionId },
+            data: {
+              accountId: input.accountId,
+              transferAccountId: input.transferAccountId,
+              isTransfer:
+                input.transferAccountId !== undefined
+                  ? Boolean(input.transferAccountId)
+                  : undefined,
+              date: input.date ? toDate(input.date) : undefined,
+              amountMinor: input.amountMinor,
+              payeeId: input.payeeId,
+              categoryId: hasSplits ? null : input.categoryId,
+              note: input.note,
+              cleared: input.cleared,
+            },
+          })
+
+          if (input.splits !== undefined) {
+            await transactionDb.transactionSplit.deleteMany({
+              where: { transactionId },
+            })
+
+            if (input.splits.length > 0) {
+              await transactionDb.transactionSplit.createMany({
+                data: input.splits.map((split, index) => ({
+                  transactionId,
+                  categoryId: split.categoryId,
+                  payeeId: split.payeeId,
+                  note: split.note,
+                  amountMinor: split.amountMinor,
+                  sortOrder: index,
+                })),
+              })
+            }
+          }
+
+          return transactionDb.transaction.findUniqueOrThrow({
+            where: { id: transactionId },
+            include: transactionInclude,
+          })
         })
       }
 
@@ -197,6 +278,7 @@ export const updateTransaction = (
             date: input.date ? toDate(input.date) : undefined,
             amountMinor: input.amountMinor,
             payeeId: input.payeeId,
+            categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
             note: input.note,
             cleared: input.cleared,
           },
@@ -220,6 +302,7 @@ export const updateTransaction = (
                   ? toMirrorTransferAmountMinor(input.amountMinor)
                   : undefined,
               payeeId: input.payeeId,
+              categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
               note:
                 input.note !== undefined
                   ? buildMirrorTransferNote(input.note)

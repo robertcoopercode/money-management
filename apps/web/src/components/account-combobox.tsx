@@ -59,7 +59,7 @@ export const AccountCombobox = ({
         placeholder={placeholder}
       />
       <Combobox.Portal>
-        <Combobox.Positioner sideOffset={4}>
+        <Combobox.Positioner sideOffset={4} className="combobox-positioner">
           <Combobox.Popup className="category-autocomplete-menu">
             <Combobox.List>
               {(account: AccountOption) => (

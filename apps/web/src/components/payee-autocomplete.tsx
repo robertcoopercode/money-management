@@ -1,27 +1,30 @@
-import { useMemo, useState } from "react"
-import { Combobox } from "@base-ui/react/combobox"
+import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  SearchableSelect,
+  type SearchableSelectGroup,
+} from "./searchable-select.js"
 
 type Payee = {
   id: string
   name: string
 }
 
-export type PayeeOption =
-  | { kind: "payee"; id: string; name: string }
-  | { kind: "transfer"; id: string; name: string; accountId: string }
-
-type PayeeGroup = {
-  label: string
-  items: PayeeOption[]
+export type PayeeOption = { kind: "payee"; id: string; name: string } | {
+  kind: "transfer"
+  id: string
+  name: string
+  accountId: string
+  isLoanPayment?: boolean
 }
 
 type PayeeAutocompleteProps = {
   payees: Payee[]
-  accounts: Array<{ id: string; name: string }>
+  accounts: Array<{ id: string; name: string; type: string }>
   currentAccountId: string
   value: PayeeOption | null
   onChange: (selection: PayeeOption | null) => void
-  onCreatePayee?: (name: string) => void
+  onCreatePayee?: (name: string) => Promise<{ id: string; name: string }>
+  onManagePayees?: () => void
   disabled?: boolean
   isCreating?: boolean
   placeholder?: string
@@ -35,6 +38,7 @@ export const PayeeAutocomplete = ({
   value,
   onChange,
   onCreatePayee,
+  onManagePayees,
   disabled = false,
   isCreating = false,
   placeholder = "Payee",
@@ -42,16 +46,35 @@ export const PayeeAutocomplete = ({
 }: PayeeAutocompleteProps) => {
   const [inputValue, setInputValue] = useState(initialInputValue)
   const [open, setOpen] = useState(false)
+  const justCreatedRef = useRef(false)
 
-  const groups = useMemo<PayeeGroup[]>(() => {
+  useEffect(() => {
+    if (!value && !justCreatedRef.current) setInputValue("")
+    if (value) justCreatedRef.current = false
+  }, [value])
+
+  const groups = useMemo<SearchableSelectGroup<PayeeOption>[]>(() => {
+    const currentAccount = accounts.find((a) => a.id === currentAccountId)
     const transferItems: PayeeOption[] = accounts
       .filter((a) => a.id !== currentAccountId)
-      .map((a) => ({
-        kind: "transfer" as const,
-        id: `transfer:${a.id}`,
-        name: a.name,
-        accountId: a.id,
-      }))
+      .map((a) => {
+        const isLoanTransfer =
+          a.type === "LOAN" || currentAccount?.type === "LOAN"
+        let displayName = a.name
+        if (isLoanTransfer) {
+          displayName =
+            a.type === "LOAN"
+              ? `Payment to ${a.name}`
+              : `Payment from ${a.name}`
+        }
+        return {
+          kind: "transfer" as const,
+          id: `transfer:${a.id}`,
+          name: displayName,
+          accountId: a.id,
+          isLoanPayment: isLoanTransfer,
+        }
+      })
 
     const payeeItems: PayeeOption[] = payees.map((p) => ({
       kind: "payee" as const,
@@ -65,84 +88,112 @@ export const PayeeAutocomplete = ({
     ]
   }, [accounts, currentAccountId, payees])
 
+  const exactMatchExists = useMemo(() => {
+    const query = inputValue.trim().toLowerCase()
+    if (!query) return true
+    return groups.some((g) =>
+      g.items.some((item) => item.name.toLowerCase() === query),
+    )
+  }, [groups, inputValue])
+
   const showCreateButton =
-    Boolean(onCreatePayee) && inputValue.trim().length > 0
+    Boolean(onCreatePayee) && inputValue.trim().length > 0 && !exactMatchExists
+
+  const hasFilteredResults = useMemo(() => {
+    if (!inputValue.trim()) return true
+    const query = inputValue.toLowerCase()
+    return groups.some((g) =>
+      g.items.some((item) => item.name.toLowerCase().includes(query)),
+    )
+  }, [groups, inputValue])
+
+  const handleCreate = async () => {
+    const name = inputValue.trim()
+    if (!name || !onCreatePayee) return
+    const payee = await onCreatePayee(name)
+    justCreatedRef.current = true
+    onChange({ kind: "payee", id: payee.id, name: payee.name })
+    setInputValue(payee.name)
+    setOpen(false)
+  }
 
   return (
-    <Combobox.Root<PayeeOption, PayeeGroup>
+    <SearchableSelect<PayeeOption>
+      items={groups}
       value={value}
-      onValueChange={(option) => {
-        onChange(option ?? null)
-      }}
+      onValueChange={(option) => onChange(option ?? null)}
       inputValue={inputValue}
       onInputValueChange={(newInputValue, details) => {
+        if (justCreatedRef.current && details.reason !== "input-change") return
         setInputValue(newInputValue)
         if (details.reason === "input-change" && value) {
           onChange(null)
         }
       }}
       open={open}
-      onOpenChange={(nextOpen) => setOpen(nextOpen)}
+      onOpenChange={setOpen}
       disabled={disabled}
-      items={groups}
-      itemToStringLabel={(item) => item.name}
-      isItemEqualToValue={(a, b) => a.id === b.id}
+      placeholder={placeholder}
+      itemToString={(item) => item.name}
+      isItemEqual={(a, b) => a.id === b.id}
       filter={(item, query) =>
         item.name.toLowerCase().includes(query.toLowerCase())
       }
-    >
-      <Combobox.Input
-        className="category-autocomplete-input"
-        placeholder={placeholder}
-      />
-      <Combobox.Portal>
-        <Combobox.Positioner sideOffset={4}>
-          <Combobox.Popup className="category-autocomplete-menu">
-            <Combobox.List>
-              <Combobox.Collection>
-                {(group: PayeeGroup) => (
-                  <Combobox.Group key={group.label} items={group.items}>
-                    <Combobox.GroupLabel className="payee-group-label">
-                      {group.label}
-                    </Combobox.GroupLabel>
-                    <Combobox.Collection>
-                      {(item: PayeeOption) => (
-                        <Combobox.Item
-                          key={item.id}
-                          value={item}
-                          className="category-autocomplete-option"
-                        >
-                          <span>{item.name}</span>
-                        </Combobox.Item>
-                      )}
-                    </Combobox.Collection>
-                  </Combobox.Group>
-                )}
-              </Combobox.Collection>
-            </Combobox.List>
-            <Combobox.Empty>
-              <p className="category-autocomplete-empty">
-                No matching payees.
-              </p>
-            </Combobox.Empty>
-            {showCreateButton && (
-              <button
-                type="button"
-                className="category-autocomplete-create"
-                onClick={() => {
-                  onCreatePayee?.(inputValue.trim())
-                  setOpen(false)
-                }}
-                disabled={isCreating}
-              >
-                {isCreating
-                  ? "Creating payee..."
-                  : `New payee "${inputValue.trim()}"`}
-              </button>
-            )}
-          </Combobox.Popup>
-        </Combobox.Positioner>
-      </Combobox.Portal>
-    </Combobox.Root>
+      emptyMessage="No matching payees."
+      topAction={
+        showCreateButton ? (
+          <button
+            type="button"
+            className="searchable-select-create"
+            onClick={() => void handleCreate()}
+            disabled={isCreating}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+            </svg>
+            {isCreating
+              ? "Creating payee..."
+              : `Create "${inputValue.trim()}" Payee`}
+          </button>
+        ) : undefined
+      }
+      bottomAction={
+        onManagePayees ? (
+          <button
+            type="button"
+            className="searchable-select-link"
+            onClick={() => {
+              onManagePayees()
+              setOpen(false)
+            }}
+          >
+            Manage Payees
+          </button>
+        ) : undefined
+      }
+      renderItem={(item) => <span>{item.name}</span>}
+      onInputKeyDown={(e) => {
+        if (
+          e.key === "Enter" &&
+          showCreateButton &&
+          !hasFilteredResults &&
+          !isCreating
+        ) {
+          e.preventDefault()
+          void handleCreate()
+        }
+      }}
+    />
   )
 }

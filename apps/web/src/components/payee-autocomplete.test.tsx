@@ -11,8 +11,8 @@ const payees = [
 ]
 
 const accounts = [
-  { id: "chequing", name: "RBC Chequing" },
-  { id: "credit", name: "Rogers MasterCard" },
+  { id: "chequing", name: "RBC Chequing", type: "CASH" },
+  { id: "credit", name: "Rogers MasterCard", type: "CREDIT" },
 ]
 
 const defaultProps = {
@@ -61,13 +61,12 @@ describe("PayeeAutocomplete", () => {
 
   it("shows create button only when no payee matches", async () => {
     const user = userEvent.setup()
-    const onCreatePayee = vi.fn()
+    const onCreatePayee = vi
+      .fn()
+      .mockResolvedValue({ id: "new", name: "Coffee Shop" })
 
     render(
-      <PayeeAutocomplete
-        {...defaultProps}
-        onCreatePayee={onCreatePayee}
-      />,
+      <PayeeAutocomplete {...defaultProps} onCreatePayee={onCreatePayee} />,
     )
 
     const input = screen.getByRole("combobox")
@@ -93,9 +92,7 @@ describe("PayeeAutocomplete", () => {
     expect(
       screen.getByRole("option", { name: /Rogers MasterCard/i }),
     ).toBeTruthy()
-    expect(
-      screen.queryByRole("option", { name: /RBC Chequing/i }),
-    ).toBeNull()
+    expect(screen.queryByRole("option", { name: /RBC Chequing/i })).toBeNull()
   })
 
   it("calls onChange with transfer option when selecting a transfer account", async () => {
@@ -106,15 +103,14 @@ describe("PayeeAutocomplete", () => {
 
     const input = screen.getByRole("combobox")
     await user.click(input)
-    await user.click(
-      screen.getByRole("option", { name: /Rogers MasterCard/i }),
-    )
+    await user.click(screen.getByRole("option", { name: /Rogers MasterCard/i }))
 
     expect(onChange).toHaveBeenLastCalledWith({
       kind: "transfer",
       id: "transfer:credit",
       name: "Rogers MasterCard",
       accountId: "credit",
+      isLoanPayment: false,
     })
   })
 })

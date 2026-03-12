@@ -8,8 +8,15 @@ datasource db {
 }
 
 enum AccountType {
-  CHEQUING
-  CREDIT_CARD
+  CASH
+  CREDIT
+  INVESTMENT
+  LOAN
+}
+
+enum LoanType {
+  MORTGAGE
+  AUTO
 }
 
 enum OriginType {
@@ -48,6 +55,16 @@ model Account {
   transactions        Transaction[]
   incomingTransferLinks Transaction[] @relation("TransferTarget")
   importBatches       ImportBatch[]
+  loanProfile         LoanProfile?
+}
+
+model LoanProfile {
+  id                   String   @id @default(cuid())
+  accountId            String   @unique
+  loanType             LoanType
+  interestRateAnnual   Decimal  @db.Decimal(8, 6)
+  minimumPaymentMinor  Int
+  account              Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 model Payee {
@@ -58,6 +75,7 @@ model Payee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   transactions   Transaction[]
+  transactionSplits TransactionSplit[]
 
   @@index([normalizedName])
 }
@@ -85,6 +103,7 @@ model Category {
   assignments      CategoryAssignment[]
   group            CategoryGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   transactions     Transaction[]
+  transactionSplits TransactionSplit[]
 
   @@unique([groupId, name])
 }
@@ -110,6 +129,7 @@ model Transaction {
   payee          Payee?              @relation(fields: [payeeId], references: [id], onDelete: SetNull)
   transferAccount Account?           @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
   origins        TransactionOrigin[]
+  splits         TransactionSplit[]
   matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
 
   @@index([accountId, date])
@@ -188,5 +208,24 @@ model CategoryAssignment {
 
   @@unique([budgetMonthId, categoryId])
   @@index([categoryId, budgetMonthId])
+}
+
+model TransactionSplit {
+  id            String      @id @default(cuid())
+  transactionId String
+  categoryId    String
+  payeeId       String?
+  note          String?
+  amountMinor   Int
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  payee         Payee?      @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+
+  @@index([transactionId])
+  @@index([categoryId, transactionId])
 }
 

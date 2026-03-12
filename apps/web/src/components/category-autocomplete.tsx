@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react"
-import { Combobox } from "@base-ui/react/combobox"
+import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  SearchableSelect,
+  type SearchableSelectGroup,
+} from "./searchable-select.js"
 
 type CategoryGroup = {
   id: string
@@ -14,7 +17,8 @@ type CategoryAutocompleteProps = {
   categoryGroups: CategoryGroup[]
   value: string
   onChange: (categoryId: string) => void
-  onCreateCategory?: (name: string) => void
+  onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
+  onSplit?: () => void
   disabled?: boolean
   isCreating?: boolean
   placeholder?: string
@@ -32,6 +36,7 @@ export const CategoryAutocomplete = ({
   value,
   onChange,
   onCreateCategory,
+  onSplit,
   disabled = false,
   isCreating = false,
   placeholder = "Category",
@@ -39,17 +44,24 @@ export const CategoryAutocomplete = ({
 }: CategoryAutocompleteProps) => {
   const [inputValue, setInputValue] = useState(initialInputValue)
   const [open, setOpen] = useState(false)
+  const justCreatedRef = useRef(false)
 
-  const allOptions = useMemo<CategoryOption[]>(
+  const groups = useMemo<SearchableSelectGroup<CategoryOption>[]>(
     () =>
-      categoryGroups.flatMap((group) =>
-        group.categories.map((cat) => ({
+      categoryGroups.map((group) => ({
+        label: group.name,
+        items: group.categories.map((cat) => ({
           id: cat.id,
           name: cat.name,
           groupName: group.name,
         })),
-      ),
+      })),
     [categoryGroups],
+  )
+
+  const allOptions = useMemo<CategoryOption[]>(
+    () => groups.flatMap((g) => g.items),
+    [groups],
   )
 
   const selectedCategory = useMemo(
@@ -57,76 +69,139 @@ export const CategoryAutocomplete = ({
     [allOptions, value],
   )
 
+  useEffect(() => {
+    if (!value && !justCreatedRef.current) setInputValue("")
+    if (value && selectedCategory) justCreatedRef.current = false
+  }, [value, selectedCategory])
+
+  const exactMatchExists = useMemo(() => {
+    const query = inputValue.trim().toLowerCase()
+    if (!query) return true
+    return allOptions.some((item) => item.name.toLowerCase() === query)
+  }, [allOptions, inputValue])
+
   const showCreateButton =
-    Boolean(onCreateCategory) && inputValue.trim().length > 0
+    Boolean(onCreateCategory) &&
+    inputValue.trim().length > 0 &&
+    !exactMatchExists
+
+  const hasFilteredResults = useMemo(() => {
+    if (!inputValue.trim()) return true
+    const query = inputValue.toLowerCase()
+    return allOptions.some((item) =>
+      `${item.groupName} ${item.name}`.toLowerCase().includes(query),
+    )
+  }, [allOptions, inputValue])
+
+  const handleCreate = async () => {
+    const name = inputValue.trim()
+    if (!name || !onCreateCategory) return
+    const category = await onCreateCategory(name)
+    justCreatedRef.current = true
+    onChange(category.id)
+    setInputValue(category.name)
+    setOpen(false)
+  }
 
   return (
-    <Combobox.Root<CategoryOption>
+    <SearchableSelect<CategoryOption>
+      items={groups}
       value={selectedCategory}
-      onValueChange={(category) => {
-        onChange(category?.id ?? "")
-      }}
+      onValueChange={(category) => onChange(category?.id ?? "")}
       inputValue={inputValue}
       onInputValueChange={(newInputValue, details) => {
+        if (justCreatedRef.current && details.reason !== "input-change") return
         setInputValue(newInputValue)
         if (details.reason === "input-change" && value) {
           onChange("")
         }
       }}
       open={open}
-      onOpenChange={(nextOpen) => setOpen(nextOpen)}
+      onOpenChange={setOpen}
       disabled={disabled}
-      items={allOptions}
-      itemToStringLabel={(c) => c.name}
-      isItemEqualToValue={(a, b) => a.id === b.id}
+      placeholder={placeholder}
+      itemToString={(c) => c.name}
+      isItemEqual={(a, b) => a.id === b.id}
       filter={(item, query) =>
         `${item.groupName} ${item.name}`
           .toLowerCase()
           .includes(query.toLowerCase())
       }
-    >
-      <Combobox.Input
-        className="category-autocomplete-input"
-        placeholder={placeholder}
-      />
-      <Combobox.Portal>
-        <Combobox.Positioner sideOffset={4}>
-          <Combobox.Popup className="category-autocomplete-menu">
-            <Combobox.List>
-              {(category: CategoryOption) => (
-                <Combobox.Item
-                  key={category.id}
-                  value={category}
-                  className="category-autocomplete-option"
-                >
-                  <span>{category.name}</span>
-                  <small>{category.groupName}</small>
-                </Combobox.Item>
-              )}
-            </Combobox.List>
-            <Combobox.Empty>
-              <p className="category-autocomplete-empty">
-                No matching categories.
-              </p>
-            </Combobox.Empty>
-            {showCreateButton && (
-              <button
-                type="button"
-                className="category-autocomplete-create"
-                onClick={() => {
-                  onCreateCategory?.(inputValue.trim())
-                  setOpen(false)
-                }}
-                disabled={isCreating}
-              >
-                {isCreating
-                  ? "Creating category..."
-                  : `New category "${inputValue.trim()}"`}
-              </button>
-            )}
-          </Combobox.Popup>
-        </Combobox.Positioner>
-      </Combobox.Portal>
-    </Combobox.Root>
+      emptyMessage="No matching categories."
+      topAction={
+        showCreateButton ? (
+          <button
+            type="button"
+            className="searchable-select-create"
+            onClick={() => void handleCreate()}
+            disabled={isCreating}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+            </svg>
+            {isCreating
+              ? "Creating category..."
+              : `Create "${inputValue.trim()}" Category`}
+          </button>
+        ) : undefined
+      }
+      bottomAction={
+        onSplit ? (
+          <button
+            type="button"
+            className="searchable-select-split"
+            onClick={() => {
+              onSplit()
+              setOpen(false)
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M16 3h5v5" />
+              <path d="M8 3H3v5" />
+              <path d="M12 22V8" />
+              <path d="m3 8 9-5 9 5" />
+            </svg>
+            Split transaction
+          </button>
+        ) : undefined
+      }
+      renderItem={(category) => (
+        <>
+          <span>{category.name}</span>
+          <small>{category.groupName}</small>
+        </>
+      )}
+      onInputKeyDown={(e) => {
+        if (
+          e.key === "Enter" &&
+          showCreateButton &&
+          !hasFilteredResults &&
+          !isCreating
+        ) {
+          e.preventDefault()
+          void handleCreate()
+        }
+      }}
+    />
   )
 }

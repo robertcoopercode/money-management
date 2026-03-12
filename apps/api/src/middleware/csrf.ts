@@ -7,8 +7,7 @@ export const csrfMiddleware = async (c: Context, next: Next) => {
     return next()
   }
 
-  const allowedOrigin =
-    process.env.AUTH_ORIGIN ?? "http://localhost:5173"
+  const allowedOrigin = process.env.AUTH_ORIGIN ?? "http://localhost:5173"
   const origin = c.req.header("origin")
 
   if (!origin || origin !== allowedOrigin) {

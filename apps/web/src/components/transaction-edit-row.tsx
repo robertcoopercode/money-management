@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef } from "react"
+import { parseMoneyInputToMinor } from "@ledgr/shared"
 import { AccountCombobox } from "./account-combobox.js"
-import {
-  PayeeAutocomplete,
-  type PayeeOption,
-} from "./payee-autocomplete.js"
+import { PayeeAutocomplete, type PayeeOption } from "./payee-autocomplete.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
 import { ClearedToggle } from "./cleared-toggle.js"
-import type { TransactionDraft, EditableField } from "../lib/transaction-entry.js"
+import { DatePicker } from "./date-picker.js"
+import { SplitEditor } from "./split-editor.js"
+import type {
+  TransactionDraft,
+  EditableField,
+  SplitDraft,
+} from "../lib/transaction-entry.js"
 import { derivePayeeSelection } from "../lib/transaction-entry.js"
 
 type CategoryGroup = {
@@ -19,15 +23,16 @@ type TransactionEditRowProps = {
   draft: TransactionDraft
   onDraftChange: (draft: TransactionDraft) => void
   focusField: EditableField | null
-  accounts: Array<{ id: string; name: string }>
+  accounts: Array<{ id: string; name: string; type: string }>
   payees: Array<{ id: string; name: string }>
   categoryGroups: CategoryGroup[]
   onSave: () => void
   onCancel: () => void
   isSaving: boolean
-  onCreatePayee?: (name: string) => void
+  onCreatePayee?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingPayee?: boolean
-  onCreateCategory?: (name: string) => void
+  onManagePayees?: () => void
+  onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
 }
 
@@ -53,6 +58,7 @@ export const TransactionEditRow = ({
   isSaving,
   onCreatePayee,
   isCreatingPayee = false,
+  onManagePayees,
   onCreateCategory,
   isCreatingCategory = false,
 }: TransactionEditRowProps) => {
@@ -60,8 +66,14 @@ export const TransactionEditRow = ({
 
   const payeeSelection = useMemo(
     (): PayeeOption | null =>
-      derivePayeeSelection(draft.payeeId, draft.transferAccountId, accounts, payees),
-    [draft.payeeId, draft.transferAccountId, accounts, payees],
+      derivePayeeSelection(
+        draft.payeeId,
+        draft.transferAccountId,
+        accounts,
+        payees,
+        draft.accountId,
+      ),
+    [draft.payeeId, draft.transferAccountId, accounts, payees, draft.accountId],
   )
 
   const initialAccountName = useMemo(
@@ -88,16 +100,57 @@ export const TransactionEditRow = ({
   useEffect(() => {
     if (!focusField || !formRef.current) return
     const colIndex = FIELD_TO_COLUMN[focusField]
-    const cells = formRef.current.querySelectorAll<HTMLElement>(":scope > .transaction-cell")
+    const cells = formRef.current.querySelectorAll<HTMLElement>(
+      ":scope > .transaction-cell",
+    )
     const cell = cells[colIndex]
     if (!cell) return
     const input = cell.querySelector<HTMLElement>("input, button")
     input?.focus()
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only on mount
   }, [])
 
   const update = (patch: Partial<TransactionDraft>) =>
     onDraftChange({ ...draft, ...patch })
+
+  const hasSplits = draft.splits.length > 0
+  const isTransfer = Boolean(draft.transferAccountId)
+  const isLoanTransfer = useMemo(() => {
+    if (!draft.transferAccountId) return false
+    const sourceAccount = accounts.find((a) => a.id === draft.accountId)
+    const targetAccount = accounts.find((a) => a.id === draft.transferAccountId)
+    return sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+  }, [draft.accountId, draft.transferAccountId, accounts])
+
+  const parentAmountMinor = draft.isExpense
+    ? -Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+    : Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+
+  const toggleSplitMode = () => {
+    if (hasSplits) {
+      update({ splits: [], categoryId: "" })
+    } else {
+      update({
+        splits: [
+          {
+            categoryId: draft.categoryId,
+            payeeId: "",
+            note: "",
+            amount: "",
+            isExpense: draft.isExpense,
+          },
+          {
+            categoryId: "",
+            payeeId: "",
+            note: "",
+            amount: "",
+            isExpense: draft.isExpense,
+          },
+        ],
+        categoryId: "",
+      })
+    }
+  }
 
   return (
     <form
@@ -118,8 +171,8 @@ export const TransactionEditRow = ({
             'input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])',
           )
           if (focusable.length === 0) return
-          const first = focusable[0]
-          const last = focusable[focusable.length - 1]
+          const first = focusable[0]!
+          const last = focusable[focusable.length - 1]!
           if (e.shiftKey && document.activeElement === first) {
             e.preventDefault()
             last.focus()
@@ -129,25 +182,11 @@ export const TransactionEditRow = ({
           }
         }
       }}
-      onBlur={(e) => {
-        // Cancel when focus moves outside the form.
-        // Use requestAnimationFrame so relatedTarget is set and portal
-        // elements (combobox dropdowns) have time to claim focus.
-        requestAnimationFrame(() => {
-          if (
-            formRef.current &&
-            !formRef.current.contains(document.activeElement)
-          ) {
-            onCancel()
-          }
-        })
-      }}
     >
       <div className="transaction-cell" data-field="date">
-        <input
-          type="date"
+        <DatePicker
           value={draft.date}
-          onChange={(e) => update({ date: e.target.value })}
+          onChange={(date) => update({ date })}
           required
         />
       </div>
@@ -170,30 +209,69 @@ export const TransactionEditRow = ({
             if (!selection) {
               update({ payeeId: "", transferAccountId: "" })
             } else if (selection.kind === "transfer") {
-              update({
+              const patch: Partial<TransactionDraft> = {
                 payeeId: "",
                 transferAccountId: selection.accountId,
-                categoryId: "",
-              })
+                splits: [],
+              }
+              if (!selection.isLoanPayment) {
+                patch.categoryId = ""
+              }
+              update(patch)
             } else {
               update({ payeeId: selection.id, transferAccountId: "" })
             }
           }}
           onCreatePayee={onCreatePayee}
           isCreating={isCreatingPayee}
+          onManagePayees={onManagePayees}
           initialInputValue={initialPayeeName}
         />
       </div>
       <div className="transaction-cell" data-field="category">
-        <CategoryAutocomplete
-          value={draft.categoryId}
-          categoryGroups={categoryGroups}
-          onChange={(categoryId) => update({ categoryId })}
-          disabled={Boolean(draft.transferAccountId)}
-          onCreateCategory={onCreateCategory}
-          isCreating={isCreatingCategory}
-          initialInputValue={initialCategoryName}
-        />
+        {hasSplits ? (
+          <div className="split-category-input-wrapper">
+            <input
+              className="split-category-input"
+              value="Split transaction"
+              readOnly
+              tabIndex={-1}
+            />
+            <button
+              type="button"
+              className="split-category-clear"
+              onClick={toggleSplitMode}
+              title="Remove splits"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <CategoryAutocomplete
+            value={draft.categoryId}
+            categoryGroups={categoryGroups}
+            onChange={(categoryId) => update({ categoryId })}
+            disabled={isTransfer && !isLoanTransfer}
+            onCreateCategory={onCreateCategory}
+            isCreating={isCreatingCategory}
+            onSplit={
+              isTransfer && !isLoanTransfer ? undefined : toggleSplitMode
+            }
+            initialInputValue={initialCategoryName}
+          />
+        )}
       </div>
       <div className="transaction-cell" data-field="note">
         <input
@@ -206,7 +284,9 @@ export const TransactionEditRow = ({
         <div className="amount-input-group">
           <button
             type="button"
-            className={`sign-toggle ${draft.isExpense ? "sign-toggle-minus" : "sign-toggle-plus"}`}
+            className={`sign-toggle ${
+              draft.isExpense ? "sign-toggle-minus" : "sign-toggle-plus"
+            }`}
             onClick={() => update({ isExpense: !draft.isExpense })}
           >
             {draft.isExpense ? "\u2212" : "+"}
@@ -232,8 +312,17 @@ export const TransactionEditRow = ({
             disabled={isSaving}
             aria-label="Save transaction"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6 9 17l-5-5"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
             </svg>
           </button>
           <button
@@ -242,13 +331,34 @@ export const TransactionEditRow = ({
             onClick={onCancel}
             aria-label="Cancel editing"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M18 6 6 18" />
               <path d="M6 6l12 12" />
             </svg>
           </button>
         </div>
       </div>
+      {hasSplits && (
+        <SplitEditor
+          splits={draft.splits}
+          parentAmountMinor={parentAmountMinor}
+          onSplitsChange={(splits: SplitDraft[]) => update({ splits })}
+          payees={payees}
+          accounts={accounts}
+          categoryGroups={categoryGroups}
+          onCreateCategory={onCreateCategory}
+          isCreatingCategory={isCreatingCategory}
+        />
+      )}
     </form>
   )
 }

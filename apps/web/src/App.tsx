@@ -18,26 +18,36 @@ import { CategoryAutocomplete } from "./components/category-autocomplete.js"
 import { PayeeAutocomplete } from "./components/payee-autocomplete.js"
 import { PayeeMergeForm } from "./components/payee-merge-form.js"
 import { ClearedToggle } from "./components/cleared-toggle.js"
+import { DatePicker } from "./components/date-picker.js"
 import { buildCsvPreview } from "./lib/csv-preview.js"
 import { toDisplayErrorMessage } from "./lib/errors.js"
 import {
   buildNextTransactionDraft,
   transactionToEditDraft,
   derivePayeeSelection,
+  getSplitBalanceStatus,
   type TransactionDraft,
   type EditableField,
 } from "./lib/transaction-entry.js"
 import { TransactionEditRow } from "./components/transaction-edit-row.js"
+import { SplitEditor } from "./components/split-editor.js"
 import type { CsvPreview } from "./lib/csv-preview.js"
 
 import "./App.css"
 
+type LoanProfile = {
+  loanType: "MORTGAGE" | "AUTO"
+  interestRateAnnual: number
+  minimumPaymentMinor: number
+}
+
 type Account = {
   id: string
   name: string
-  type: "CHEQUING" | "CREDIT_CARD"
+  type: "CASH" | "CREDIT" | "INVESTMENT" | "LOAN"
   startingBalanceMinor: number
   balanceMinor: number
+  loanProfile: LoanProfile | null
 }
 
 type Payee = {
@@ -57,6 +67,16 @@ type CategoryGroup = {
   categories: Category[]
 }
 
+type TransactionSplit = {
+  id: string
+  categoryId: string
+  payeeId?: string | null
+  note?: string | null
+  amountMinor: number
+  category: Category & { group: { id: string; name: string } }
+  payee?: Payee | null
+}
+
 type Transaction = {
   id: string
   date: string
@@ -69,6 +89,7 @@ type Transaction = {
   transferAccount?: Account | null
   payee?: Payee | null
   category?: Category | null
+  splits: TransactionSplit[]
   origins: Array<{ originType: "MANUAL" | "CSV_IMPORT" }>
 }
 
@@ -121,6 +142,12 @@ type UpdateTransactionMutationInput = {
     categoryId?: string
     note?: string
     cleared?: boolean
+    splits?: Array<{
+      categoryId: string
+      payeeId?: string
+      note?: string
+      amountMinor: number
+    }>
   }
 }
 
@@ -238,8 +265,7 @@ const App = () => {
 
   const authQuery = useQuery({
     queryKey: ["auth"],
-    queryFn: () =>
-      apiFetch<{ authenticated: boolean }>("/api/auth/me"),
+    queryFn: () => apiFetch<{ authenticated: boolean }>("/api/auth/me"),
     retry: false,
   })
 
@@ -296,8 +322,11 @@ const AuthenticatedApp = () => {
   })
   const [newAccount, setNewAccount] = useState({
     name: "",
-    type: "CHEQUING" as Account["type"],
+    type: "CASH" as Account["type"],
     startingBalance: "0",
+    loanType: "MORTGAGE" as LoanProfile["loanType"],
+    interestRate: "",
+    minimumPayment: "",
   })
   const [editingAccountId, setEditingAccountId] = useState("")
   const [accountNameDrafts, setAccountNameDrafts] =
@@ -312,7 +341,7 @@ const AuthenticatedApp = () => {
     sourcePayeeId: "",
     targetPayeeId: "",
   })
-  const [newTransaction, setNewTransaction] = useState({
+  const [newTransaction, setNewTransaction] = useState<TransactionDraft>({
     accountId: "",
     transferAccountId: "",
     date: defaultTransactionDate,
@@ -322,6 +351,7 @@ const AuthenticatedApp = () => {
     note: "",
     cleared: false,
     isExpense: true,
+    splits: [],
   })
   const [transactionOffset, setTransactionOffset] = useState(0)
 
@@ -423,14 +453,32 @@ const AuthenticatedApp = () => {
         newTransaction.transferAccountId,
         accountsQuery.data ?? [],
         payeesQuery.data ?? [],
+        newTransaction.accountId,
       ),
     [
       newTransaction.payeeId,
       newTransaction.transferAccountId,
       accountsQuery.data,
       payeesQuery.data,
+      newTransaction.accountId,
     ],
   )
+
+  const isNewTransactionLoanTransfer = useMemo(() => {
+    if (!newTransaction.transferAccountId) return false
+    const accounts = accountsQuery.data ?? []
+    const sourceAccount = accounts.find(
+      (a) => a.id === newTransaction.accountId,
+    )
+    const targetAccount = accounts.find(
+      (a) => a.id === newTransaction.transferAccountId,
+    )
+    return sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+  }, [
+    newTransaction.accountId,
+    newTransaction.transferAccountId,
+    accountsQuery.data,
+  ])
 
   const [editingTransaction, setEditingTransaction] =
     useState<EditingTransaction | null>(null)
@@ -446,6 +494,17 @@ const AuthenticatedApp = () => {
   const handleSaveEdit = () => {
     if (!editingTransaction) return
     const { draft, transactionId } = editingTransaction
+    const hasSplits = draft.splits.length > 0
+    if (hasSplits) {
+      const parentMinor = draft.isExpense
+        ? -Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+        : Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+      const status = getSplitBalanceStatus(draft.splits, parentMinor)
+      if (!status.isBalanced) {
+        toast.error(`Split amounts don't add up. ${status.message}`)
+        return
+      }
+    }
     updateTransactionMutation.mutate({
       transactionId,
       patch: {
@@ -456,9 +515,19 @@ const AuthenticatedApp = () => {
           ? -Math.abs(parseMoneyInputToMinor(draft.amount))
           : Math.abs(parseMoneyInputToMinor(draft.amount)),
         payeeId: draft.payeeId || undefined,
-        categoryId: draft.categoryId || undefined,
-        note: draft.note || undefined,
+        categoryId: hasSplits ? undefined : draft.categoryId || undefined,
+        note: draft.note,
         cleared: draft.cleared,
+        splits: hasSplits
+          ? draft.splits.map((s) => ({
+              categoryId: s.categoryId,
+              payeeId: s.payeeId || undefined,
+              note: s.note || undefined,
+              amountMinor: s.isExpense
+                ? -Math.abs(parseMoneyInputToMinor(s.amount))
+                : Math.abs(parseMoneyInputToMinor(s.amount)),
+            }))
+          : [],
       },
     })
   }
@@ -481,6 +550,15 @@ const AuthenticatedApp = () => {
           startingBalanceMinor: parseMoneyInputToMinor(
             newAccount.startingBalance,
           ),
+          ...(newAccount.type === "LOAN"
+            ? {
+                loanType: newAccount.loanType,
+                interestRateAnnual: Number(newAccount.interestRate) || 0,
+                minimumPaymentMinor: parseMoneyInputToMinor(
+                  newAccount.minimumPayment,
+                ),
+              }
+            : {}),
         }),
       }),
     onSuccess: (account) => {
@@ -488,8 +566,11 @@ const AuthenticatedApp = () => {
       setIsCreateAccountDialogOpen(false)
       setNewAccount({
         name: "",
-        type: "CHEQUING",
+        type: "CASH",
         startingBalance: "0",
+        loanType: "MORTGAGE",
+        interestRate: "",
+        minimumPayment: "",
       })
       setNewTransaction((current) => ({
         ...current,
@@ -519,6 +600,18 @@ const AuthenticatedApp = () => {
     },
   })
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: (accountId: string) =>
+      apiFetch(`/api/accounts/${accountId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast.success("Account deleted")
+      refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to delete account: ${error.message}`)
+    },
+  })
+
   const createPayeeMutation = useMutation({
     mutationFn: () =>
       apiFetch<Payee>("/api/payees", {
@@ -541,12 +634,8 @@ const AuthenticatedApp = () => {
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (category) => {
+    onSuccess: () => {
       toast.success("Category created")
-      setNewTransaction((current) => ({
-        ...current,
-        categoryId: category.id,
-      }))
       void queryClient.invalidateQueries({ queryKey: ["categories"] })
       void queryClient.invalidateQueries({ queryKey: ["planning"] })
     },
@@ -561,12 +650,8 @@ const AuthenticatedApp = () => {
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (payee) => {
+    onSuccess: () => {
       toast.success("Payee created")
-      setNewTransaction((current) => ({
-        ...current,
-        payeeId: payee.id,
-      }))
       void queryClient.invalidateQueries({ queryKey: ["payees"] })
       void queryClient.invalidateQueries({ queryKey: ["reports"] })
     },
@@ -592,22 +677,38 @@ const AuthenticatedApp = () => {
   })
 
   const createTransactionMutation = useMutation({
-    mutationFn: () =>
-      apiFetch<Transaction>("/api/transactions", {
+    mutationFn: () => {
+      const parentAmountMinor = newTransaction.isExpense
+        ? -Math.abs(parseMoneyInputToMinor(newTransaction.amount))
+        : Math.abs(parseMoneyInputToMinor(newTransaction.amount))
+      const hasSplits = newTransaction.splits.length > 0
+
+      return apiFetch<Transaction>("/api/transactions", {
         method: "POST",
         body: JSON.stringify({
           accountId: newTransaction.accountId,
           transferAccountId: newTransaction.transferAccountId || undefined,
           date: newTransaction.date,
-          amountMinor: newTransaction.isExpense
-            ? -Math.abs(parseMoneyInputToMinor(newTransaction.amount))
-            : Math.abs(parseMoneyInputToMinor(newTransaction.amount)),
+          amountMinor: parentAmountMinor,
           payeeId: newTransaction.payeeId || undefined,
-          categoryId: newTransaction.categoryId || undefined,
+          categoryId: hasSplits
+            ? undefined
+            : newTransaction.categoryId || undefined,
           note: newTransaction.note || undefined,
           cleared: newTransaction.cleared,
+          splits: hasSplits
+            ? newTransaction.splits.map((s) => ({
+                categoryId: s.categoryId,
+                payeeId: s.payeeId || undefined,
+                note: s.note || undefined,
+                amountMinor: s.isExpense
+                  ? -Math.abs(parseMoneyInputToMinor(s.amount))
+                  : Math.abs(parseMoneyInputToMinor(s.amount)),
+              }))
+            : undefined,
         }),
-      }),
+      })
+    },
     onSuccess: () => {
       toast.success("Transaction saved")
       setNewTransaction((current) => buildNextTransactionDraft(current))
@@ -860,61 +961,19 @@ const AuthenticatedApp = () => {
                   No accounts yet. Add one to get started.
                 </p>
               ) : (
-                (accountsQuery.data ?? []).map((account) => (
-                  <div className="list-item" key={account.id}>
-                    <div className="account-item-main">
-                      {editingAccountId === account.id ? (
-                        <form className="account-name-form" onSubmit={(e) => {
-                          e.preventDefault()
-                          const nextName = (
-                            accountNameDrafts[account.id] ?? account.name
-                          ).trim()
-
-                          if (!nextName) {
-                            toast.error("Account name cannot be blank.")
-                            return
-                          }
-
-                          if (nextName === account.name) {
-                            setEditingAccountId("")
-                            clearAccountNameDraft(account.id)
-                            return
-                          }
-
-                          updateAccountNameMutation.mutate({
-                            accountId: account.id,
-                            name: nextName,
-                          })
-                        }}>
-                          <input
-                            value={
-                              accountNameDrafts[account.id] ?? account.name
-                            }
-                            onChange={(event) =>
-                              setAccountNameDrafts((current) => ({
-                                ...current,
-                                [account.id]: event.target.value,
-                              }))
-                            }
-                            aria-label={`Account name for ${account.name}`}
-                            disabled={updateAccountNameMutation.isPending}
-                          />
-                        </form>
-                      ) : (
-                        <strong>{account.name}</strong>
-                      )}
-                    </div>
-                    <div className="account-item-meta">
-                      <span className="muted">
-                        {account.type.replaceAll("_", " ")}
-                      </span>
-                      <strong>{formatMoney(account.type === "CREDIT_CARD" ? -account.balanceMinor : account.balanceMinor)}</strong>
-                      {editingAccountId === account.id ? (
-                        <>
-                          <button
-                            type="submit"
-                            className="edit-icon-button button-success"
-                            onClick={() => {
+                (accountsQuery.data ?? []).map((account) => {
+                  const displayBalance =
+                    account.type === "LOAN"
+                      ? -account.balanceMinor
+                      : account.balanceMinor
+                  return (
+                    <div className="list-item" key={account.id}>
+                      <div className="account-item-main">
+                        {editingAccountId === account.id ? (
+                          <form
+                            className="account-name-form"
+                            onSubmit={(e) => {
+                              e.preventDefault()
                               const nextName = (
                                 accountNameDrafts[account.id] ?? account.name
                               ).trim()
@@ -935,44 +994,172 @@ const AuthenticatedApp = () => {
                                 name: nextName,
                               })
                             }}
-                            disabled={updateAccountNameMutation.isPending}
-                            aria-label="Save account name"
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="edit-icon-button button-danger"
-                            onClick={() => {
-                              setEditingAccountId("")
-                              clearAccountNameDraft(account.id)
-                            }}
-                            disabled={updateAccountNameMutation.isPending}
-                            aria-label="Cancel editing"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="edit-icon-button"
-                          onClick={() => {
-                            setEditingAccountId(account.id)
-                            setAccountNameDrafts((current) => ({
-                              ...current,
-                              [account.id]: account.name,
-                            }))
-                          }}
-                          disabled={updateAccountNameMutation.isPending}
-                          aria-label={`Edit ${account.name}`}
+                            <input
+                              value={
+                                accountNameDrafts[account.id] ?? account.name
+                              }
+                              onChange={(event) =>
+                                setAccountNameDrafts((current) => ({
+                                  ...current,
+                                  [account.id]: event.target.value,
+                                }))
+                              }
+                              aria-label={`Account name for ${account.name}`}
+                              disabled={updateAccountNameMutation.isPending}
+                            />
+                          </form>
+                        ) : (
+                          <strong>{account.name}</strong>
+                        )}
+                      </div>
+                      <div className="account-item-meta">
+                        <span className="muted">
+                          {account.type.replaceAll("_", " ")}
+                        </span>
+                        <strong
+                          className={
+                            displayBalance < 0
+                              ? "amount-negative"
+                              : displayBalance > 0
+                                ? "amount-positive"
+                                : undefined
+                          }
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                        </button>
-                      )}
+                          {formatMoney(displayBalance)}
+                        </strong>
+                        {editingAccountId === account.id ? (
+                          <>
+                            <button
+                              type="submit"
+                              className="edit-icon-button button-success"
+                              onClick={() => {
+                                const nextName = (
+                                  accountNameDrafts[account.id] ?? account.name
+                                ).trim()
+
+                                if (!nextName) {
+                                  toast.error("Account name cannot be blank.")
+                                  return
+                                }
+
+                                if (nextName === account.name) {
+                                  setEditingAccountId("")
+                                  clearAccountNameDraft(account.id)
+                                  return
+                                }
+
+                                updateAccountNameMutation.mutate({
+                                  accountId: account.id,
+                                  name: nextName,
+                                })
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                              aria-label="Save account name"
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="edit-icon-button button-danger"
+                              onClick={() => {
+                                setEditingAccountId("")
+                                clearAccountNameDraft(account.id)
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                              aria-label="Cancel editing"
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                              </svg>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="edit-icon-button"
+                              onClick={() => {
+                                setEditingAccountId(account.id)
+                                setAccountNameDrafts((current) => ({
+                                  ...current,
+                                  [account.id]: account.name,
+                                }))
+                              }}
+                              disabled={updateAccountNameMutation.isPending}
+                              aria-label={`Edit ${account.name}`}
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                <path d="m15 5 4 4" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-button-danger"
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Delete account "${account.name}"? This will archive the account and hide it from the list.`,
+                                  )
+                                ) {
+                                  deleteAccountMutation.mutate(account.id)
+                                }
+                              }}
+                              disabled={deleteAccountMutation.isPending}
+                              aria-label={`Delete ${account.name}`}
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </section>
@@ -1032,10 +1219,61 @@ const AuthenticatedApp = () => {
                         }))
                       }
                     >
-                      <option value="CHEQUING">Chequing</option>
-                      <option value="CREDIT_CARD">Credit Card</option>
+                      <option value="CASH">Cash</option>
+                      <option value="CREDIT">Credit</option>
+                      <option value="INVESTMENT">Investment</option>
+                      <option value="LOAN">Loan</option>
                     </select>
                   </label>
+                  {newAccount.type === "LOAN" ? (
+                    <>
+                      <label>
+                        Loan Type
+                        <select
+                          value={newAccount.loanType}
+                          onChange={(event) =>
+                            setNewAccount((current) => ({
+                              ...current,
+                              loanType: event.target
+                                .value as LoanProfile["loanType"],
+                            }))
+                          }
+                        >
+                          <option value="MORTGAGE">Mortgage</option>
+                          <option value="AUTO">Auto</option>
+                        </select>
+                      </label>
+                      <label>
+                        Interest Rate (%)
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={newAccount.interestRate}
+                          onChange={(event) =>
+                            setNewAccount((current) => ({
+                              ...current,
+                              interestRate: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+                      <label>
+                        Minimum Payment
+                        <input
+                          value={newAccount.minimumPayment}
+                          onChange={(event) =>
+                            setNewAccount((current) => ({
+                              ...current,
+                              minimumPayment: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </>
+                  ) : null}
                   <label>
                     Starting Balance
                     <input
@@ -1075,6 +1313,23 @@ const AuthenticatedApp = () => {
               className="transaction-form"
               onSubmit={(event) => {
                 event.preventDefault()
+                if (newTransaction.splits.length > 0) {
+                  const parentMinor = newTransaction.isExpense
+                    ? -Math.abs(
+                        parseMoneyInputToMinor(newTransaction.amount || "0"),
+                      )
+                    : Math.abs(
+                        parseMoneyInputToMinor(newTransaction.amount || "0"),
+                      )
+                  const status = getSplitBalanceStatus(
+                    newTransaction.splits,
+                    parentMinor,
+                  )
+                  if (!status.isBalanced) {
+                    toast.error(`Split amounts don't add up. ${status.message}`)
+                    return
+                  }
+                }
                 createTransactionMutation.mutate()
               }}
             >
@@ -1089,13 +1344,12 @@ const AuthenticatedApp = () => {
                 }
                 placeholder="Select account"
               />
-              <input
-                type="date"
+              <DatePicker
                 value={newTransaction.date}
-                onChange={(event) =>
+                onChange={(date) =>
                   setNewTransaction((current) => ({
                     ...current,
-                    date: event.target.value,
+                    date,
                   }))
                 }
                 required
@@ -1103,7 +1357,11 @@ const AuthenticatedApp = () => {
               <div className="amount-input-group">
                 <button
                   type="button"
-                  className={`sign-toggle ${newTransaction.isExpense ? "sign-toggle-minus" : "sign-toggle-plus"}`}
+                  className={`sign-toggle ${
+                    newTransaction.isExpense
+                      ? "sign-toggle-minus"
+                      : "sign-toggle-plus"
+                  }`}
                   onClick={() =>
                     setNewTransaction((current) => ({
                       ...current,
@@ -1145,7 +1403,7 @@ const AuthenticatedApp = () => {
                         ...current,
                         payeeId: "",
                         transferAccountId: selection.accountId,
-                        categoryId: "",
+                        ...(selection.isLoanPayment ? {} : { categoryId: "" }),
                       }
                     }
                     return {
@@ -1155,26 +1413,96 @@ const AuthenticatedApp = () => {
                     }
                   })
                 }}
-                onCreatePayee={(name) => {
-                  createTransactionPayeeMutation.mutate({ name })
+                onCreatePayee={async (name) => {
+                  const payee =
+                    await createTransactionPayeeMutation.mutateAsync({ name })
+                  await queryClient.invalidateQueries({ queryKey: ["payees"] })
+                  return payee
                 }}
                 isCreating={createTransactionPayeeMutation.isPending}
+                onManagePayees={() => setActiveTab("payees")}
               />
-              <CategoryAutocomplete
-                value={newTransaction.categoryId}
-                categoryGroups={categoriesQuery.data ?? []}
-                onChange={(categoryId) =>
-                  setNewTransaction((current) => ({
-                    ...current,
-                    categoryId,
-                  }))
-                }
-                disabled={Boolean(newTransaction.transferAccountId)}
-                onCreateCategory={(name) => {
-                  createCategoryMutation.mutate({ name })
-                }}
-                isCreating={createCategoryMutation.isPending}
-              />
+              {newTransaction.splits.length > 0 ? (
+                <div className="split-category-input-wrapper">
+                  <input
+                    className="split-category-input"
+                    value="Split transaction"
+                    readOnly
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    className="split-category-clear"
+                    onClick={() =>
+                      setNewTransaction((current) => ({
+                        ...current,
+                        splits: [],
+                        categoryId: "",
+                      }))
+                    }
+                    title="Remove splits"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 6 6 18" />
+                      <path d="M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <CategoryAutocomplete
+                  value={newTransaction.categoryId}
+                  categoryGroups={categoriesQuery.data ?? []}
+                  onChange={(categoryId) =>
+                    setNewTransaction((current) => ({
+                      ...current,
+                      categoryId,
+                    }))
+                  }
+                  disabled={
+                    Boolean(newTransaction.transferAccountId) &&
+                    !isNewTransactionLoanTransfer
+                  }
+                  onCreateCategory={(name) =>
+                    createCategoryMutation.mutateAsync({ name })
+                  }
+                  isCreating={createCategoryMutation.isPending}
+                  onSplit={
+                    newTransaction.transferAccountId &&
+                    !isNewTransactionLoanTransfer
+                      ? undefined
+                      : () =>
+                          setNewTransaction((current) => ({
+                            ...current,
+                            splits: [
+                              {
+                                categoryId: current.categoryId,
+                                payeeId: "",
+                                note: "",
+                                amount: "",
+                                isExpense: current.isExpense,
+                              },
+                              {
+                                categoryId: "",
+                                payeeId: "",
+                                note: "",
+                                amount: "",
+                                isExpense: current.isExpense,
+                              },
+                            ],
+                            categoryId: "",
+                          }))
+                  }
+                />
+              )}
               <input
                 value={newTransaction.note}
                 onChange={(event) =>
@@ -1200,10 +1528,43 @@ const AuthenticatedApp = () => {
                 disabled={createTransactionMutation.isPending}
                 aria-label="Save transaction"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5"/>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
                 </svg>
               </button>
+              {newTransaction.splits.length > 0 && (
+                <SplitEditor
+                  splits={newTransaction.splits}
+                  parentAmountMinor={
+                    newTransaction.isExpense
+                      ? -Math.abs(
+                          parseMoneyInputToMinor(newTransaction.amount || "0"),
+                        )
+                      : Math.abs(
+                          parseMoneyInputToMinor(newTransaction.amount || "0"),
+                        )
+                  }
+                  onSplitsChange={(splits) =>
+                    setNewTransaction((current) => ({ ...current, splits }))
+                  }
+                  payees={payeesQuery.data ?? []}
+                  accounts={accountsQuery.data ?? []}
+                  categoryGroups={categoriesQuery.data ?? []}
+                  onCreateCategory={(name) =>
+                    createCategoryMutation.mutateAsync({ name })
+                  }
+                  isCreatingCategory={createCategoryMutation.isPending}
+                />
+              )}
             </form>
           </section>
 
@@ -1211,13 +1572,27 @@ const AuthenticatedApp = () => {
             <div className="table-wrap">
               <div className="transaction-list" role="table">
                 <div className="transaction-header" role="row">
-                  <div className="transaction-cell" role="columnheader">Date</div>
-                  <div className="transaction-cell" role="columnheader">Account</div>
-                  <div className="transaction-cell" role="columnheader">Payee</div>
-                  <div className="transaction-cell" role="columnheader">Category</div>
-                  <div className="transaction-cell" role="columnheader">Note</div>
-                  <div className="transaction-cell" role="columnheader">Amount</div>
-                  <div className="transaction-cell" role="columnheader">Status</div>
+                  <div className="transaction-cell" role="columnheader">
+                    Date
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Account
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Payee
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Category
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Note
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Amount
+                  </div>
+                  <div className="transaction-cell" role="columnheader">
+                    Status
+                  </div>
                   <div className="transaction-cell" role="columnheader"></div>
                 </div>
                 {transactionsQuery.isError ? (
@@ -1254,23 +1629,40 @@ const AuthenticatedApp = () => {
                         onSave={handleSaveEdit}
                         onCancel={() => setEditingTransaction(null)}
                         isSaving={updateTransactionMutation.isPending}
-                        onCreatePayee={(name) =>
-                          createTransactionPayeeMutation.mutate({ name })
+                        onCreatePayee={async (name) => {
+                          const payee =
+                            await createTransactionPayeeMutation.mutateAsync({
+                              name,
+                            })
+                          await queryClient.invalidateQueries({
+                            queryKey: ["payees"],
+                          })
+                          return payee
+                        }}
+                        isCreatingPayee={
+                          createTransactionPayeeMutation.isPending
                         }
-                        isCreatingPayee={createTransactionPayeeMutation.isPending}
+                        onManagePayees={() => setActiveTab("payees")}
                         onCreateCategory={(name) =>
-                          createCategoryMutation.mutate({ name })
+                          createCategoryMutation.mutateAsync({ name })
                         }
                         isCreatingCategory={createCategoryMutation.isPending}
                       />
                     ) : (
-                      <div key={transaction.id} className="transaction-row" role="row">
+                      <div
+                        key={transaction.id}
+                        className="transaction-row"
+                        role="row"
+                      >
                         <div
                           className="transaction-cell clickable-cell"
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "date")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "date") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "date")
+                          }}
                         >
                           {new Date(transaction.date)
                             .toISOString()
@@ -1281,7 +1673,10 @@ const AuthenticatedApp = () => {
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "account")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "account") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "account")
+                          }}
                         >
                           {transaction.account.name}
                         </div>
@@ -1290,31 +1685,70 @@ const AuthenticatedApp = () => {
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "payee")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "payee") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "payee")
+                          }}
                         >
-                          {transaction.payee?.name ?? "—"}
+                          {transaction.isTransfer
+                            ? (() => {
+                                const targetName =
+                                  transaction.transferAccount?.name ?? "Account"
+                                const isLoan =
+                                  transaction.transferAccount?.type ===
+                                    "LOAN" ||
+                                  transaction.account.type === "LOAN"
+                                if (isLoan) {
+                                  return transaction.transferAccount?.type ===
+                                    "LOAN"
+                                    ? `Payment to ${targetName}`
+                                    : `Payment from ${targetName}`
+                                }
+                                return targetName
+                              })()
+                            : (transaction.payee?.name ?? "—")}
                         </div>
                         <div
                           className="transaction-cell clickable-cell"
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "category")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "category") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "category")
+                          }}
                         >
-                          {transaction.isTransfer
-                            ? `Transfer → ${
-                                transaction.transferAccount?.name ?? "Account"
-                              }`
-                            : (transaction.category?.name ?? "—")}
+                          {transaction.splits?.length > 0
+                            ? "Split transaction"
+                            : transaction.isTransfer
+                              ? transaction.category?.name
+                                ? transaction.category.name
+                                : (() => {
+                                    const isLoan =
+                                      transaction.transferAccount?.type ===
+                                        "LOAN" ||
+                                      transaction.account.type === "LOAN"
+                                    if (isLoan) {
+                                      return transaction.transferAccount
+                                        ?.type === "LOAN"
+                                        ? `Payment to ${transaction.transferAccount?.name ?? "Account"}`
+                                        : `Payment from ${transaction.transferAccount?.name ?? "Account"}`
+                                    }
+                                    return `Transfer → ${transaction.transferAccount?.name ?? "Account"}`
+                                  })()
+                              : (transaction.category?.name ?? "—")}
                         </div>
                         <div
                           className="transaction-cell clickable-cell"
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "note")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "note") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "note")
+                          }}
                         >
-                          {transaction.note ?? "—"}
+                          {transaction.note || ""}
                         </div>
                         <div
                           className={`transaction-cell clickable-cell ${
@@ -1325,7 +1759,10 @@ const AuthenticatedApp = () => {
                           role="cell"
                           tabIndex={0}
                           onClick={() => startEditing(transaction, "amount")}
-                          onKeyDown={(e) => { if (e.key === "Enter") startEditing(transaction, "amount") }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              startEditing(transaction, "amount")
+                          }}
                         >
                           {formatMoney(transaction.amountMinor)}
                         </div>
@@ -1353,7 +1790,16 @@ const AuthenticatedApp = () => {
                               disabled={deleteTransactionMutation.isPending}
                               aria-label="Delete transaction"
                             >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
                                 <path d="M3 6h18" />
                                 <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
@@ -1381,7 +1827,16 @@ const AuthenticatedApp = () => {
                 }
                 aria-label="Previous page"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
               </button>
@@ -1401,7 +1856,16 @@ const AuthenticatedApp = () => {
                 }
                 aria-label="Next page"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M9 18l6-6-6-6" />
                 </svg>
               </button>
@@ -1556,13 +2020,27 @@ const AuthenticatedApp = () => {
                           </td>
                           <td>{transaction.account.name}</td>
                           <td>
-                            {transaction.isTransfer
-                              ? `Transfer → ${
-                                  transaction.transferAccount?.name ?? "Account"
-                                }`
-                              : (transaction.category?.name ?? "—")}
+                            {transaction.splits?.length > 0
+                              ? "Split transaction"
+                              : transaction.isTransfer
+                                ? transaction.category?.name
+                                  ? transaction.category.name
+                                  : (() => {
+                                      const isLoan =
+                                        transaction.transferAccount?.type ===
+                                          "LOAN" ||
+                                        transaction.account.type === "LOAN"
+                                      if (isLoan) {
+                                        return transaction.transferAccount
+                                          ?.type === "LOAN"
+                                          ? `Payment to ${transaction.transferAccount?.name ?? "Account"}`
+                                          : `Payment from ${transaction.transferAccount?.name ?? "Account"}`
+                                      }
+                                      return `Transfer → ${transaction.transferAccount?.name ?? "Account"}`
+                                    })()
+                                : (transaction.category?.name ?? "—")}
                           </td>
-                          <td>{transaction.note ?? "—"}</td>
+                          <td>{transaction.note || ""}</td>
                           <td
                             className={
                               transaction.amountMinor >= 0
@@ -1798,26 +2276,24 @@ const AuthenticatedApp = () => {
             <div className="inline-controls">
               <label>
                 From
-                <input
-                  type="date"
+                <DatePicker
                   value={reportRange.fromDate}
-                  onChange={(event) =>
+                  onChange={(fromDate) =>
                     setReportRange((current) => ({
                       ...current,
-                      fromDate: event.target.value,
+                      fromDate,
                     }))
                   }
                 />
               </label>
               <label>
                 To
-                <input
-                  type="date"
+                <DatePicker
                   value={reportRange.toDate}
-                  onChange={(event) =>
+                  onChange={(toDate) =>
                     setReportRange((current) => ({
                       ...current,
-                      toDate: event.target.value,
+                      toDate,
                     }))
                   }
                 />

@@ -66,7 +66,9 @@ describe("CategoryAutocomplete", () => {
 
   it("shows create button only when no category matches", async () => {
     const user = userEvent.setup()
-    const onCreateCategory = vi.fn()
+    const onCreateCategory = vi
+      .fn()
+      .mockResolvedValue({ id: "new", name: "Car Insurance" })
 
     render(
       <CategoryAutocomplete

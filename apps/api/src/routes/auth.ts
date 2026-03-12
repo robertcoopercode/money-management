@@ -16,12 +16,11 @@ const SESSION_COOKIE = "session"
 const MAX_ATTEMPTS = 10
 const BLOCK_DURATION_MS = 10 * 60 * 1000 // 10 minutes
 
-const loginAttempts = new Map<
-  string,
-  { count: number; blockedUntil: number }
->()
+const loginAttempts = new Map<string, { count: number; blockedUntil: number }>()
 
-function getClientIp(c: { req: { header: (name: string) => string | undefined } }): string {
+function getClientIp(c: {
+  req: { header: (name: string) => string | undefined }
+}): string {
   return (
     c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
     c.req.header("x-real-ip") ??

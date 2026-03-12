@@ -8,11 +8,40 @@ export type ReportingCategory = {
   } | null
 } | null
 
+export type ReportingSplit = {
+  categoryId: string
+  amountMinor: number
+  category: ReportingCategory
+}
+
 export type ReportingTransactionInput = {
   date: Date
   amountMinor: number
   categoryId: string | null
   category: ReportingCategory
+  splits?: ReportingSplit[]
+}
+
+const addCategorySpending = (
+  map: Map<string, {
+    categoryId: string
+    groupName: string
+    categoryName: string
+    totalMinor: number
+  }>,
+  categoryId: string | null,
+  category: ReportingCategory,
+  amountMinor: number,
+) => {
+  if (amountMinor >= 0) return
+  const key = categoryId ?? "uncategorized"
+  const existing = map.get(key)
+  map.set(key, {
+    categoryId: key,
+    groupName: category?.group?.name ?? "Uncategorized",
+    categoryName: category?.name ?? "Uncategorized",
+    totalMinor: (existing?.totalMinor ?? 0) + Math.abs(amountMinor),
+  })
 }
 
 export const aggregateReportingMetrics = ({
@@ -36,20 +65,22 @@ export const aggregateReportingMetrics = ({
   const balanceDeltaByMonth = new Map<string, number>()
 
   for (const transaction of transactions) {
-    const categoryKey = transaction.categoryId ?? "uncategorized"
-    const groupName = transaction.category?.group?.name ?? "Uncategorized"
-    const categoryName = transaction.category?.name ?? "Uncategorized"
-    const existingCategory = spendingByCategory.get(categoryKey)
-
-    if (transaction.amountMinor < 0) {
-      spendingByCategory.set(categoryKey, {
-        categoryId: categoryKey,
-        groupName,
-        categoryName,
-        totalMinor:
-          (existingCategory?.totalMinor ?? 0) +
-          Math.abs(transaction.amountMinor),
-      })
+    if (transaction.splits && transaction.splits.length > 0) {
+      for (const split of transaction.splits) {
+        addCategorySpending(
+          spendingByCategory,
+          split.categoryId,
+          split.category,
+          split.amountMinor,
+        )
+      }
+    } else {
+      addCategorySpending(
+        spendingByCategory,
+        transaction.categoryId,
+        transaction.category,
+        transaction.amountMinor,
+      )
     }
 
     const key = monthKey(transaction.date)

@@ -58,7 +58,9 @@ export const getPlanningMonth = (month: string) =>
       const [
         thisMonthAssignments,
         thisMonthActivity,
+        thisMonthSplitActivity,
         carryoverActivity,
+        carryoverSplitActivity,
         carryoverAssignments,
       ] = await Promise.all([
         prisma.categoryAssignment.findMany({
@@ -75,11 +77,29 @@ export const getPlanningMonth = (month: string) =>
           },
           _sum: { amountMinor: true },
         }),
+        prisma.transactionSplit.groupBy({
+          by: ["categoryId"],
+          where: {
+            transaction: {
+              date: { gte: start, lt: endExclusive },
+            },
+          },
+          _sum: { amountMinor: true },
+        }),
         prisma.transaction.groupBy({
           by: ["categoryId"],
           where: {
             categoryId: { not: null },
             date: { lt: start },
+          },
+          _sum: { amountMinor: true },
+        }),
+        prisma.transactionSplit.groupBy({
+          by: ["categoryId"],
+          where: {
+            transaction: {
+              date: { lt: start },
+            },
           },
           _sum: { amountMinor: true },
         }),
@@ -104,6 +124,13 @@ export const getPlanningMonth = (month: string) =>
           item._sum.amountMinor ?? 0,
         ]),
       )
+      for (const item of thisMonthSplitActivity) {
+        activityMap.set(
+          item.categoryId,
+          (activityMap.get(item.categoryId) ?? 0) +
+            (item._sum.amountMinor ?? 0),
+        )
+      }
 
       const priorActivityMap = new Map(
         carryoverActivity.map((item) => [
@@ -111,6 +138,13 @@ export const getPlanningMonth = (month: string) =>
           item._sum.amountMinor ?? 0,
         ]),
       )
+      for (const item of carryoverSplitActivity) {
+        priorActivityMap.set(
+          item.categoryId,
+          (priorActivityMap.get(item.categoryId) ?? 0) +
+            (item._sum.amountMinor ?? 0),
+        )
+      }
       const priorAssignmentMap = new Map<string, number>()
 
       for (const assignment of carryoverAssignments) {
@@ -145,30 +179,41 @@ export const getPlanningMonth = (month: string) =>
         }
       }
 
-      const [incomeThroughMonth, totalAssignedThroughMonth] = await Promise.all(
-        [
-          prisma.transaction.aggregate({
-            _sum: { amountMinor: true },
-            where: {
-              category: {
-                isIncomeCategory: true,
-              },
-              date: { lt: endExclusive },
+      const [
+        incomeThroughMonth,
+        incomeSplitsThroughMonth,
+        totalAssignedThroughMonth,
+      ] = await Promise.all([
+        prisma.transaction.aggregate({
+          _sum: { amountMinor: true },
+          where: {
+            category: {
+              isIncomeCategory: true,
             },
-          }),
-          prisma.categoryAssignment.aggregate({
-            _sum: { assignedMinor: true },
-            where: {
-              budgetMonth: {
-                month: { lte: month },
-              },
+            date: { lt: endExclusive },
+          },
+        }),
+        prisma.transactionSplit.aggregate({
+          _sum: { amountMinor: true },
+          where: {
+            category: { isIncomeCategory: true },
+            transaction: { date: { lt: endExclusive } },
+          },
+        }),
+        prisma.categoryAssignment.aggregate({
+          _sum: { assignedMinor: true },
+          where: {
+            budgetMonth: {
+              month: { lte: month },
             },
-          }),
-        ],
-      )
+          },
+        }),
+      ])
 
       const readyToAssignMinor = calculateReadyToAssignMinor({
-        incomeThroughMonthMinor: incomeThroughMonth._sum.amountMinor ?? 0,
+        incomeThroughMonthMinor:
+          (incomeThroughMonth._sum.amountMinor ?? 0) +
+          (incomeSplitsThroughMonth._sum.amountMinor ?? 0),
         assignedThroughMonthMinor:
           totalAssignedThroughMonth._sum.assignedMinor ?? 0,
       })

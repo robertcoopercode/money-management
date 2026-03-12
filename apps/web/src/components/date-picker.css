@@ -1,0 +1,119 @@
+.date-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.date-picker-input {
+  width: 100%;
+  padding-right: 2rem;
+}
+
+.date-picker-trigger {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: #e7f0ff;
+  display: flex;
+  align-items: center;
+  font-weight: normal;
+}
+
+.date-picker-trigger:hover {
+  color: rgb(188 205 240);
+}
+
+.date-picker-positioner {
+  z-index: 50;
+}
+
+.date-picker-popup {
+  padding: 0.75rem;
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 10px;
+  background: rgb(6 13 35 / 98%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 35%);
+}
+
+/* react-day-picker overrides */
+
+.date-picker-popup .rdp-root {
+  --rdp-accent-color: rgb(70 99 184);
+  --rdp-accent-background-color: rgb(70 99 184 / 36%);
+  --rdp-range_middle-background-color: rgb(70 99 184 / 18%);
+  --rdp-day_button-height: 2rem;
+  --rdp-day_button-width: 2rem;
+  color: #e7f0ff;
+  font-size: 0.85rem;
+}
+
+.date-picker-popup .rdp-month_caption {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.date-picker-popup .rdp-nav {
+  gap: 0.25rem;
+}
+
+.date-picker-popup .rdp-button_previous,
+.date-picker-popup .rdp-button_next {
+  background: none;
+  border: none;
+  color: rgb(188 205 240 / 74%);
+  padding: 0.25rem;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: normal;
+}
+
+.date-picker-popup .rdp-button_previous:hover,
+.date-picker-popup .rdp-button_next:hover {
+  background: rgb(70 99 184 / 24%);
+  color: #e7f0ff;
+}
+
+.date-picker-popup .rdp-weekday {
+  color: rgb(188 205 240 / 60%);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.date-picker-popup .rdp-day_button {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: normal;
+  padding: 0;
+}
+
+.date-picker-popup .rdp-day_button:hover {
+  background: rgb(70 99 184 / 24%);
+}
+
+.date-picker-popup .rdp-selected .rdp-day_button {
+  background: rgb(70 99 184);
+  color: #fff;
+  font-weight: 600;
+}
+
+.date-picker-popup .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: rgb(124 162 255);
+  font-weight: 600;
+}
+
+.date-picker-popup .rdp-outside .rdp-day_button {
+  color: rgb(188 205 240 / 35%);
+}
+
+.date-picker-popup .rdp-disabled .rdp-day_button {
+  color: rgb(188 205 240 / 25%);
+  cursor: not-allowed;
+}

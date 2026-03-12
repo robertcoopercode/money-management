@@ -18,6 +18,7 @@ describe("buildNextTransactionDraft", () => {
       note: "Lunch",
       cleared: true,
       isExpense: true,
+      splits: [],
     })
 
     expect(nextDraft).toEqual({
@@ -30,6 +31,7 @@ describe("buildNextTransactionDraft", () => {
       categoryId: "",
       note: "",
       cleared: false,
+      splits: [],
     })
   })
 })
@@ -57,6 +59,7 @@ describe("transactionToEditDraft", () => {
       categoryId: "cat-1",
       note: "Coffee",
       cleared: true,
+      splits: [],
     })
   })
 
@@ -82,14 +85,16 @@ describe("transactionToEditDraft", () => {
       categoryId: "",
       note: "",
       cleared: false,
+      splits: [],
     })
   })
 })
 
 describe("derivePayeeSelection", () => {
   const accounts = [
-    { id: "acc-1", name: "Chequing" },
-    { id: "acc-2", name: "Savings" },
+    { id: "acc-1", name: "Chequing", type: "CASH" },
+    { id: "acc-2", name: "Savings", type: "CASH" },
+    { id: "acc-3", name: "Mortgage", type: "LOAN" },
   ]
   const payees = [
     { id: "payee-1", name: "Grocery Store" },
@@ -103,6 +108,7 @@ describe("derivePayeeSelection", () => {
       id: "transfer:acc-2",
       name: "Savings",
       accountId: "acc-2",
+      isLoanPayment: false,
     })
   })
 
@@ -123,5 +129,27 @@ describe("derivePayeeSelection", () => {
   it("prefers transfer over payee when both are set", () => {
     const result = derivePayeeSelection("payee-1", "acc-2", accounts, payees)
     expect(result?.kind).toBe("transfer")
+  })
+
+  it("shows 'Payment to' when transferring to a loan account", () => {
+    const result = derivePayeeSelection("", "acc-3", accounts, payees, "acc-1")
+    expect(result).toEqual({
+      kind: "transfer",
+      id: "transfer:acc-3",
+      name: "Payment to Mortgage",
+      accountId: "acc-3",
+      isLoanPayment: true,
+    })
+  })
+
+  it("shows 'Payment from' when viewing from loan account", () => {
+    const result = derivePayeeSelection("", "acc-1", accounts, payees, "acc-3")
+    expect(result).toEqual({
+      kind: "transfer",
+      id: "transfer:acc-1",
+      name: "Payment from Chequing",
+      accountId: "acc-1",
+      isLoanPayment: true,
+    })
   })
 })

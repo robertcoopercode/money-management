@@ -43,6 +43,11 @@ export const getReports = (filters: ReportFilters) =>
             category: {
               include: { group: true },
             },
+            splits: {
+              include: {
+                category: { include: { group: true } },
+              },
+            },
           },
         }),
         prisma.account.findMany({

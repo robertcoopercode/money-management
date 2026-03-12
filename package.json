@@ -15,6 +15,7 @@
     "db:generate": "pnpm --filter @ledgr/db db:generate",
     "db:migrate": "pnpm --filter @ledgr/db db:migrate",
     "db:seed": "pnpm --filter @ledgr/db db:seed",
+    "db:migrate:manual": "pnpm --filter @ledgr/db db:migrate:manual",
     "test": "pnpm -r --if-present test",
     "hash-password": "tsx scripts/hash-password.ts"
   },
