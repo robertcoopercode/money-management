@@ -38,8 +38,8 @@ type TransactionEditRowProps = {
 }
 
 const FIELD_TO_COLUMN: Record<EditableField, number> = {
-  date: 0,
-  account: 1,
+  account: 0,
+  date: 1,
   payee: 2,
   category: 3,
   note: 4,
@@ -205,13 +205,6 @@ export const TransactionEditRow = ({
         }
       }}
     >
-      <div className="transaction-cell" data-field="date">
-        <DatePicker
-          value={draft.date}
-          onChange={(date) => update({ date })}
-          required
-        />
-      </div>
       <div className="transaction-cell" data-field="account">
         <AccountCombobox
           accounts={accounts}
@@ -219,6 +212,13 @@ export const TransactionEditRow = ({
           onChange={(accountId) => update({ accountId })}
           placeholder="Account"
           initialInputValue={initialAccountName}
+        />
+      </div>
+      <div className="transaction-cell" data-field="date">
+        <DatePicker
+          value={draft.date}
+          onChange={(date) => update({ date })}
+          required
         />
       </div>
       <div className="transaction-cell" data-field="payee">
@@ -280,12 +280,25 @@ export const TransactionEditRow = ({
               </svg>
             </button>
           </div>
+        ) : isTransfer && !isLoanTransfer ? (
+          <input
+            value={(() => {
+              const targetName =
+                accounts.find((a) => a.id === draft.transferAccountId)?.name ??
+                "Account"
+              return draft.isExpense
+                ? `Payment to ${targetName}`
+                : `Payment from ${targetName}`
+            })()}
+            readOnly
+            tabIndex={-1}
+            className="transfer-category-readonly"
+          />
         ) : (
           <CategoryAutocomplete
             value={draft.categoryId}
             categoryGroups={categoryGroups}
             onChange={(categoryId) => update({ categoryId })}
-            disabled={isTransfer && !isLoanTransfer}
             onCreateCategory={onCreateCategory}
             isCreating={isCreatingCategory}
             onSplit={

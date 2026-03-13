@@ -130,6 +130,18 @@ export const updateTransactionSchema = z
   )
   .superRefine(transactionSplitRefinement)
 
+export const transactionSortColumnSchema = z.enum([
+  "date",
+  "account",
+  "payee",
+  "category",
+  "note",
+  "amountMinor",
+  "cleared",
+])
+
+export const transactionSortDirSchema = z.enum(["asc", "desc"])
+
 export const transactionFilterSchema = z.object({
   accountId: z.string().min(1).optional(),
   fromDate: z.iso.date().optional(),
@@ -139,6 +151,8 @@ export const transactionFilterSchema = z.object({
   cleared: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
   offset: z.coerce.number().int().min(0).default(0),
+  sortBy: transactionSortColumnSchema.default("date"),
+  sortDir: transactionSortDirSchema.default("desc"),
 })
 
 export const updateCategoryAssignmentSchema = z.object({
@@ -187,3 +201,5 @@ export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>
 export type TransactionFilterInput = z.infer<typeof transactionFilterSchema>
 export type UpdateCategoryAssignmentInput = z.infer<typeof updateCategoryAssignmentSchema>
 export type TransactionSplitInput = z.infer<typeof transactionSplitInputSchema>
+export type TransactionSortColumn = z.infer<typeof transactionSortColumnSchema>
+export type TransactionSortDir = z.infer<typeof transactionSortDirSchema>

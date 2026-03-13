@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { toast } from "sonner"
@@ -14,6 +14,8 @@ import {
 } from "../lib/transaction-entry.js"
 import { useTransactionMutations } from "../hooks/use-transaction-mutations.js"
 import { AccountCombobox } from "../components/account-combobox.js"
+import { AccountFilterSelect } from "../components/account-filter-select.js"
+import { useLocalStorage } from "../hooks/use-local-storage.js"
 import { CategoryAutocomplete } from "../components/category-autocomplete.js"
 import { PayeeAutocomplete } from "../components/payee-autocomplete.js"
 import { ClearedToggle } from "../components/cleared-toggle.js"
@@ -39,6 +41,16 @@ type TransactionsTabProps = {
   onNavigateToPayees: () => void
 }
 
+const DEFAULT_SORT_DIRS: Record<string, "asc" | "desc"> = {
+  date: "desc",
+  amountMinor: "desc",
+  note: "asc",
+  payee: "asc",
+  category: "asc",
+  account: "asc",
+  cleared: "asc",
+}
+
 export const TransactionsTab = ({
   newTransaction,
   setNewTransaction,
@@ -49,7 +61,7 @@ export const TransactionsTab = ({
   onNavigateToPayees,
 }: TransactionsTabProps) => {
   const queryClient = useQueryClient()
-  const amountRef = useRef<HTMLInputElement | null>(null)
+  const dateRef = useRef<HTMLInputElement | null>(null)
 
   const [editingTransaction, setEditingTransaction] =
     useState<EditingTransaction | null>(null)
@@ -57,14 +69,35 @@ export const TransactionsTab = ({
     new Set(),
   )
   const [transactionOffset, setTransactionOffset] = useState(0)
+  const [filterAccountId, setFilterAccountId] = useLocalStorage("ledgr:filter-account", "")
+  const [sortBy, setSortBy] = useLocalStorage("ledgr:sort-by", "date")
+  const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("ledgr:sort-dir", "desc")
+
+  const handleSort = useCallback(
+    (column: string) => {
+      if (sortBy === column) {
+        setSortDir(sortDir === "asc" ? "desc" : "asc")
+      } else {
+        setSortBy(column)
+        setSortDir(DEFAULT_SORT_DIRS[column] ?? "asc")
+      }
+      setTransactionOffset(0)
+    },
+    [sortBy, sortDir, setSortBy, setSortDir],
+  )
 
   const transactionsQuery = useQuery({
-    queryKey: ["transactions", transactionOffset],
+    queryKey: ["transactions", transactionOffset, filterAccountId, sortBy, sortDir],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(TRANSACTION_PAGE_SIZE),
         offset: String(transactionOffset),
+        sortBy,
+        sortDir,
       })
+      if (filterAccountId) {
+        params.set("accountId", filterAccountId)
+      }
       return apiFetch<Transaction[]>(`/api/transactions?${params}`)
     },
   })
@@ -79,7 +112,7 @@ export const TransactionsTab = ({
     refetchCoreData,
     onTransactionCreated: () => {
       setNewTransaction((current) => buildNextTransactionDraft(current))
-      window.setTimeout(() => amountRef.current?.focus(), 0)
+      window.setTimeout(() => dateRef.current?.focus(), 0)
     },
     onTransactionUpdated: () => {
       setEditingTransaction(null)
@@ -253,6 +286,7 @@ export const TransactionsTab = ({
             placeholder="Select account"
           />
           <DatePicker
+            ref={dateRef}
             value={newTransaction.date}
             onChange={(date) =>
               setNewTransaction((current) => ({
@@ -262,36 +296,6 @@ export const TransactionsTab = ({
             }
             required
           />
-          <div className="amount-input-group">
-            <button
-              type="button"
-              className={`sign-toggle ${
-                newTransaction.isExpense
-                  ? "sign-toggle-minus"
-                  : "sign-toggle-plus"
-              }`}
-              onClick={() =>
-                setNewTransaction((current) => ({
-                  ...current,
-                  isExpense: !current.isExpense,
-                }))
-              }
-            >
-              {newTransaction.isExpense ? "\u2212" : "+"}
-            </button>
-            <input
-              ref={amountRef}
-              value={newTransaction.amount}
-              onChange={(event) =>
-                setNewTransaction((current) => ({
-                  ...current,
-                  amount: event.target.value,
-                }))
-              }
-              placeholder="Amount"
-              required
-            />
-          </div>
           <PayeeAutocomplete
             payees={payees}
             accounts={accounts}
@@ -421,6 +425,35 @@ export const TransactionsTab = ({
             }
             placeholder="Note"
           />
+          <div className="amount-input-group">
+            <button
+              type="button"
+              className={`sign-toggle ${
+                newTransaction.isExpense
+                  ? "sign-toggle-minus"
+                  : "sign-toggle-plus"
+              }`}
+              onClick={() =>
+                setNewTransaction((current) => ({
+                  ...current,
+                  isExpense: !current.isExpense,
+                }))
+              }
+            >
+              {newTransaction.isExpense ? "\u2212" : "+"}
+            </button>
+            <input
+              value={newTransaction.amount}
+              onChange={(event) =>
+                setNewTransaction((current) => ({
+                  ...current,
+                  amount: event.target.value,
+                }))
+              }
+              placeholder="Amount"
+              required
+            />
+          </div>
           <ClearedToggle
             pressed={newTransaction.cleared}
             onPressedChange={(pressed) =>
@@ -476,31 +509,63 @@ export const TransactionsTab = ({
         </form>
       </section>
 
+      <div className="transaction-filter-bar">
+        <AccountFilterSelect
+          accounts={accounts}
+          value={filterAccountId}
+          onChange={(value) => {
+            setFilterAccountId(value)
+            setTransactionOffset(0)
+          }}
+        />
+        {filterAccountId && (
+          <button
+            type="button"
+            className="filter-clear-button"
+            onClick={() => {
+              setFilterAccountId("")
+              setTransactionOffset(0)
+            }}
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+
       <section className="card">
         <div className="table-wrap">
           <div className="transaction-list" role="table">
             <div className="transaction-header" role="row">
-              <div className="transaction-cell" role="columnheader">
-                Date
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Account
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Payee
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Category
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Note
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Amount
-              </div>
-              <div className="transaction-cell" role="columnheader">
-                Status
-              </div>
+              {([
+                ["account", "Account"],
+                ["date", "Date"],
+                ["payee", "Payee"],
+                ["category", "Category"],
+                ["note", "Note"],
+                ["amountMinor", "Amount"],
+                ["cleared", "Status"],
+              ] as const).map(([column, label]) => (
+                <div
+                  key={column}
+                  className={`transaction-cell sortable-header${sortBy === column ? " sorted" : ""}`}
+                  role="columnheader"
+                  tabIndex={0}
+                  onClick={() => handleSort(column)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      handleSort(column)
+                    }
+                  }}
+                >
+                  {label}
+                  {sortBy === column && (
+                    <span className="sort-arrow" aria-hidden="true">
+                      {sortDir === "asc" ? " ▲" : " ▼"}
+                    </span>
+                  )}
+                </div>
+              ))}
               <div className="transaction-cell" role="columnheader"></div>
             </div>
             {transactionsQuery.isError ? (
@@ -564,6 +629,18 @@ export const TransactionsTab = ({
                         className="transaction-cell clickable-cell"
                         role="cell"
                         tabIndex={0}
+                        onClick={() => startEditing(transaction, "account")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter")
+                            startEditing(transaction, "account")
+                        }}
+                      >
+                        {transaction.account.name}
+                      </div>
+                      <div
+                        className="transaction-cell clickable-cell"
+                        role="cell"
+                        tabIndex={0}
                         onClick={() => startEditing(transaction, "date")}
                         onKeyDown={(e) => {
                           if (e.key === "Enter")
@@ -573,18 +650,6 @@ export const TransactionsTab = ({
                         {new Date(transaction.date)
                           .toISOString()
                           .slice(0, 10)}
-                      </div>
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "account")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "account")
-                        }}
-                      >
-                        {transaction.account.name}
                       </div>
                       <div
                         className="transaction-cell clickable-cell"
@@ -658,22 +723,23 @@ export const TransactionsTab = ({
                             <em>Split transaction</em>
                           </button>
                         ) : transaction.isTransfer ? (
-                          transaction.category?.name ? (
-                            transaction.category.name
-                          ) : (
-                            (() => {
-                              const isLoan =
-                                transaction.transferAccount?.type === "LOAN" ||
-                                transaction.account.type === "LOAN"
-                              if (isLoan) {
-                                return transaction.transferAccount?.type ===
-                                  "LOAN"
-                                  ? `Payment to ${transaction.transferAccount?.name ?? "Account"}`
-                                  : `Payment from ${transaction.transferAccount?.name ?? "Account"}`
-                              }
-                              return `Transfer \u2192 ${transaction.transferAccount?.name ?? "Account"}`
-                            })()
-                          )
+                          (() => {
+                            const targetName =
+                              transaction.transferAccount?.name ?? "Account"
+                            const isLoan =
+                              transaction.transferAccount?.type === "LOAN" ||
+                              transaction.account.type === "LOAN"
+                            if (isLoan) {
+                              return transaction.category?.name
+                                ? transaction.category.name
+                                : transaction.transferAccount?.type === "LOAN"
+                                  ? `Payment to ${targetName}`
+                                  : `Payment from ${targetName}`
+                            }
+                            return transaction.amountMinor < 0
+                              ? `Payment to ${targetName}`
+                              : `Payment from ${targetName}`
+                          })()
                         ) : (
                           (transaction.category?.name ?? "\u2014")
                         )}
@@ -759,6 +825,15 @@ export const TransactionsTab = ({
                           role="row"
                         >
                           <div className="transaction-cell split-detail-leading" />
+                          <div
+                            className="transaction-cell split-detail-payee"
+                            role="cell"
+                          >
+                            {split.payee &&
+                              split.payee.id !== transaction.payee?.id
+                              ? split.payee.name
+                              : ""}
+                          </div>
                           <div
                             className="transaction-cell clickable-cell split-detail-category"
                             tabIndex={0}

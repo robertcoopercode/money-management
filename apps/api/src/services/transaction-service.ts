@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto"
 import { OriginType, Prisma, prisma } from "@ledgr/db"
 import type {
   TransactionFilterInput,
+  TransactionSortColumn,
+  TransactionSortDir,
   TransactionSplitInput,
 } from "@ledgr/shared"
 import { Effect } from "effect"
@@ -11,6 +13,27 @@ import {
 } from "../domain/transfer.js"
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`)
+
+const buildOrderBy = (
+  sortBy: TransactionSortColumn,
+  sortDir: TransactionSortDir,
+): Prisma.TransactionOrderByWithRelationInput[] => {
+  const primary: Prisma.TransactionOrderByWithRelationInput =
+    sortBy === "account"
+      ? { account: { name: sortDir } }
+      : sortBy === "payee"
+        ? { payee: { name: sortDir } }
+        : sortBy === "category"
+          ? { category: { name: sortDir } }
+          : { [sortBy]: sortDir }
+
+  const secondary: Prisma.TransactionOrderByWithRelationInput[] =
+    sortBy === "date"
+      ? [{ createdAt: "desc" }]
+      : [{ date: "desc" }, { createdAt: "desc" }]
+
+  return [primary, ...secondary]
+}
 
 const transactionInclude = {
   account: true,
@@ -47,7 +70,7 @@ export const listTransactions = (filters: TransactionFilterInput) =>
         include: {
           ...transactionInclude,
         },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        orderBy: buildOrderBy(filters.sortBy, filters.sortDir),
         take: filters.limit,
         skip: filters.offset,
       }),
@@ -193,6 +216,9 @@ export const updateTransaction = (
         where: { id: transactionId },
         select: {
           id: true,
+          accountId: true,
+          transferAccountId: true,
+          categoryId: true,
           transferPairId: true,
           isTransfer: true,
           account: { select: { type: true } },
@@ -214,9 +240,13 @@ export const updateTransaction = (
 
       if (
         existing.transferPairId &&
-        (input.accountId !== undefined ||
-          input.transferAccountId !== undefined ||
-          (input.categoryId !== undefined && !existingIsLoanTransfer))
+        ((input.accountId !== undefined &&
+          input.accountId !== existing.accountId) ||
+          (input.transferAccountId !== undefined &&
+            input.transferAccountId !== existing.transferAccountId) ||
+          (input.categoryId !== undefined &&
+            input.categoryId !== existing.categoryId &&
+            !existingIsLoanTransfer))
       ) {
         throw new Error(
           "Changing transfer accounts/categories requires recreating the transfer.",
@@ -319,7 +349,7 @@ export const updateTransaction = (
       })
     },
     catch: (error) =>
-      new Error(`Unable to update transaction: ${String(error)}`),
+      new Error(`Unable to update transaction: ${error instanceof Error ? error.message : String(error)}`),
   })
 
 export const deleteTransaction = (transactionId: string) =>

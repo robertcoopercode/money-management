@@ -371,6 +371,139 @@ button:disabled {
   gap: 0.55rem;
 }
 
+/* ── Account filter select ── */
+
+.transaction-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 1rem 0.55rem;
+  background: rgb(10 20 53 / 82%);
+  border-left: 1px solid rgb(95 117 171 / 22%);
+  border-right: 1px solid rgb(95 117 171 / 22%);
+}
+
+.account-filter-trigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgb(5 11 30 / 78%);
+  border: 1px solid rgb(95 117 171 / 28%);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  color: #e7f0ff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+  min-width: 140px;
+}
+
+.account-filter-trigger:hover {
+  border-color: rgb(130 157 226 / 50%);
+  background: rgb(15 25 55 / 90%);
+}
+
+.account-filter-trigger:focus-visible {
+  outline: 2px solid rgb(140 170 255 / 50%);
+  outline-offset: -1px;
+}
+
+.account-filter-trigger[data-popup-open] {
+  border-color: rgb(140 170 255 / 50%);
+}
+
+.account-filter-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-filter-value[data-placeholder] {
+  color: rgb(180 195 230 / 55%);
+}
+
+.account-filter-icon {
+  flex-shrink: 0;
+  color: rgb(180 195 230 / 60%);
+  display: flex;
+  align-items: center;
+  transition: transform 150ms ease;
+}
+
+.account-filter-trigger[data-popup-open] .account-filter-icon {
+  transform: rotate(180deg);
+}
+
+.account-filter-positioner {
+  z-index: 50;
+}
+
+.account-filter-popup {
+  padding: 0.35rem;
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 10px;
+  background: rgb(6 13 35 / 98%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 35%);
+  max-height: 280px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 180px;
+}
+
+.account-filter-option {
+  all: unset;
+  cursor: pointer;
+  color: rgb(225 232 250);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.85rem;
+  transition: background-color 100ms ease;
+}
+
+.account-filter-option:hover,
+.account-filter-option[data-highlighted] {
+  background: rgb(70 99 184 / 36%);
+}
+
+.account-filter-option[data-selected] {
+  color: rgb(130 226 160);
+}
+
+.account-filter-check {
+  flex-shrink: 0;
+  color: rgb(130 226 160);
+  display: flex;
+  align-items: center;
+}
+
+.filter-clear-button {
+  all: unset;
+  font-size: 0.78rem;
+  color: rgb(180 195 230 / 60%);
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.filter-clear-button:hover {
+  color: rgb(225 232 250);
+  background: rgb(95 117 171 / 18%);
+}
+
+.filter-clear-button:focus-visible {
+  outline: 2px solid rgb(140 170 255 / 50%);
+  outline-offset: -1px;
+}
+
 .category-autocomplete-input {
   width: 100%;
 }
@@ -696,8 +829,8 @@ button:disabled {
 .transaction-list {
   display: grid;
   grid-template-columns:
-    minmax(9.5rem, 1.1fr)
     1.2fr
+    minmax(9.5rem, 1.1fr)
     1.4fr
     1.4fr
     1.4fr
@@ -720,6 +853,20 @@ button:disabled {
   letter-spacing: 0.05em;
   font-weight: bold;
   z-index: 1;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-header:hover {
+  opacity: 0.8;
+}
+
+.sort-arrow {
+  font-size: 0.7em;
+  margin-left: 2px;
 }
 
 .transaction-row {
@@ -1030,19 +1177,19 @@ button:disabled {
   padding-right: 0;
 }
 
-.split-cell-payee {
+.split-cell-amount {
   grid-column: 3;
 }
 
-.split-cell-category {
+.split-cell-payee {
   grid-column: 4;
 }
 
-.split-cell-note {
+.split-cell-category {
   grid-column: 5;
 }
 
-.split-cell-amount {
+.split-cell-note {
   grid-column: 6;
 }
 
@@ -1135,6 +1282,12 @@ button:disabled {
   padding-right: 2rem;
 }
 
+.transfer-category-readonly {
+  width: 100%;
+  cursor: default;
+  opacity: 0.5;
+}
+
 .split-category-clear {
   position: absolute;
   right: 0.35rem;
@@ -1160,10 +1313,6 @@ button:disabled {
   grid-column: 1 / 3;
 }
 
-.transaction-list .split-cell-amount {
-  grid-column: 6;
-}
-
 .transaction-list .split-cell-payee {
   grid-column: 3;
 }
@@ -1174,6 +1323,10 @@ button:disabled {
 
 .transaction-list .split-cell-note {
   grid-column: 5;
+}
+
+.transaction-list .split-cell-amount {
+  grid-column: 6;
 }
 
 .transaction-list .split-cell-trailing {
@@ -1240,7 +1393,11 @@ button:disabled {
 }
 
 .split-detail-leading {
-  grid-column: 1 / 4;
+  grid-column: 1 / 3;
+}
+
+.split-detail-payee {
+  grid-column: 3;
 }
 
 .split-detail-category {

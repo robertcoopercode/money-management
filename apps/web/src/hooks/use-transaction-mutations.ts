@@ -43,7 +43,7 @@ export const useTransactionMutations = (opts: {
       opts.refetchCoreData()
     },
     onError: (error) => {
-      toast.error(`Unable to update transaction: ${error.message}`)
+      toast.error(error.message)
     },
   })
 

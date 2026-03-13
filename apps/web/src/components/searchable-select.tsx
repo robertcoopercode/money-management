@@ -60,6 +60,7 @@ export function SearchableSelect<T>({
       itemToStringLabel={itemToString}
       isItemEqualToValue={isItemEqual}
       filter={filter}
+      autoHighlight
     >
       <Combobox.Input
         className="category-autocomplete-input"

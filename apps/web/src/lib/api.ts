@@ -14,7 +14,13 @@ export const apiFetch = async <T,>(
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(errorText || "Request failed.")
+    try {
+      const errorJson = JSON.parse(errorText)
+      throw new Error(errorJson.error || errorJson.message || errorText)
+    } catch (e) {
+      if (e instanceof Error && e.message !== errorText) throw e
+      throw new Error(errorText || "Request failed.")
+    }
   }
 
   if (response.status === 204) {

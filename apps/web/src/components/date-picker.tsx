@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react"
 import { Popover } from "@base-ui/react/popover"
 import { DayPicker } from "react-day-picker"
 import * as chrono from "chrono-node"
@@ -34,16 +34,18 @@ type DatePickerProps = {
   required?: boolean
 }
 
-export function DatePicker({
+export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(function DatePicker({
   value,
   onChange,
   placeholder = "Pick a date…",
   disabled,
   required,
-}: DatePickerProps) {
+}, ref) {
   const [inputValue, setInputValue] = useState(() => toDisplayDate(value))
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useImperativeHandle(ref, () => inputRef.current!, [])
 
   useEffect(() => {
     setInputValue(toDisplayDate(value))
@@ -129,4 +131,4 @@ export function DatePicker({
       </Popover.Portal>
     </Popover.Root>
   )
-}
+})
