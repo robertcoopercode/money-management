@@ -1,4 +1,4 @@
-import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
+import { formatMoney } from "@ledgr/shared"
 import type { SplitDraft } from "../lib/transaction-entry.js"
 import { getSplitBalanceStatus } from "../lib/transaction-entry.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
@@ -15,7 +15,7 @@ type SplitEditorProps = {
   parentAmountMinor: number
   onSplitsChange: (splits: SplitDraft[]) => void
   payees: Array<{ id: string; name: string }>
-  accounts: Array<{ id: string; name: string }>
+  accounts: Array<{ id: string; name: string; type: string }>
   categoryGroups: CategoryGroup[]
   onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean

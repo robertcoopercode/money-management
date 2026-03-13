@@ -14,7 +14,7 @@ export const AccountFilterSelect = ({
   return (
     <Select.Root
       value={value}
-      onValueChange={onChange}
+      onValueChange={(value) => onChange(value ?? "")}
     >
       <Select.Trigger className="account-filter-trigger">
         <Select.Value
