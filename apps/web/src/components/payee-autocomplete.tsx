@@ -9,13 +9,16 @@ type Payee = {
   name: string
 }
 
-export type PayeeOption = { kind: "payee"; id: string; name: string } | {
-  kind: "transfer"
-  id: string
-  name: string
-  accountId: string
-  isLoanPayment?: boolean
-}
+export type PayeeOption =
+  | { kind: "payee"; id: string; name: string }
+  | {
+      kind: "transfer"
+      id: string
+      name: string
+      accountId: string
+      isLoanPayment?: boolean
+    }
+  | { kind: "create"; id: string; name: string }
 
 type PayeeAutocompleteProps = {
   payees: Payee[]
@@ -27,6 +30,7 @@ type PayeeAutocompleteProps = {
   onManagePayees?: () => void
   disabled?: boolean
   isCreating?: boolean
+  isExpense?: boolean
   placeholder?: string
   initialInputValue?: string
 }
@@ -41,6 +45,7 @@ export const PayeeAutocomplete = ({
   onManagePayees,
   disabled = false,
   isCreating = false,
+  isExpense,
   placeholder = "Payee",
   initialInputValue = "",
 }: PayeeAutocompleteProps) => {
@@ -60,13 +65,15 @@ export const PayeeAutocomplete = ({
       .map((a) => {
         const isLoanTransfer =
           a.type === "LOAN" || currentAccount?.type === "LOAN"
-        let displayName = a.name
-        if (isLoanTransfer) {
-          displayName =
-            a.type === "LOAN"
-              ? `Payment to ${a.name}`
-              : `Payment from ${a.name}`
-        }
+        const isOutgoing = isLoanTransfer
+          ? a.type === "LOAN"
+          : Boolean(isExpense)
+        const isCashToCash =
+          !isLoanTransfer && a.type === "CASH" && currentAccount?.type === "CASH"
+        const prefix = isCashToCash ? "Transfer" : "Payment"
+        const displayName = isOutgoing
+          ? `${prefix} to ${a.name}`
+          : `${prefix} from ${a.name}`
         return {
           kind: "transfer" as const,
           id: `transfer:${a.id}`,
@@ -86,7 +93,7 @@ export const PayeeAutocomplete = ({
       { label: "Payments and Transfers", items: transferItems },
       { label: "Saved Payees", items: payeeItems },
     ]
-  }, [accounts, currentAccountId, payees])
+  }, [accounts, currentAccountId, payees, isExpense])
 
   const exactMatchExists = useMemo(() => {
     const query = inputValue.trim().toLowerCase()
@@ -96,16 +103,18 @@ export const PayeeAutocomplete = ({
     )
   }, [groups, inputValue])
 
-  const showCreateButton =
+  const showCreateOption =
     Boolean(onCreatePayee) && inputValue.trim().length > 0 && !exactMatchExists
 
-  const hasFilteredResults = useMemo(() => {
-    if (!inputValue.trim()) return true
-    const query = inputValue.toLowerCase()
-    return groups.some((g) =>
-      g.items.some((item) => item.name.toLowerCase().includes(query)),
-    )
-  }, [groups, inputValue])
+  const groupsWithCreate = useMemo<SearchableSelectGroup<PayeeOption>[]>(() => {
+    if (!showCreateOption) return groups
+    const createItem: PayeeOption = {
+      kind: "create",
+      id: "__create__",
+      name: `Create "${inputValue.trim()}" Payee`,
+    }
+    return [{ label: "", items: [createItem] }, ...groups]
+  }, [groups, showCreateOption, inputValue])
 
   const handleCreate = async () => {
     const name = inputValue.trim()
@@ -119,9 +128,15 @@ export const PayeeAutocomplete = ({
 
   return (
     <SearchableSelect<PayeeOption>
-      items={groups}
+      items={groupsWithCreate}
       value={value}
-      onValueChange={(option) => onChange(option ?? null)}
+      onValueChange={(option) => {
+        if (option && option.kind === "create") {
+          void handleCreate()
+          return
+        }
+        onChange(option ?? null)
+      }}
       inputValue={inputValue}
       onInputValueChange={(newInputValue, details) => {
         if (justCreatedRef.current && details.reason !== "input-change") return
@@ -134,40 +149,13 @@ export const PayeeAutocomplete = ({
       onOpenChange={setOpen}
       disabled={disabled}
       placeholder={placeholder}
-      itemToString={(item) => item.name}
+      itemToString={(item) => (item.kind === "create" ? "" : item.name)}
       isItemEqual={(a, b) => a.id === b.id}
-      filter={(item, query) =>
-        item.name.toLowerCase().includes(query.toLowerCase())
-      }
+      filter={(item, query) => {
+        if (item.kind === "create") return true
+        return item.name.toLowerCase().includes(query.toLowerCase())
+      }}
       emptyMessage="No matching payees."
-      topAction={
-        showCreateButton ? (
-          <button
-            type="button"
-            className="searchable-select-create"
-            onClick={() => void handleCreate()}
-            disabled={isCreating}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 12h8" />
-              <path d="M12 8v8" />
-            </svg>
-            {isCreating
-              ? "Creating payee..."
-              : `Create "${inputValue.trim()}" Payee`}
-          </button>
-        ) : undefined
-      }
       bottomAction={
         onManagePayees ? (
           <button
@@ -182,17 +170,29 @@ export const PayeeAutocomplete = ({
           </button>
         ) : undefined
       }
-      renderItem={(item) => <span>{item.name}</span>}
-      onInputKeyDown={(e) => {
-        if (
-          e.key === "Enter" &&
-          showCreateButton &&
-          !hasFilteredResults &&
-          !isCreating
-        ) {
-          e.preventDefault()
-          void handleCreate()
+      renderItem={(item) => {
+        if (item.kind === "create") {
+          return (
+            <span className="searchable-select-create">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8" />
+                <path d="M12 8v8" />
+              </svg>
+              {isCreating ? "Creating payee..." : item.name}
+            </span>
+          )
         }
+        return <span>{item.name}</span>
       }}
     />
   )

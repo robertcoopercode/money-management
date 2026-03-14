@@ -3,6 +3,7 @@ import { apiFetch } from "../lib/api.js"
 import type {
   Account,
   Payee,
+  Tag,
   CategoryGroup,
   PlanningResponse,
 } from "../types.js"
@@ -25,6 +26,11 @@ export const useCoreQueries = (month: string) => {
     queryFn: () => apiFetch<CategoryGroup[]>("/api/categories"),
   })
 
+  const tagsQuery = useQuery({
+    queryKey: ["tags"],
+    queryFn: () => apiFetch<Tag[]>("/api/tags"),
+  })
+
   const planningQuery = useQuery({
     queryKey: ["planning", month],
     queryFn: () => apiFetch<PlanningResponse>(`/api/planning/${month}`),
@@ -35,6 +41,7 @@ export const useCoreQueries = (month: string) => {
     void queryClient.invalidateQueries({ queryKey: ["transactions"] })
     void queryClient.invalidateQueries({ queryKey: ["payees"] })
     void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    void queryClient.invalidateQueries({ queryKey: ["tags"] })
     void queryClient.invalidateQueries({ queryKey: ["reports"] })
   }
 
@@ -42,6 +49,7 @@ export const useCoreQueries = (month: string) => {
     accountsQuery,
     payeesQuery,
     categoriesQuery,
+    tagsQuery,
     planningQuery,
     refetchCoreData,
   }

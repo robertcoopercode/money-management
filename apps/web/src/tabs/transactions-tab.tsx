@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
+import { parseMoneyInputToMinor } from "@ledgr/shared"
 import { toast } from "sonner"
 import { apiFetch, TRANSACTION_PAGE_SIZE } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
@@ -13,20 +13,25 @@ import {
   type EditableField,
 } from "../lib/transaction-entry.js"
 import { useTransactionMutations } from "../hooks/use-transaction-mutations.js"
+import { useTagMutations } from "../hooks/use-tag-mutations.js"
 import { AccountCombobox } from "../components/account-combobox.js"
 import { AccountFilterSelect } from "../components/account-filter-select.js"
 import { useLocalStorage } from "../hooks/use-local-storage.js"
 import { CategoryAutocomplete } from "../components/category-autocomplete.js"
 import { PayeeAutocomplete } from "../components/payee-autocomplete.js"
+import { TagCombobox } from "../components/tag-combobox.js"
 import { ClearedToggle } from "../components/cleared-toggle.js"
 import { DatePicker } from "../components/date-picker.js"
 import { TransactionEditRow } from "../components/transaction-edit-row.js"
 import { SplitEditor } from "../components/split-editor.js"
-import { TransactionBadge } from "../components/transaction-badge.js"
+import { TransactionDisplayRow } from "../components/transaction-display-row.js"
+import { TransactionContextMenu } from "../components/transaction-context-menu.js"
+import { buildDuplicateBody } from "../lib/build-duplicate-body.js"
 import type {
   Transaction,
   Account,
   Payee,
+  Tag,
   CategoryGroup,
   EditingTransaction,
 } from "../types.js"
@@ -36,6 +41,7 @@ type TransactionsTabProps = {
   setNewTransaction: React.Dispatch<React.SetStateAction<TransactionDraft>>
   accounts: Account[]
   payees: Payee[]
+  tags: Tag[]
   categoryGroups: CategoryGroup[]
   refetchCoreData: () => void
   onNavigateToPayees: () => void
@@ -56,6 +62,7 @@ export const TransactionsTab = ({
   setNewTransaction,
   accounts,
   payees,
+  tags,
   categoryGroups,
   refetchCoreData,
   onNavigateToPayees,
@@ -119,6 +126,8 @@ export const TransactionsTab = ({
     },
   })
 
+  const { createTagMutation } = useTagMutations({ refetchCoreData })
+
   const payeeSelection = useMemo(
     () =>
       derivePayeeSelection(
@@ -127,6 +136,7 @@ export const TransactionsTab = ({
         accounts,
         payees,
         newTransaction.accountId,
+        newTransaction.isExpense,
       ),
     [
       newTransaction.payeeId,
@@ -134,6 +144,7 @@ export const TransactionsTab = ({
       accounts,
       payees,
       newTransaction.accountId,
+      newTransaction.isExpense,
     ],
   )
 
@@ -176,6 +187,22 @@ export const TransactionsTab = ({
     })
   }
 
+  const handleJumpToTransfer = useCallback(
+    (transferPairId: string, sourceTransactionId: string) => {
+      const partner = transactionsQuery.data?.find(
+        (t) => t.transferPairId === transferPairId && t.id !== sourceTransactionId,
+      )
+      if (partner) {
+        startEditing(partner, "payee")
+      } else {
+        toast.warning(
+          "The linked transfer is not visible. It may be on a different page or filtered out.",
+        )
+      }
+    },
+    [transactionsQuery.data],
+  )
+
   const handleSaveEdit = () => {
     if (!editingTransaction) return
     const { draft, transactionId } = editingTransaction
@@ -211,8 +238,10 @@ export const TransactionsTab = ({
               amountMinor: s.isExpense
                 ? -Math.abs(parseMoneyInputToMinor(s.amount))
                 : Math.abs(parseMoneyInputToMinor(s.amount)),
+              tagIds: s.tagIds,
             }))
           : [],
+        tagIds: draft.tagIds,
       },
     })
   }
@@ -242,8 +271,13 @@ export const TransactionsTab = ({
             amountMinor: s.isExpense
               ? -Math.abs(parseMoneyInputToMinor(s.amount))
               : Math.abs(parseMoneyInputToMinor(s.amount)),
+            tagIds: s.tagIds.length > 0 ? s.tagIds : undefined,
           }))
         : undefined,
+      tagIds:
+        newTransaction.tagIds.length > 0
+          ? newTransaction.tagIds
+          : undefined,
     })
   }
 
@@ -318,10 +352,14 @@ export const TransactionsTab = ({
                     ...(selection.isLoanPayment ? {} : { categoryId: "" }),
                   }
                 }
+                const selectedPayee = payees.find((p) => p.id === selection.id)
                 return {
                   ...current,
                   payeeId: selection.id,
                   transferAccountId: "",
+                  ...(selectedPayee?.defaultCategory && !current.categoryId
+                    ? { categoryId: selectedPayee.defaultCategory.id }
+                    : {}),
                 }
               })
             }}
@@ -332,6 +370,7 @@ export const TransactionsTab = ({
               return payee
             }}
             isCreating={createTransactionPayeeMutation.isPending}
+            isExpense={newTransaction.isExpense}
             onManagePayees={onNavigateToPayees}
           />
           {newTransaction.splits.length > 0 ? (
@@ -401,6 +440,7 @@ export const TransactionsTab = ({
                             note: "",
                             amount: "",
                             isExpense: current.isExpense,
+                            tagIds: [],
                           },
                           {
                             categoryId: "",
@@ -408,6 +448,7 @@ export const TransactionsTab = ({
                             note: "",
                             amount: "",
                             isExpense: current.isExpense,
+                            tagIds: [],
                           },
                         ],
                         categoryId: "",
@@ -454,6 +495,19 @@ export const TransactionsTab = ({
               required
             />
           </div>
+          <TagCombobox
+            tags={tags}
+            selectedTagIds={newTransaction.tagIds}
+            onChange={(tagIds) =>
+              setNewTransaction((current) => ({
+                ...current,
+                tagIds,
+              }))
+            }
+            onCreateTag={(name) =>
+              createTagMutation.mutateAsync({ name })
+            }
+          />
           <ClearedToggle
             pressed={newTransaction.cleared}
             onPressedChange={(pressed) =>
@@ -504,6 +558,10 @@ export const TransactionsTab = ({
                 createCategoryMutation.mutateAsync({ name })
               }
               isCreatingCategory={createCategoryMutation.isPending}
+              tags={tags}
+              onCreateTag={(name) =>
+                createTagMutation.mutateAsync({ name })
+              }
             />
           )}
         </form>
@@ -543,7 +601,6 @@ export const TransactionsTab = ({
                 ["category", "Category"],
                 ["note", "Note"],
                 ["amountMinor", "Amount"],
-                ["cleared", "Status"],
               ] as const).map(([column, label]) => (
                 <div
                   key={column}
@@ -566,6 +623,7 @@ export const TransactionsTab = ({
                   )}
                 </div>
               ))}
+              <div className="transaction-cell" role="columnheader">Tags</div>
               <div className="transaction-cell" role="columnheader"></div>
             </div>
             {transactionsQuery.isError ? (
@@ -599,6 +657,7 @@ export const TransactionsTab = ({
                     focusSplitIndex={editingTransaction.focusSplitIndex}
                     accounts={accounts}
                     payees={payees}
+                    tags={tags}
                     categoryGroups={categoryGroups}
                     onSave={handleSaveEdit}
                     onCancel={() => setEditingTransaction(null)}
@@ -621,287 +680,43 @@ export const TransactionsTab = ({
                       createCategoryMutation.mutateAsync({ name })
                     }
                     isCreatingCategory={createCategoryMutation.isPending}
+                    onCreateTag={(name) =>
+                      createTagMutation.mutateAsync({ name })
+                    }
                   />
                 ) : (
-                  <Fragment key={transaction.id}>
-                    <div className="transaction-row" role="row">
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "account")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "account")
-                        }}
-                      >
-                        {transaction.account.name}
-                      </div>
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "date")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "date")
-                        }}
-                      >
-                        {new Date(transaction.date)
-                          .toISOString()
-                          .slice(0, 10)}
-                      </div>
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "payee")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "payee")
-                        }}
-                      >
-                        {transaction.isTransfer
-                          ? (() => {
-                              const targetName =
-                                transaction.transferAccount?.name ?? "Account"
-                              const isLoan =
-                                transaction.transferAccount?.type === "LOAN" ||
-                                transaction.account.type === "LOAN"
-                              if (isLoan) {
-                                return transaction.transferAccount?.type ===
-                                  "LOAN"
-                                  ? `Payment to ${targetName}`
-                                  : `Payment from ${targetName}`
-                              }
-                              return targetName
-                            })()
-                          : (transaction.payee?.name ?? "\u2014")}
-                      </div>
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() =>
-                          startEditing(transaction, "category")
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "category")
-                        }}
-                      >
-                        {transaction.splits?.length > 0 ? (
-                          <button
-                            type="button"
-                            className="split-chevron"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleSplitExpand(transaction.id)
-                            }}
-                            aria-expanded={expandedSplitIds.has(
-                              transaction.id,
-                            )}
-                            aria-label="Toggle split details"
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className={
-                                expandedSplitIds.has(transaction.id)
-                                  ? "split-chevron-expanded"
-                                  : ""
-                              }
-                            >
-                              <path d="M9 18l6-6-6-6" />
-                            </svg>
-                            <em>Split transaction</em>
-                          </button>
-                        ) : transaction.isTransfer ? (
-                          (() => {
-                            const targetName =
-                              transaction.transferAccount?.name ?? "Account"
-                            const isLoan =
-                              transaction.transferAccount?.type === "LOAN" ||
-                              transaction.account.type === "LOAN"
-                            if (isLoan) {
-                              return transaction.category?.name
-                                ? transaction.category.name
-                                : transaction.transferAccount?.type === "LOAN"
-                                  ? `Payment to ${targetName}`
-                                  : `Payment from ${targetName}`
-                            }
-                            return transaction.amountMinor < 0
-                              ? `Payment to ${targetName}`
-                              : `Payment from ${targetName}`
-                          })()
-                        ) : (
-                          (transaction.category?.name ?? "\u2014")
-                        )}
-                      </div>
-                      <div
-                        className="transaction-cell clickable-cell"
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "note")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "note")
-                        }}
-                      >
-                        {transaction.note || ""}
-                      </div>
-                      <div
-                        className={`transaction-cell clickable-cell ${
-                          transaction.amountMinor >= 0
-                            ? "amount-inflow"
-                            : "amount-outflow"
-                        }`}
-                        role="cell"
-                        tabIndex={0}
-                        onClick={() => startEditing(transaction, "amount")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter")
-                            startEditing(transaction, "amount")
-                        }}
-                      >
-                        {formatMoney(transaction.amountMinor)}
-                      </div>
-                      <div className="transaction-cell" role="cell">
-                        <TransactionBadge transaction={transaction} />
-                      </div>
-                      <div className="transaction-cell" role="cell">
-                        <div className="row-actions">
-                          <ClearedToggle
-                            pressed={transaction.cleared}
-                            onPressedChange={(pressed) =>
-                              updateTransactionMutation.mutate({
-                                transactionId: transaction.id,
-                                patch: { cleared: pressed },
-                              })
-                            }
-                            disabled={updateTransactionMutation.isPending}
-                          />
-                          <button
-                            type="button"
-                            className="icon-button-danger"
-                            onClick={() =>
-                              deleteTransactionMutation.mutate(
-                                transaction.id,
-                              )
-                            }
-                            disabled={deleteTransactionMutation.isPending}
-                            aria-label="Delete transaction"
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    {expandedSplitIds.has(transaction.id) &&
-                      transaction.splits?.length > 0 &&
-                      transaction.splits.map((split, splitIndex) => (
-                        <div
-                          key={split.id}
-                          className="split-detail-row"
-                          role="row"
-                        >
-                          <div className="transaction-cell split-detail-leading" />
-                          <div
-                            className="transaction-cell split-detail-payee"
-                            role="cell"
-                          >
-                            {split.payee &&
-                              split.payee.id !== transaction.payee?.id
-                              ? split.payee.name
-                              : ""}
-                          </div>
-                          <div
-                            className="transaction-cell clickable-cell split-detail-category"
-                            tabIndex={0}
-                            onClick={() =>
-                              startEditing(
-                                transaction,
-                                "category",
-                                splitIndex,
-                              )
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter")
-                                startEditing(
-                                  transaction,
-                                  "category",
-                                  splitIndex,
-                                )
-                            }}
-                          >
-                            {split.category.group.name}:{" "}
-                            {split.category.name}
-                          </div>
-                          <div
-                            className="transaction-cell clickable-cell split-detail-note"
-                            tabIndex={0}
-                            onClick={() =>
-                              startEditing(transaction, "note", splitIndex)
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter")
-                                startEditing(
-                                  transaction,
-                                  "note",
-                                  splitIndex,
-                                )
-                            }}
-                          >
-                            {split.note || ""}
-                          </div>
-                          <div
-                            className={`transaction-cell clickable-cell split-detail-amount ${
-                              split.amountMinor >= 0
-                                ? "amount-inflow"
-                                : "amount-outflow"
-                            }`}
-                            tabIndex={0}
-                            onClick={() =>
-                              startEditing(
-                                transaction,
-                                "amount",
-                                splitIndex,
-                              )
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter")
-                                startEditing(
-                                  transaction,
-                                  "amount",
-                                  splitIndex,
-                                )
-                            }}
-                          >
-                            {formatMoney(split.amountMinor)}
-                          </div>
-                          <div className="transaction-cell split-detail-trailing" />
-                        </div>
-                      ))}
-                  </Fragment>
+                  <TransactionContextMenu
+                    key={transaction.id}
+                    transaction={transaction}
+                    onToggleCleared={(id, cleared) =>
+                      updateTransactionMutation.mutate({
+                        transactionId: id,
+                        patch: { cleared },
+                      })
+                    }
+                    onDuplicate={(t) =>
+                      createTransactionMutation.mutate(buildDuplicateBody(t))
+                    }
+                    onDelete={(id) =>
+                      deleteTransactionMutation.mutate(id)
+                    }
+                  >
+                    <TransactionDisplayRow
+                      transaction={transaction}
+                      tags={tags}
+                      expandedSplitIds={expandedSplitIds}
+                      onStartEditing={startEditing}
+                      onJumpToTransfer={handleJumpToTransfer}
+                      onToggleSplitExpand={toggleSplitExpand}
+                      onClearedChange={(id, cleared) =>
+                        updateTransactionMutation.mutate({
+                          transactionId: id,
+                          patch: { cleared },
+                        })
+                      }
+                      isUpdatePending={updateTransactionMutation.isPending}
+                    />
+                  </TransactionContextMenu>
                 ),
               )
             )}

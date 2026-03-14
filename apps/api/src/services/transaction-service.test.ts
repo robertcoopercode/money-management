@@ -17,11 +17,22 @@ vi.mock("@ledgr/db", () => {
       deleteMany: vi.fn(),
     },
     transactionSplit: {
+      create: vi.fn(),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
     },
+    splitTag: {
+      createMany: vi.fn(),
+    },
+    transactionTag: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+    },
     transactionOrigin: {
       create: vi.fn(),
+    },
+    payee: {
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   }
@@ -57,10 +68,14 @@ const mockPrisma = prisma as unknown as {
     deleteMany: ReturnType<typeof vi.fn>
   }
   transactionSplit: {
+    create: ReturnType<typeof vi.fn>
     createMany: ReturnType<typeof vi.fn>
     deleteMany: ReturnType<typeof vi.fn>
   }
+  splitTag: { createMany: ReturnType<typeof vi.fn> }
+  transactionTag: { deleteMany: ReturnType<typeof vi.fn>; createMany: ReturnType<typeof vi.fn> }
   transactionOrigin: { create: ReturnType<typeof vi.fn> }
+  payee: { updateMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -187,7 +202,9 @@ describe("transaction-service", () => {
 
       it("creates splits and strips categoryId when splits provided", async () => {
         setupCreateDefaults()
-        mockPrisma.transactionSplit.createMany.mockResolvedValue({ count: 2 })
+        mockPrisma.transactionSplit.create
+          .mockResolvedValueOnce({ id: "split-1" })
+          .mockResolvedValueOnce({ id: "split-2" })
 
         const input = makeCreateInput({
           splits: [
@@ -201,11 +218,11 @@ describe("transaction-service", () => {
         const createData = callArg(mockPrisma.transaction.create).data
         expect(createData.categoryId).toBeUndefined()
 
-        expect(mockPrisma.transactionSplit.createMany).toHaveBeenCalledOnce()
-        const splitData = callArg(mockPrisma.transactionSplit.createMany).data
-        expect(splitData).toHaveLength(2)
-        expect(splitData[0].sortOrder).toBe(0)
-        expect(splitData[1].sortOrder).toBe(1)
+        expect(mockPrisma.transactionSplit.create).toHaveBeenCalledTimes(2)
+        const split0 = callArg(mockPrisma.transactionSplit.create, 0).data
+        const split1 = callArg(mockPrisma.transactionSplit.create, 1).data
+        expect(split0.sortOrder).toBe(0)
+        expect(split1.sortOrder).toBe(1)
       })
     })
 
@@ -262,22 +279,22 @@ describe("transaction-service", () => {
         expect(mirrorData.amountMinor).toBe(5000)
       })
 
-      it("prefixes mirror note with 'Transfer mirror: '", async () => {
+      it("mirrors note exactly to mirror transaction", async () => {
         const input = makeTransferInput({ note: "Payment" })
 
         await Effect.runPromise(createTransaction(input))
 
         const mirrorData = callArg(mockPrisma.transaction.create, 1).data
-        expect(mirrorData.note).toBe("Transfer mirror: Payment")
+        expect(mirrorData.note).toBe("Payment")
       })
 
-      it("uses 'Transfer mirror entry' when source note is undefined", async () => {
+      it("mirrors undefined note as undefined", async () => {
         const input = makeTransferInput({ note: undefined })
 
         await Effect.runPromise(createTransaction(input))
 
         const mirrorData = callArg(mockPrisma.transaction.create, 1).data
-        expect(mirrorData.note).toBe("Transfer mirror entry")
+        expect(mirrorData.note).toBeUndefined()
       })
 
       it("sets isTransfer=true on both source and mirror", async () => {
@@ -393,7 +410,9 @@ describe("transaction-service", () => {
         mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
         mockPrisma.transaction.update.mockResolvedValue({})
         mockPrisma.transactionSplit.deleteMany.mockResolvedValue({ count: 1 })
-        mockPrisma.transactionSplit.createMany.mockResolvedValue({ count: 2 })
+        mockPrisma.transactionSplit.create
+          .mockResolvedValueOnce({ id: "split-1" })
+          .mockResolvedValueOnce({ id: "split-2" })
         mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(makeFullTransaction())
 
         await Effect.runPromise(
@@ -408,8 +427,7 @@ describe("transaction-service", () => {
         expect(mockPrisma.transactionSplit.deleteMany).toHaveBeenCalledWith({
           where: { transactionId: "txn-1" },
         })
-        expect(mockPrisma.transactionSplit.createMany).toHaveBeenCalledOnce()
-        expect(callArg(mockPrisma.transactionSplit.createMany).data).toHaveLength(2)
+        expect(mockPrisma.transactionSplit.create).toHaveBeenCalledTimes(2)
       })
 
       it("clears splits when empty array provided", async () => {
@@ -422,6 +440,31 @@ describe("transaction-service", () => {
 
         expect(mockPrisma.transactionSplit.deleteMany).toHaveBeenCalledOnce()
         expect(mockPrisma.transactionSplit.createMany).not.toHaveBeenCalled()
+      })
+
+      it("deletes all tags when tagIds is empty array", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transactionTag.deleteMany.mockResolvedValue({ count: 2 })
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(makeFullTransaction())
+
+        await Effect.runPromise(updateTransaction("txn-1", { tagIds: [] }))
+
+        expect(mockPrisma.transactionTag.deleteMany).toHaveBeenCalledWith({
+          where: { transactionId: "txn-1" },
+        })
+        expect(mockPrisma.transactionTag.createMany).not.toHaveBeenCalled()
+      })
+
+      it("does not touch tags when tagIds is undefined", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(makeFullTransaction())
+
+        await Effect.runPromise(updateTransaction("txn-1", { note: "updated" }))
+
+        expect(mockPrisma.transactionTag.deleteMany).not.toHaveBeenCalled()
+        expect(mockPrisma.transactionTag.createMany).not.toHaveBeenCalled()
       })
     })
 
@@ -557,11 +600,11 @@ describe("transaction-service", () => {
         expect(mirrorData.amountMinor).toBe(3000)
       })
 
-      it("syncs prefixed note to mirror", async () => {
+      it("syncs note exactly to mirror", async () => {
         await Effect.runPromise(updateTransaction("txn-1", { note: "Updated" }))
 
         const mirrorData = callArg(mockPrisma.transaction.update, 1).data
-        expect(mirrorData.note).toBe("Transfer mirror: Updated")
+        expect(mirrorData.note).toBe("Updated")
       })
 
       it("syncs cleared status to mirror", async () => {

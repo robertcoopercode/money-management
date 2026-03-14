@@ -7,6 +7,8 @@ export const usePayeeMutations = (opts: {
   refetchCoreData: () => void
   onPayeeCreated?: () => void
   onPayeesMerged?: () => void
+  onPayeesCombined?: () => void
+  onPayeesDeleted?: () => void
 }) => {
   const createPayeeMutation = useMutation({
     mutationFn: (name: string) =>
@@ -40,5 +42,54 @@ export const usePayeeMutations = (opts: {
     },
   })
 
-  return { createPayeeMutation, mergePayeeMutation }
+  const combinePayeeMutation = useMutation({
+    mutationFn: (input: { payeeIds: string[]; newName: string }) =>
+      apiFetch<Payee>("/api/payees/combine", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      toast.success("Payees combined")
+      opts.onPayeesCombined?.()
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to combine payees: ${error.message}`)
+    },
+  })
+
+  const deletePayeeMutation = useMutation({
+    mutationFn: (payeeIds: string[]) =>
+      apiFetch<{ count: number }>("/api/payees/delete", {
+        method: "POST",
+        body: JSON.stringify({ payeeIds }),
+      }),
+    onSuccess: (_data, payeeIds) => {
+      toast.success(
+        payeeIds.length === 1 ? "Payee deleted" : `${payeeIds.length} payees deleted`,
+      )
+      opts.onPayeesDeleted?.()
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to delete payees: ${error.message}`)
+    },
+  })
+
+  const updatePayeeMutation = useMutation({
+    mutationFn: (input: { payeeId: string; defaultCategoryId: string | null }) =>
+      apiFetch<Payee>(`/api/payees/${input.payeeId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ defaultCategoryId: input.defaultCategoryId }),
+      }),
+    onSuccess: () => {
+      toast.success("Payee updated")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to update payee: ${error.message}`)
+    },
+  })
+
+  return { createPayeeMutation, mergePayeeMutation, combinePayeeMutation, deletePayeeMutation, updatePayeeMutation }
 }

@@ -35,6 +35,7 @@ export const registerTransactionRoutes = (app: Hono) => {
         note: payload.note,
         cleared: payload.cleared,
         splits: payload.splits,
+        tagIds: payload.tagIds,
       }),
     )
 
@@ -57,6 +58,7 @@ export const registerTransactionRoutes = (app: Hono) => {
         note: payload.note,
         cleared: payload.cleared,
         splits: payload.splits,
+        tagIds: payload.tagIds,
       }),
     )
 

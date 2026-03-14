@@ -19,11 +19,9 @@ type SearchableSelectProps<T,> = {
   itemToString: (item: T) => string
   isItemEqual: (a: T, b: T) => boolean
   filter: (item: T, query: string) => boolean
-  topAction?: ReactNode
   bottomAction?: ReactNode
   renderItem: (item: T) => ReactNode
   renderGroupLabel?: (label: string) => ReactNode
-  onInputKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   emptyMessage?: string
 }
 
@@ -40,11 +38,9 @@ export function SearchableSelect<T>({
   itemToString,
   isItemEqual,
   filter,
-  topAction,
   bottomAction,
   renderItem,
   renderGroupLabel,
-  onInputKeyDown,
   emptyMessage = "No results found.",
 }: SearchableSelectProps<T>) {
   return (
@@ -65,32 +61,30 @@ export function SearchableSelect<T>({
       <Combobox.Input
         className="category-autocomplete-input"
         placeholder={placeholder}
-        onKeyDown={onInputKeyDown}
       />
       <Combobox.Portal>
         <Combobox.Positioner sideOffset={4} align="start" className="combobox-positioner">
           <Combobox.Popup className="searchable-select-popup">
-            {topAction && (
-              <div className="searchable-select-top">{topAction}</div>
-            )}
             <div className="searchable-select-scroll">
               <Combobox.List>
                 <Combobox.Collection>
                   {(group: SearchableSelectGroup<T>) => (
-                    <Combobox.Group key={group.label} items={group.items}>
-                      {renderGroupLabel ? (
-                        <Combobox.GroupLabel className="searchable-select-group-label">
-                          {renderGroupLabel(group.label)}
-                        </Combobox.GroupLabel>
-                      ) : (
-                        <Combobox.GroupLabel className="searchable-select-group-label">
-                          {group.label}
-                        </Combobox.GroupLabel>
-                      )}
+                    <Combobox.Group key={group.label || "__no-label__"} items={group.items}>
+                      {group.label ? (
+                        renderGroupLabel ? (
+                          <Combobox.GroupLabel className="searchable-select-group-label">
+                            {renderGroupLabel(group.label)}
+                          </Combobox.GroupLabel>
+                        ) : (
+                          <Combobox.GroupLabel className="searchable-select-group-label">
+                            {group.label}
+                          </Combobox.GroupLabel>
+                        )
+                      ) : null}
                       <Combobox.Collection>
                         {(item: T) => (
                           <Combobox.Item
-                            key={itemToString(item)}
+                            key={itemToString(item) || "__create__"}
                             value={item}
                             className="searchable-select-option"
                           >

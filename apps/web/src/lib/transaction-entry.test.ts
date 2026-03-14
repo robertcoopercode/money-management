@@ -32,6 +32,7 @@ describe("buildNextTransactionDraft", () => {
       note: "",
       cleared: false,
       splits: [],
+      tagIds: [],
     })
   })
 })
@@ -60,6 +61,7 @@ describe("transactionToEditDraft", () => {
       note: "Coffee",
       cleared: true,
       splits: [],
+      tagIds: [],
     })
   })
 
@@ -86,6 +88,7 @@ describe("transactionToEditDraft", () => {
       note: "",
       cleared: false,
       splits: [],
+      tagIds: [],
     })
   })
 })
@@ -101,12 +104,23 @@ describe("derivePayeeSelection", () => {
     { id: "payee-2", name: "Gas Station" },
   ]
 
-  it("returns transfer option when transferAccountId is set", () => {
-    const result = derivePayeeSelection("", "acc-2", accounts, payees)
+  it("returns 'Transfer to' for outgoing non-loan transfer", () => {
+    const result = derivePayeeSelection("", "acc-2", accounts, payees, "acc-1", true)
     expect(result).toEqual({
       kind: "transfer",
       id: "transfer:acc-2",
-      name: "Savings",
+      name: "Transfer to Savings",
+      accountId: "acc-2",
+      isLoanPayment: false,
+    })
+  })
+
+  it("returns 'Transfer from' for incoming non-loan transfer", () => {
+    const result = derivePayeeSelection("", "acc-2", accounts, payees, "acc-1", false)
+    expect(result).toEqual({
+      kind: "transfer",
+      id: "transfer:acc-2",
+      name: "Transfer from Savings",
       accountId: "acc-2",
       isLoanPayment: false,
     })

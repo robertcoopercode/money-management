@@ -9,6 +9,10 @@ export const listPayees = Effect.tryPromise({
     prisma.payee.findMany({
       where: { isArchived: false },
       orderBy: { name: "asc" },
+      include: {
+        _count: { select: { transactions: true } },
+        defaultCategory: { select: { id: true, name: true, groupId: true } },
+      },
     }),
   catch: (error) => new Error(`Unable to list payees: ${String(error)}`),
 })
@@ -23,6 +27,20 @@ export const createPayee = (name: string) =>
         },
       }),
     catch: (error) => new Error(`Unable to create payee: ${String(error)}`),
+  })
+
+export const updatePayee = (payeeId: string, data: { defaultCategoryId: string | null }) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.payee.update({
+        where: { id: payeeId },
+        data: { defaultCategoryId: data.defaultCategoryId },
+        include: {
+          _count: { select: { transactions: true } },
+          defaultCategory: { select: { id: true, name: true, groupId: true } },
+        },
+      }),
+    catch: (error) => new Error(`Unable to update payee: ${String(error)}`),
   })
 
 export const mergePayees = (sourcePayeeId: string, targetPayeeId: string) =>
@@ -57,6 +75,74 @@ export const mergePayees = (sourcePayeeId: string, targetPayeeId: string) =>
       return target
     },
     catch: (error) => new Error(`Unable to merge payees: ${String(error)}`),
+  })
+
+export const combinePayees = (input: { payeeIds: string[]; newName: string }) =>
+  Effect.tryPromise({
+    try: async () => {
+      if (input.payeeIds.length < 2) {
+        throw new Error("At least 2 payees are required to combine.")
+      }
+
+      const trimmedName = input.newName.trim()
+      const normalized = normalizePayeeName(trimmedName)
+
+      return prisma.$transaction(async (tx) => {
+        const sourcePayees = await tx.payee.findMany({
+          where: { id: { in: input.payeeIds } },
+          select: { defaultCategoryId: true },
+        })
+        const inheritedDefaultCategoryId =
+          sourcePayees.find((p) => p.defaultCategoryId != null)?.defaultCategoryId ?? null
+
+        const newPayee = await tx.payee.create({
+          data: { name: trimmedName, normalizedName: normalized, defaultCategoryId: inheritedDefaultCategoryId },
+        })
+
+        await tx.transaction.updateMany({
+          where: { payeeId: { in: input.payeeIds } },
+          data: { payeeId: newPayee.id },
+        })
+
+        await tx.transactionSplit.updateMany({
+          where: { payeeId: { in: input.payeeIds } },
+          data: { payeeId: newPayee.id },
+        })
+
+        await tx.payee.deleteMany({
+          where: { id: { in: input.payeeIds } },
+        })
+
+        return newPayee
+      })
+    },
+    catch: (error) => new Error(`Unable to combine payees: ${String(error)}`),
+  })
+
+export const deletePayees = (payeeIds: string[]) =>
+  Effect.tryPromise({
+    try: async (): Promise<{ count: number }> => {
+      if (payeeIds.length === 0) {
+        throw new Error("At least one payee ID is required.")
+      }
+
+      return prisma.$transaction(async (tx) => {
+        await tx.transaction.updateMany({
+          where: { payeeId: { in: payeeIds } },
+          data: { payeeId: null },
+        })
+
+        await tx.transactionSplit.updateMany({
+          where: { payeeId: { in: payeeIds } },
+          data: { payeeId: null },
+        })
+
+        return tx.payee.deleteMany({
+          where: { id: { in: payeeIds } },
+        })
+      })
+    },
+    catch: (error) => new Error(`Unable to delete payees: ${String(error)}`),
   })
 
 export const listPayeeTransactions = (payeeId: string) =>

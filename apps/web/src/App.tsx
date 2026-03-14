@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"
 import { Tabs } from "@base-ui/react/tabs"
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { formatMoney } from "@ledgr/shared"
 import { Toaster } from "sonner"
 import { LoginPage } from "./pages/login.js"
 import { apiFetch } from "./lib/api.js"
@@ -15,6 +14,7 @@ import { PayeesTab } from "./tabs/payees-tab.js"
 import { ImportsTab } from "./tabs/imports-tab.js"
 import { PlanningTab } from "./tabs/planning-tab.js"
 import { ReportsTab } from "./tabs/reports-tab.js"
+import { TagsTab } from "./tabs/tags-tab.js"
 import { isAppTab, getInitialAppTab } from "./types.js"
 import type { AppTab } from "./types.js"
 import type { TransactionDraft } from "./lib/transaction-entry.js"
@@ -71,6 +71,7 @@ const AuthenticatedApp = () => {
     cleared: false,
     isExpense: true,
     splits: [],
+    tagIds: [],
   })
 
   useEffect(() => {
@@ -91,6 +92,7 @@ const AuthenticatedApp = () => {
     accountsQuery,
     payeesQuery,
     categoriesQuery,
+    tagsQuery,
     planningQuery,
     refetchCoreData,
   } = useCoreQueries(month)
@@ -109,12 +111,6 @@ const AuthenticatedApp = () => {
           </div>
         </div>
         <div className="header-right">
-          <div className="ready-to-assign-pill">
-            <span className="ready-to-assign-label">Ready to Assign</span>
-            <span className="ready-to-assign-amount">
-              {formatMoney(planningQuery.data?.readyToAssignMinor ?? 0)}
-            </span>
-          </div>
           <BaseTooltip.Provider>
             <BaseTooltip.Root>
               <BaseTooltip.Trigger
@@ -167,6 +163,9 @@ const AuthenticatedApp = () => {
           <Tabs.Tab className="tabs-tab" value="payees">
             Payees
           </Tabs.Tab>
+          <Tabs.Tab className="tabs-tab" value="tags">
+            Tags
+          </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="imports">
             CSV Import
           </Tabs.Tab>
@@ -198,6 +197,7 @@ const AuthenticatedApp = () => {
             setNewTransaction={setNewTransaction}
             accounts={accountsQuery.data ?? []}
             payees={payeesQuery.data ?? []}
+            tags={tagsQuery.data ?? []}
             categoryGroups={categoriesQuery.data ?? []}
             refetchCoreData={refetchCoreData}
             onNavigateToPayees={() => setActiveTab("payees")}
@@ -205,8 +205,12 @@ const AuthenticatedApp = () => {
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="payees">
-          <PayeesTab
-            payeesQuery={payeesQuery}
+          <PayeesTab payeesQuery={payeesQuery} categoryGroups={categoriesQuery.data ?? []} refetchCoreData={refetchCoreData} />
+        </Tabs.Panel>
+
+        <Tabs.Panel className="panel" value="tags">
+          <TagsTab
+            tagsQuery={tagsQuery}
             refetchCoreData={refetchCoreData}
           />
         </Tabs.Panel>

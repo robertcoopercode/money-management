@@ -3,9 +3,11 @@ import { parseMoneyInputToMinor } from "@ledgr/shared"
 import { AccountCombobox } from "./account-combobox.js"
 import { PayeeAutocomplete, type PayeeOption } from "./payee-autocomplete.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
+import { TagCombobox } from "./tag-combobox.js"
 import { ClearedToggle } from "./cleared-toggle.js"
 import { DatePicker } from "./date-picker.js"
 import { SplitEditor } from "./split-editor.js"
+import type { Tag } from "../types.js"
 import type {
   TransactionDraft,
   EditableField,
@@ -25,7 +27,8 @@ type TransactionEditRowProps = {
   focusField: EditableField | null
   focusSplitIndex?: number
   accounts: Array<{ id: string; name: string; type: string }>
-  payees: Array<{ id: string; name: string }>
+  payees: Array<{ id: string; name: string; defaultCategory?: { id: string; name: string; groupId: string } | null }>
+  tags: Tag[]
   categoryGroups: CategoryGroup[]
   onSave: () => void
   onCancel: () => void
@@ -35,6 +38,7 @@ type TransactionEditRowProps = {
   onManagePayees?: () => void
   onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
+  onCreateTag?: (name: string) => Promise<Tag>
 }
 
 const FIELD_TO_COLUMN: Record<EditableField, number> = {
@@ -44,6 +48,7 @@ const FIELD_TO_COLUMN: Record<EditableField, number> = {
   category: 3,
   note: 4,
   amount: 5,
+  tags: 6,
   cleared: 7,
 }
 
@@ -54,6 +59,7 @@ export const TransactionEditRow = ({
   focusSplitIndex,
   accounts,
   payees,
+  tags,
   categoryGroups,
   onSave,
   onCancel,
@@ -63,6 +69,7 @@ export const TransactionEditRow = ({
   onManagePayees,
   onCreateCategory,
   isCreatingCategory = false,
+  onCreateTag,
 }: TransactionEditRowProps) => {
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -74,8 +81,9 @@ export const TransactionEditRow = ({
         accounts,
         payees,
         draft.accountId,
+        draft.isExpense,
       ),
-    [draft.payeeId, draft.transferAccountId, accounts, payees, draft.accountId],
+    [draft.payeeId, draft.transferAccountId, accounts, payees, draft.accountId, draft.isExpense],
   )
 
   const initialAccountName = useMemo(
@@ -112,7 +120,9 @@ export const TransactionEditRow = ({
             ? ".split-cell-note"
             : focusField === "amount"
               ? ".split-cell-amount"
-              : ".split-cell-category"
+              : focusField === "tags"
+                ? ".split-cell-tags"
+                : ".split-cell-category"
         const input = splitRow.querySelector<HTMLElement>(
           `${splitFieldClass} input`,
         )
@@ -160,6 +170,7 @@ export const TransactionEditRow = ({
             note: "",
             amount: "",
             isExpense: draft.isExpense,
+            tagIds: [],
           },
           {
             categoryId: "",
@@ -167,6 +178,7 @@ export const TransactionEditRow = ({
             note: "",
             amount: "",
             isExpense: draft.isExpense,
+            tagIds: [],
           },
         ],
         categoryId: "",
@@ -241,12 +253,21 @@ export const TransactionEditRow = ({
               }
               update(patch)
             } else {
-              update({ payeeId: selection.id, transferAccountId: "" })
+              const selectedPayee = payees.find((p) => p.id === selection.id)
+              const patch: Partial<TransactionDraft> = {
+                payeeId: selection.id,
+                transferAccountId: "",
+              }
+              if (selectedPayee?.defaultCategory && !draft.categoryId) {
+                patch.categoryId = selectedPayee.defaultCategory.id
+              }
+              update(patch)
             }
           }}
           onCreatePayee={onCreatePayee}
           isCreating={isCreatingPayee}
           onManagePayees={onManagePayees}
+          isExpense={draft.isExpense}
           initialInputValue={initialPayeeName}
         />
       </div>
@@ -282,14 +303,7 @@ export const TransactionEditRow = ({
           </div>
         ) : isTransfer && !isLoanTransfer ? (
           <input
-            value={(() => {
-              const targetName =
-                accounts.find((a) => a.id === draft.transferAccountId)?.name ??
-                "Account"
-              return draft.isExpense
-                ? `Payment to ${targetName}`
-                : `Payment from ${targetName}`
-            })()}
+            value="Not applicable"
             readOnly
             tabIndex={-1}
             className="transfer-category-readonly"
@@ -334,7 +348,14 @@ export const TransactionEditRow = ({
           />
         </div>
       </div>
-      <div className="transaction-cell" />
+      <div className="transaction-cell" data-field="tags">
+        <TagCombobox
+          tags={tags}
+          selectedTagIds={draft.tagIds}
+          onChange={(tagIds) => update({ tagIds })}
+          onCreateTag={onCreateTag}
+        />
+      </div>
       <div className="transaction-cell">
         <div className="row-actions">
           <ClearedToggle
@@ -392,6 +413,8 @@ export const TransactionEditRow = ({
           categoryGroups={categoryGroups}
           onCreateCategory={onCreateCategory}
           isCreatingCategory={isCreatingCategory}
+          tags={tags}
+          onCreateTag={onCreateTag}
         />
       )}
     </form>

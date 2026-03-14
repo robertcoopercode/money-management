@@ -366,7 +366,7 @@ button:disabled {
 
 .transaction-form {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr auto auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto auto;
   align-items: center;
   gap: 0.55rem;
 }
@@ -569,13 +569,6 @@ button:disabled {
   min-width: 300px;
 }
 
-.searchable-select-top {
-  flex-shrink: 0;
-  border-bottom: 1px solid rgb(95 117 171 / 24%);
-  padding-bottom: 0.25rem;
-  margin-bottom: 0.25rem;
-}
-
 .searchable-select-scroll {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -632,24 +625,8 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-  background: none;
-  border: none;
   color: rgb(120 160 255);
-  cursor: pointer;
   font-size: 0.85rem;
-  border-radius: 8px;
-}
-
-.searchable-select-create:hover {
-  color: rgb(160 190 255);
-  background: rgb(70 99 184 / 18%);
-}
-
-.searchable-select-create:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .searchable-select-split {
@@ -836,7 +813,7 @@ button:disabled {
     1.4fr
     1fr
     1fr
-    minmax(6rem, 1fr);
+    auto;
   min-width: 780px;
 }
 
@@ -888,6 +865,116 @@ button:disabled {
 
 .clickable-cell:hover {
   background: rgb(70 99 184 / 10%);
+}
+
+.payee-cell-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.25rem;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.jump-transfer-button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  color: rgb(140 170 255 / 50%);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.jump-transfer-button:hover {
+  color: rgb(140 170 255 / 90%);
+  background: rgb(95 117 171 / 18%);
+}
+
+.jump-transfer-button:focus-visible {
+  outline: 2px solid rgb(140 170 255 / 60%);
+  outline-offset: 2px;
+}
+
+.jump-transfer-tooltip {
+  background: rgb(15 22 48 / 96%);
+  border: 1px solid rgb(95 117 171 / 35%);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  color: rgb(210 225 255 / 90%);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.truncated-cell {
+  overflow: hidden;
+}
+
+.truncated-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 100%;
+}
+
+.note-tooltip {
+  background: rgb(15 22 48 / 96%);
+  border: 1px solid rgb(95 117 171 / 35%);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: rgb(210 225 255 / 90%);
+  font-size: 0.82rem;
+  max-width: 320px;
+  word-wrap: break-word;
+  z-index: 100;
+}
+
+/* Context menu */
+.context-menu-positioner {
+  z-index: 60;
+}
+
+.context-menu-popup {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 10px;
+  background: rgb(12 20 42 / 95%);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  min-width: 180px;
+}
+
+.context-menu-item {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: #e7f0ff;
+}
+
+.context-menu-item:hover,
+.context-menu-item[data-highlighted] {
+  background: rgb(140 170 255 / 12%);
+}
+
+.context-menu-item-danger {
+  color: rgb(248 150 161);
+}
+
+.context-menu-item-danger:hover,
+.context-menu-item-danger[data-highlighted] {
+  background: rgb(248 150 161 / 12%);
 }
 
 .transaction-edit-row .transaction-cell input,
@@ -1306,8 +1393,39 @@ button:disabled {
   background: rgb(95 117 171 / 20%);
 }
 
+/* Grid column overrides for split cells inside the transaction form (new transaction).
+   Form columns: account(1) date(2) payee(3) category(4) note(5) amount(6) cleared(7) submit(8) */
+
+.transaction-form .split-cell-leading {
+  grid-column: 1 / 3;
+}
+
+.transaction-form .split-cell-payee {
+  grid-column: 3;
+}
+
+.transaction-form .split-cell-category {
+  grid-column: 4;
+}
+
+.transaction-form .split-cell-note {
+  grid-column: 5;
+}
+
+.transaction-form .split-cell-amount {
+  grid-column: 6;
+}
+
+.transaction-form .split-cell-trailing {
+  grid-column: 7 / -1;
+}
+
+.transaction-form .split-add-button {
+  grid-column: 1 / 4;
+}
+
 /* Grid column overrides for split cells inside the transaction list (edit row).
-   Transaction list columns: date(1) account(2) payee(3) category(4) note(5) amount(6) balance(7) status(8) */
+   Transaction list columns: account(1) date(2) payee(3) category(4) note(5) amount(6) badge(7) actions(8) */
 
 .transaction-list .split-cell-leading {
   grid-column: 1 / 3;
@@ -1412,6 +1530,537 @@ button:disabled {
   grid-column: 6;
 }
 
+.split-detail-tags {
+  grid-column: 7;
+}
+
 .split-detail-trailing {
-  grid-column: 7 / -1;
+  grid-column: 8 / -1;
+}
+
+/* ── Tag Styles ─────────────────────────── */
+
+.tag-chip {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.5;
+  border: 1px solid rgba(0 0 0 / 0.1);
+}
+
+.tag-chip-small {
+  font-size: 0.65rem;
+  padding: 0.1em 0.4em;
+}
+
+.tag-display-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tag-display-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Tag Combobox (multi-select with chips) */
+
+.tag-combobox-input-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.48rem 0.56rem;
+  background: rgb(5 11 30 / 78%);
+  border: 1px solid rgb(95 117 171 / 28%);
+  border-radius: 8px;
+  color: #e7f0ff;
+}
+
+.tag-combobox-input-group:focus-within {
+  outline: auto 2px -webkit-focus-ring-color;
+}
+
+.tag-combobox-chips {
+  display: contents;
+}
+
+.tag-combobox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.6;
+  line-height: 1;
+}
+
+.tag-chip-remove:hover {
+  opacity: 1;
+}
+
+.tag-combobox-input {
+  flex: 1;
+  min-width: 3rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  padding: 0.1rem 0.1rem;
+  font-size: 0.88rem;
+}
+
+.tag-combobox-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag-check-indicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: rgb(124 162 255);
+}
+
+/* Tags Tab */
+
+.tag-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.tag-form-fields {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.8rem;
+}
+
+.tag-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.tag-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.tag-color-picker input[type="color"] {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 2px;
+  border: 2px solid rgba(255 255 255 / 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(255 255 255 / 0.06);
+}
+
+.tag-color-picker input[type="color"]:hover {
+  border-color: rgba(255 255 255 / 0.4);
+}
+
+.tag-color-hex {
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: rgba(255 255 255 / 0.85);
+  background: rgba(255 255 255 / 0.06);
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+}
+
+.tag-color-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tag-color-presets-label {
+  font-size: 0.78rem;
+  color: rgba(255 255 255 / 0.7);
+  font-weight: 500;
+}
+
+.tag-color-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tag-preset-button {
+  cursor: pointer;
+  padding: 0.2em 0.55em;
+  font-weight: 700;
+}
+
+.tag-preset-button:hover {
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+.tag-color-preset-swatch {
+  width: 2.4rem;
+  height: 2rem;
+  border: 2px solid rgba(255 255 255 / 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.tag-color-preset-swatch:hover {
+  border-color: rgba(255 255 255 / 0.6);
+  transform: scale(1.15);
+}
+
+.tag-form-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+
+.tag-form-preview-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(255 255 255 / 0.75);
+  letter-spacing: 0.03em;
+}
+
+.tag-edit-colors {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tag-edit-colors input[type="color"] {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 2px;
+  border: 2px solid rgba(255 255 255 / 0.2);
+  border-radius: 5px;
+  cursor: pointer;
+  background: rgba(255 255 255 / 0.06);
+}
+
+.tag-edit-colors input[type="color"]:hover {
+  border-color: rgba(255 255 255 / 0.4);
+}
+
+.tag-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tag-row-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.tag-row-archived {
+  opacity: 0.5;
+}
+
+.tag-archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.tag-switch {
+  width: 2.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgb(95 117 171 / 35%);
+  background: rgb(5 11 30 / 78%);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.tag-switch[data-checked] {
+  background: rgb(70 99 184 / 50%);
+  border-color: rgb(130 157 226 / 50%);
+}
+
+.tag-switch-thumb {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: rgb(180 195 230 / 70%);
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  transition: left 150ms ease, background-color 150ms ease;
+}
+
+.tag-switch[data-checked] .tag-switch-thumb {
+  left: calc(100% - 0.9rem - 2px);
+  background: rgb(230 240 255);
+}
+
+/* ── Payee combine ── */
+
+.payee-header {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.payee-header h2 {
+  margin: 0;
+}
+
+.payee-header-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 6rem;
+}
+
+.payee-header-right {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  height: 6rem;
+}
+
+.payee-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.payee-editor-icon-btn {
+  background: none;
+  border: 1px solid rgb(95 117 171 / 28%);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: rgb(148 163 184);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.payee-editor-icon-btn:hover {
+  color: #e7f0ff;
+  border-color: rgb(95 117 171 / 50%);
+}
+
+.payee-editor-icon-btn--danger:hover {
+  color: rgb(248 113 113);
+  border-color: rgb(248 113 113 / 40%);
+}
+
+.combine-form {
+  background: rgb(15 25 55 / 40%);
+  border: 1px solid rgb(95 117 171 / 28%);
+  border-radius: 8px;
+  padding: 0.75rem;
+  max-width: 540px;
+}
+
+/* ── CSV Import ── */
+
+.import-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.import-section {
+  margin-bottom: 0.2rem;
+}
+
+.import-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(180 195 230 / 65%);
+  margin-bottom: 0.55rem;
+}
+
+.import-mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.55rem;
+}
+
+.import-field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.import-field-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgb(209 223 252 / 85%);
+  text-transform: capitalize;
+}
+
+.import-divider {
+  height: 1px;
+  background: rgb(95 117 171 / 22%);
+  margin: 0.8rem 0;
+}
+
+.import-file-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.import-file-input {
+  display: none;
+}
+
+.import-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgb(5 11 30 / 78%);
+  border: 1px dashed rgb(95 117 171 / 38%);
+  border-radius: 8px;
+  padding: 0.48rem 0.56rem;
+  color: rgb(180 195 230 / 65%);
+  font-size: 0.86rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.import-drop-zone:hover {
+  border-color: rgb(130 157 226 / 50%);
+  color: rgb(220 230 255 / 90%);
+  background: rgb(15 25 55 / 90%);
+}
+
+.import-drop-zone svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.import-file-name {
+  color: #e7f0ff;
+  font-weight: 500;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.6rem;
+}
+
+.import-preview-card {
+  margin-top: 0;
+}
+
+.import-preview-card .section-header {
+  margin-bottom: 0.65rem;
+}
+
+.import-table-wrap {
+  border: 1px solid rgb(95 117 171 / 18%);
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.import-table thead {
+  position: sticky;
+  top: 0;
+}
+
+.import-table th {
+  background: rgb(4 11 30 / 98%);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(180 195 230 / 65%);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid rgb(95 117 171 / 28%);
+  white-space: nowrap;
+}
+
+.import-table td {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid rgb(95 117 171 / 12%);
+  color: rgb(220 230 255 / 88%);
+  white-space: nowrap;
+}
+
+.import-table tbody tr:hover {
+  background: rgb(70 99 184 / 8%);
+}
+
+.import-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.import-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  color: rgb(180 195 230 / 40%);
+  text-align: center;
+}
+
+.import-empty-state p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: rgb(180 195 230 / 50%);
 }

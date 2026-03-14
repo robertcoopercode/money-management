@@ -83,10 +83,10 @@ describe("CategoryAutocomplete", () => {
     await user.click(input)
     await user.type(input, "Car Insurance")
 
-    const createButton = screen.getByRole("button", {
-      name: /New category "Car Insurance"/i,
+    const createOption = screen.getByRole("option", {
+      name: /Create "Car Insurance" Category/i,
     })
-    await user.click(createButton)
+    await user.click(createOption)
 
     expect(onCreateCategory).toHaveBeenCalledWith("Car Insurance")
   })

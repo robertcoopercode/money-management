@@ -3,6 +3,8 @@ import type { SplitDraft } from "../lib/transaction-entry.js"
 import { getSplitBalanceStatus } from "../lib/transaction-entry.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
 import { PayeeAutocomplete } from "./payee-autocomplete.js"
+import { TagCombobox } from "./tag-combobox.js"
+import type { Tag } from "../types.js"
 
 type CategoryGroup = {
   id: string
@@ -19,6 +21,8 @@ type SplitEditorProps = {
   categoryGroups: CategoryGroup[]
   onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
+  tags: Tag[]
+  onCreateTag?: (name: string) => Promise<Tag>
 }
 
 export const SplitEditor = ({
@@ -30,6 +34,8 @@ export const SplitEditor = ({
   categoryGroups,
   onCreateCategory,
   isCreatingCategory,
+  tags,
+  onCreateTag,
 }: SplitEditorProps) => {
   const { isBalanced, isOverAssigned, remainingMinor } = getSplitBalanceStatus(
     splits,
@@ -59,6 +65,7 @@ export const SplitEditor = ({
         amount:
           remainingMinor !== 0 ? String(Math.abs(remainingMinor) / 100) : "",
         isExpense,
+        tagIds: [],
       },
     ])
   }
@@ -158,7 +165,14 @@ export const SplitEditor = ({
               />
             </div>
           </div>
-          <div className="split-cell split-cell-trailing" />
+          <div className="split-cell split-cell-tags">
+            <TagCombobox
+              tags={tags}
+              selectedTagIds={split.tagIds}
+              onChange={(tagIds) => updateSplit(index, { tagIds })}
+              onCreateTag={onCreateTag}
+            />
+          </div>
         </div>
       ))}
       <div className="split-footer">

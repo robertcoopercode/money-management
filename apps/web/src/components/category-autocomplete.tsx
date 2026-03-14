@@ -29,6 +29,7 @@ type CategoryOption = {
   id: string
   name: string
   groupName: string
+  kind?: "create"
 }
 
 export const CategoryAutocomplete = ({
@@ -80,18 +81,21 @@ export const CategoryAutocomplete = ({
     return allOptions.some((item) => item.name.toLowerCase() === query)
   }, [allOptions, inputValue])
 
-  const showCreateButton =
+  const showCreateOption =
     Boolean(onCreateCategory) &&
     inputValue.trim().length > 0 &&
     !exactMatchExists
 
-  const hasFilteredResults = useMemo(() => {
-    if (!inputValue.trim()) return true
-    const query = inputValue.toLowerCase()
-    return allOptions.some((item) =>
-      `${item.groupName} ${item.name}`.toLowerCase().includes(query),
-    )
-  }, [allOptions, inputValue])
+  const groupsWithCreate = useMemo<SearchableSelectGroup<CategoryOption>[]>(() => {
+    if (!showCreateOption) return groups
+    const createItem: CategoryOption = {
+      id: "__create__",
+      name: `Create "${inputValue.trim()}" Category`,
+      groupName: "",
+      kind: "create",
+    }
+    return [{ label: "", items: [createItem] }, ...groups]
+  }, [groups, showCreateOption, inputValue])
 
   const handleCreate = async () => {
     const name = inputValue.trim()
@@ -105,9 +109,15 @@ export const CategoryAutocomplete = ({
 
   return (
     <SearchableSelect<CategoryOption>
-      items={groups}
+      items={groupsWithCreate}
       value={selectedCategory}
-      onValueChange={(category) => onChange(category?.id ?? "")}
+      onValueChange={(category) => {
+        if (category && category.kind === "create") {
+          void handleCreate()
+          return
+        }
+        onChange(category?.id ?? "")
+      }}
       inputValue={inputValue}
       onInputValueChange={(newInputValue, details) => {
         if (justCreatedRef.current && details.reason !== "input-change") return
@@ -120,42 +130,15 @@ export const CategoryAutocomplete = ({
       onOpenChange={setOpen}
       disabled={disabled}
       placeholder={placeholder}
-      itemToString={(c) => c.name}
+      itemToString={(c) => (c.kind === "create" ? "" : c.name)}
       isItemEqual={(a, b) => a.id === b.id}
-      filter={(item, query) =>
-        `${item.groupName} ${item.name}`
+      filter={(item, query) => {
+        if (item.kind === "create") return true
+        return `${item.groupName} ${item.name}`
           .toLowerCase()
           .includes(query.toLowerCase())
-      }
+      }}
       emptyMessage="No matching categories."
-      topAction={
-        showCreateButton ? (
-          <button
-            type="button"
-            className="searchable-select-create"
-            onClick={() => void handleCreate()}
-            disabled={isCreating}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 12h8" />
-              <path d="M12 8v8" />
-            </svg>
-            {isCreating
-              ? "Creating category..."
-              : `Create "${inputValue.trim()}" Category`}
-          </button>
-        ) : undefined
-      }
       bottomAction={
         onSplit ? (
           <button
@@ -185,22 +168,34 @@ export const CategoryAutocomplete = ({
           </button>
         ) : undefined
       }
-      renderItem={(category) => (
-        <>
-          <span>{category.name}</span>
-          <small>{category.groupName}</small>
-        </>
-      )}
-      onInputKeyDown={(e) => {
-        if (
-          e.key === "Enter" &&
-          showCreateButton &&
-          !hasFilteredResults &&
-          !isCreating
-        ) {
-          e.preventDefault()
-          void handleCreate()
+      renderItem={(category) => {
+        if (category.kind === "create") {
+          return (
+            <span className="searchable-select-create">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8" />
+                <path d="M12 8v8" />
+              </svg>
+              {isCreating ? "Creating category..." : category.name}
+            </span>
+          )
         }
+        return (
+          <>
+            <span>{category.name}</span>
+            <small>{category.groupName}</small>
+          </>
+        )
       }}
     />
   )

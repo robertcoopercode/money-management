@@ -48,6 +48,12 @@ export const PlanningTab = ({
       <div className="planning-header">
         <h2>Planning · {month}</h2>
         <div className="inline-controls">
+          <div className="ready-to-assign-pill">
+            <span className="ready-to-assign-label">Ready to Assign</span>
+            <span className="ready-to-assign-amount">
+              {formatMoney(planningData?.readyToAssignMinor ?? 0)}
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => onMonthChange((current) => shiftMonth(current, -1))}
@@ -62,10 +68,6 @@ export const PlanningTab = ({
           </button>
         </div>
       </div>
-      <p className="muted">
-        Ready to Assign:{" "}
-        {formatMoney(planningData?.readyToAssignMinor ?? 0)}
-      </p>
       {planningIsError ? (
         <p className="error-text">
           {toDisplayErrorMessage(

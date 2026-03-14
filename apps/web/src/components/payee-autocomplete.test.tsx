@@ -73,42 +73,206 @@ describe("PayeeAutocomplete", () => {
     await user.click(input)
     await user.type(input, "Coffee Shop")
 
-    const createButton = screen.getByRole("button", {
-      name: /New payee "Coffee Shop"/i,
+    const createOption = screen.getByRole("option", {
+      name: /Create "Coffee Shop" Payee/i,
     })
-    await user.click(createButton)
+    await user.click(createOption)
 
     expect(onCreatePayee).toHaveBeenCalledWith("Coffee Shop")
   })
 
-  it("shows transfer accounts excluding current account", async () => {
+  it("shows transfer accounts with Payment to prefix for cash-to-credit when isExpense", async () => {
     const user = userEvent.setup()
 
-    render(<PayeeAutocomplete {...defaultProps} />)
+    render(<PayeeAutocomplete {...defaultProps} isExpense />)
 
     const input = screen.getByRole("combobox")
     await user.click(input)
 
     expect(
-      screen.getByRole("option", { name: /Rogers MasterCard/i }),
+      screen.getByRole("option", { name: /Payment to Rogers MasterCard/i }),
     ).toBeTruthy()
     expect(screen.queryByRole("option", { name: /RBC Chequing/i })).toBeNull()
   })
 
-  it("calls onChange with transfer option when selecting a transfer account", async () => {
+  it("shows transfer accounts with Payment from prefix for cash-to-credit when not isExpense", async () => {
     const user = userEvent.setup()
-    const onChange = vi.fn()
 
-    render(<PayeeAutocomplete {...defaultProps} onChange={onChange} />)
+    render(<PayeeAutocomplete {...defaultProps} isExpense={false} />)
 
     const input = screen.getByRole("combobox")
     await user.click(input)
-    await user.click(screen.getByRole("option", { name: /Rogers MasterCard/i }))
+
+    expect(
+      screen.getByRole("option", { name: /Payment from Rogers MasterCard/i }),
+    ).toBeTruthy()
+  })
+
+  describe("transfer direction labels by account type", () => {
+    const accountsWithCredit = [
+      { id: "chequing", name: "RBC Chequing", type: "CASH" },
+      { id: "credit", name: "Rogers MasterCard", type: "CREDIT" },
+      { id: "savings", name: "WS Cash", type: "CASH" },
+    ]
+
+    it("shows 'Payment from' on a credit account when isExpense is false (inflow)", async () => {
+      const user = userEvent.setup()
+
+      render(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="credit"
+          value={null}
+          onChange={vi.fn()}
+          isExpense={false}
+        />,
+      )
+
+      const input = screen.getByRole("combobox")
+      await user.click(input)
+
+      expect(
+        screen.getByRole("option", { name: /Payment from RBC Chequing/i }),
+      ).toBeTruthy()
+      expect(
+        screen.getByRole("option", { name: /Payment from WS Cash/i }),
+      ).toBeTruthy()
+    })
+
+    it("shows 'Payment to' on a credit account when isExpense is true (outflow)", async () => {
+      const user = userEvent.setup()
+
+      render(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="credit"
+          value={null}
+          onChange={vi.fn()}
+          isExpense
+        />,
+      )
+
+      const input = screen.getByRole("combobox")
+      await user.click(input)
+
+      expect(
+        screen.getByRole("option", { name: /Payment to RBC Chequing/i }),
+      ).toBeTruthy()
+      expect(
+        screen.getByRole("option", { name: /Payment to WS Cash/i }),
+      ).toBeTruthy()
+    })
+
+    it("shows 'Payment to' for credit and 'Transfer to' for cash on a cash account when isExpense is true (outflow)", async () => {
+      const user = userEvent.setup()
+
+      render(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="chequing"
+          value={null}
+          onChange={vi.fn()}
+          isExpense
+        />,
+      )
+
+      const input = screen.getByRole("combobox")
+      await user.click(input)
+
+      expect(
+        screen.getByRole("option", { name: /Payment to Rogers MasterCard/i }),
+      ).toBeTruthy()
+      expect(
+        screen.getByRole("option", { name: /Transfer to WS Cash/i }),
+      ).toBeTruthy()
+    })
+
+    it("shows 'Payment from' for credit and 'Transfer from' for cash on a cash account when isExpense is false (inflow)", async () => {
+      const user = userEvent.setup()
+
+      render(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="chequing"
+          value={null}
+          onChange={vi.fn()}
+          isExpense={false}
+        />,
+      )
+
+      const input = screen.getByRole("combobox")
+      await user.click(input)
+
+      expect(
+        screen.getByRole("option", { name: /Payment from Rogers MasterCard/i }),
+      ).toBeTruthy()
+      expect(
+        screen.getByRole("option", { name: /Transfer from WS Cash/i }),
+      ).toBeTruthy()
+    })
+
+    it("updates transfer labels when isExpense changes", async () => {
+      const user = userEvent.setup()
+
+      const { rerender } = render(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="credit"
+          value={null}
+          onChange={vi.fn()}
+          isExpense
+        />,
+      )
+
+      const input = screen.getByRole("combobox")
+      await user.click(input)
+
+      // Initially expense → "Payment to" (credit-to-cash)
+      expect(
+        screen.getByRole("option", { name: /Payment to RBC Chequing/i }),
+      ).toBeTruthy()
+
+      // Toggle to income
+      rerender(
+        <PayeeAutocomplete
+          payees={payees}
+          accounts={accountsWithCredit}
+          currentAccountId="credit"
+          value={null}
+          onChange={vi.fn()}
+          isExpense={false}
+        />,
+      )
+
+      // Should now show "Payment from"
+      expect(
+        screen.getByRole("option", { name: /Payment from RBC Chequing/i }),
+      ).toBeTruthy()
+      expect(
+        screen.queryByRole("option", { name: /Payment to/i }),
+      ).toBeNull()
+    })
+  })
+
+  it("calls onChange with transfer option including Payment to name for cash-to-credit", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(<PayeeAutocomplete {...defaultProps} onChange={onChange} isExpense />)
+
+    const input = screen.getByRole("combobox")
+    await user.click(input)
+    await user.click(screen.getByRole("option", { name: /Payment to Rogers MasterCard/i }))
 
     expect(onChange).toHaveBeenLastCalledWith({
       kind: "transfer",
       id: "transfer:credit",
-      name: "Rogers MasterCard",
+      name: "Payment to Rogers MasterCard",
       accountId: "credit",
       isLoanPayment: false,
     })

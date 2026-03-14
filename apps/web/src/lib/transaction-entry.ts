@@ -8,6 +8,7 @@ export type SplitDraft = {
   note: string
   amount: string
   isExpense: boolean
+  tagIds: string[]
 }
 
 export type TransactionDraft = {
@@ -21,9 +22,10 @@ export type TransactionDraft = {
   note: string
   cleared: boolean
   splits: SplitDraft[]
+  tagIds: string[]
 }
 
-export type EditableField = "date" | "account" | "amount" | "payee" | "category" | "note" | "cleared"
+export type EditableField = "date" | "account" | "amount" | "payee" | "category" | "note" | "tags" | "cleared"
 
 export const buildNextTransactionDraft = (
   current: TransactionDraft,
@@ -36,6 +38,7 @@ export const buildNextTransactionDraft = (
   note: "",
   cleared: false,
   splits: [],
+  tagIds: [],
 })
 
 export const transactionToEditDraft = (transaction: {
@@ -53,7 +56,9 @@ export const transactionToEditDraft = (transaction: {
     payeeId?: string | null
     note?: string | null
     amountMinor: number
+    tags?: Array<{ tag: { id: string } }>
   }>
+  tags?: Array<{ tag: { id: string } }>
 }): TransactionDraft => ({
   accountId: transaction.account.id,
   transferAccountId: transaction.transferAccountId ?? "",
@@ -71,7 +76,9 @@ export const transactionToEditDraft = (transaction: {
     note: s.note ?? "",
     amount: String(Math.abs(s.amountMinor) / 100),
     isExpense: s.amountMinor < 0,
+    tagIds: (s.tags ?? []).map((t) => t.tag.id),
   })),
+  tagIds: (transaction.tags ?? []).map((t) => t.tag.id),
 })
 
 export const derivePayeeSelection = (
@@ -80,6 +87,7 @@ export const derivePayeeSelection = (
   accounts: Array<{ id: string; name: string; type: string }>,
   payees: Array<{ id: string; name: string }>,
   currentAccountId?: string,
+  isExpense?: boolean,
 ): PayeeOption | null => {
   if (transferAccountId) {
     const account = accounts.find((a) => a.id === transferAccountId)
@@ -89,13 +97,15 @@ export const derivePayeeSelection = (
         : undefined
       const isLoanTransfer =
         account.type === "LOAN" || currentAccount?.type === "LOAN"
-      let displayName = account.name
-      if (isLoanTransfer) {
-        displayName =
-          account.type === "LOAN"
-            ? `Payment to ${account.name}`
-            : `Payment from ${account.name}`
-      }
+      const isOutgoing = isLoanTransfer
+        ? account.type === "LOAN"
+        : Boolean(isExpense)
+      const isCashToCash =
+        !isLoanTransfer && account.type === "CASH" && currentAccount?.type === "CASH"
+      const prefix = isCashToCash ? "Transfer" : "Payment"
+      const displayName = isOutgoing
+        ? `${prefix} to ${account.name}`
+        : `${prefix} from ${account.name}`
       return {
         kind: "transfer",
         id: `transfer:${account.id}`,

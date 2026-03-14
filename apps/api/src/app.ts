@@ -14,6 +14,7 @@ import { registerImportRoutes } from "./routes/imports.js"
 import { registerPayeeRoutes } from "./routes/payees.js"
 import { registerPlanningRoutes } from "./routes/planning.js"
 import { registerReportRoutes } from "./routes/reports.js"
+import { registerTagRoutes } from "./routes/tags.js"
 import { registerTransactionRoutes } from "./routes/transactions.js"
 
 export const app = new Hono()
@@ -89,6 +90,7 @@ registerHealthRoutes(app)
 registerAccountRoutes(app)
 registerPayeeRoutes(app)
 registerCategoryRoutes(app)
+registerTagRoutes(app)
 registerTransactionRoutes(app)
 registerImportRoutes(app)
 registerPlanningRoutes(app)

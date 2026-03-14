@@ -53,9 +53,49 @@ export const createCategorySchema = z.object({
   groupName: z.string().min(1).max(120).optional(),
 })
 
+export const updatePayeeSchema = z.object({
+  defaultCategoryId: z.string().min(1).nullable(),
+})
+
 export const mergePayeesSchema = z.object({
   sourcePayeeId: z.string().min(1),
   targetPayeeId: z.string().min(1),
+})
+
+export const deletePayeesSchema = z.object({
+  payeeIds: z.array(z.string().min(1)).min(1),
+})
+
+export const combinePayeesSchema = z.object({
+  payeeIds: z.array(z.string().min(1)).min(2),
+  newName: z.string().min(1).max(160),
+})
+
+export const createTagSchema = z.object({
+  name: z.string().min(1).max(120),
+  description: z.string().max(500).optional(),
+  backgroundColor: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .default("#374151"),
+  textColor: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .default("#FFFFFF"),
+})
+
+export const updateTagSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  description: z.string().max(500).optional(),
+  backgroundColor: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .optional(),
+  textColor: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .optional(),
+  isArchived: z.boolean().optional(),
 })
 
 export const transactionIdSchema = z.string().min(1)
@@ -66,6 +106,7 @@ export const transactionSplitInputSchema = z.object({
   payeeId: z.string().min(1).optional(),
   note: z.string().max(1_000).optional(),
   amountMinor: z.number().int(),
+  tagIds: z.array(z.string().min(1)).optional(),
 })
 
 const baseTransactionFields = {
@@ -78,6 +119,7 @@ const baseTransactionFields = {
   note: z.string().max(1_000).optional(),
   cleared: z.boolean().default(false),
   splits: z.array(transactionSplitInputSchema).optional(),
+  tagIds: z.array(z.string().min(1)).optional(),
 } as const
 
 const transactionSplitRefinement = (
@@ -193,13 +235,17 @@ export type LoanType = z.infer<typeof loanTypeSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type CreateAccountInput = z.infer<typeof createAccountSchema>
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>
+export type UpdatePayeeInput = z.infer<typeof updatePayeeSchema>
 export type CreatePayeeInput = z.infer<typeof createPayeeSchema>
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>
 export type MergePayeesInput = z.infer<typeof mergePayeesSchema>
+export type CombinePayeesInput = z.infer<typeof combinePayeesSchema>
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>
 export type TransactionFilterInput = z.infer<typeof transactionFilterSchema>
 export type UpdateCategoryAssignmentInput = z.infer<typeof updateCategoryAssignmentSchema>
 export type TransactionSplitInput = z.infer<typeof transactionSplitInputSchema>
+export type CreateTagInput = z.infer<typeof createTagSchema>
+export type UpdateTagInput = z.infer<typeof updateTagSchema>
 export type TransactionSortColumn = z.infer<typeof transactionSortColumnSchema>
 export type TransactionSortDir = z.infer<typeof transactionSortDirSchema>

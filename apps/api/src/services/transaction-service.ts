@@ -7,10 +7,7 @@ import type {
   TransactionSplitInput,
 } from "@ledgr/shared"
 import { Effect } from "effect"
-import {
-  buildMirrorTransferNote,
-  toMirrorTransferAmountMinor,
-} from "../domain/transfer.js"
+import { toMirrorTransferAmountMinor } from "../domain/transfer.js"
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`)
 
@@ -45,8 +42,12 @@ const transactionInclude = {
     include: {
       category: { include: { group: true } },
       payee: true,
+      tags: { include: { tag: true } },
     },
     orderBy: { sortOrder: "asc" as const },
+  },
+  tags: {
+    include: { tag: true },
   },
 } satisfies Prisma.TransactionInclude
 
@@ -88,6 +89,7 @@ export const createTransaction = (input: {
   note?: string
   cleared: boolean
   splits?: TransactionSplitInput[]
+  tagIds?: string[]
 }) =>
   Effect.tryPromise({
     try: async () => {
@@ -139,16 +141,26 @@ export const createTransaction = (input: {
           })
 
           if (hasSplits) {
-            await transactionDb.transactionSplit.createMany({
-              data: input.splits!.map((split, index) => ({
-                transactionId: source.id,
-                categoryId: split.categoryId,
-                payeeId: split.payeeId,
-                note: split.note,
-                amountMinor: split.amountMinor,
-                sortOrder: index,
-              })),
-            })
+            for (const [i, split] of input.splits!.entries()) {
+              const created = await transactionDb.transactionSplit.create({
+                data: {
+                  transactionId: source.id,
+                  categoryId: split.categoryId,
+                  payeeId: split.payeeId,
+                  note: split.note,
+                  amountMinor: split.amountMinor,
+                  sortOrder: i,
+                },
+              })
+              if (split.tagIds && split.tagIds.length > 0) {
+                await transactionDb.splitTag.createMany({
+                  data: split.tagIds.map((tagId) => ({
+                    splitId: created.id,
+                    tagId,
+                  })),
+                })
+              }
+            }
           }
 
           await transactionDb.transactionOrigin.create({
@@ -157,6 +169,15 @@ export const createTransaction = (input: {
               originType: OriginType.MANUAL,
             },
           })
+
+          if (input.tagIds && input.tagIds.length > 0) {
+            await transactionDb.transactionTag.createMany({
+              data: input.tagIds.map((tagId) => ({
+                transactionId: source.id,
+                tagId,
+              })),
+            })
+          }
 
           if (input.transferAccountId) {
             const mirror = await transactionDb.transaction.create({
@@ -168,7 +189,7 @@ export const createTransaction = (input: {
                 amountMinor: toMirrorTransferAmountMinor(input.amountMinor),
                 payeeId: input.payeeId,
                 categoryId: isLoanTransfer ? input.categoryId : undefined,
-                note: buildMirrorTransferNote(input.note),
+                note: input.note,
                 cleared: input.cleared,
                 manualCreated: true,
                 isTransfer: true,
@@ -180,6 +201,14 @@ export const createTransaction = (input: {
                 transactionId: mirror.id,
                 originType: OriginType.MANUAL,
               },
+            })
+          }
+
+          // Auto-learn: set payee's default category if it doesn't have one
+          if (input.payeeId && input.categoryId && !input.transferAccountId && !hasSplits) {
+            await transactionDb.payee.updateMany({
+              where: { id: input.payeeId, defaultCategoryId: null },
+              data: { defaultCategoryId: input.categoryId },
             })
           }
 
@@ -208,6 +237,7 @@ export const updateTransaction = (
     note?: string
     cleared?: boolean
     splits?: TransactionSplitInput[]
+    tagIds?: string[]
   },
 ) =>
   Effect.tryPromise({
@@ -281,17 +311,49 @@ export const updateTransaction = (
             })
 
             if (input.splits.length > 0) {
-              await transactionDb.transactionSplit.createMany({
-                data: input.splits.map((split, index) => ({
+              for (const [i, split] of input.splits.entries()) {
+                const created = await transactionDb.transactionSplit.create({
+                  data: {
+                    transactionId,
+                    categoryId: split.categoryId,
+                    payeeId: split.payeeId,
+                    note: split.note,
+                    amountMinor: split.amountMinor,
+                    sortOrder: i,
+                  },
+                })
+                if (split.tagIds && split.tagIds.length > 0) {
+                  await transactionDb.splitTag.createMany({
+                    data: split.tagIds.map((tagId) => ({
+                      splitId: created.id,
+                      tagId,
+                    })),
+                  })
+                }
+              }
+            }
+          }
+
+          if (input.tagIds !== undefined) {
+            await transactionDb.transactionTag.deleteMany({
+              where: { transactionId },
+            })
+            if (input.tagIds.length > 0) {
+              await transactionDb.transactionTag.createMany({
+                data: input.tagIds.map((tagId) => ({
                   transactionId,
-                  categoryId: split.categoryId,
-                  payeeId: split.payeeId,
-                  note: split.note,
-                  amountMinor: split.amountMinor,
-                  sortOrder: index,
+                  tagId,
                 })),
               })
             }
+          }
+
+          // Auto-learn: set payee's default category if it doesn't have one
+          if (input.payeeId && input.categoryId && !input.transferAccountId && !hasSplits) {
+            await transactionDb.payee.updateMany({
+              where: { id: input.payeeId, defaultCategoryId: null },
+              data: { defaultCategoryId: input.categoryId },
+            })
           }
 
           return transactionDb.transaction.findUniqueOrThrow({
@@ -335,11 +397,25 @@ export const updateTransaction = (
               categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
               note:
                 input.note !== undefined
-                  ? buildMirrorTransferNote(input.note)
+                  ? input.note
                   : undefined,
               cleared: input.cleared,
             },
           })
+        }
+
+        if (input.tagIds !== undefined) {
+          await transactionDb.transactionTag.deleteMany({
+            where: { transactionId },
+          })
+          if (input.tagIds.length > 0) {
+            await transactionDb.transactionTag.createMany({
+              data: input.tagIds.map((tagId) => ({
+                transactionId,
+                tagId,
+              })),
+            })
+          }
         }
 
         return transactionDb.transaction.findUniqueOrThrow({

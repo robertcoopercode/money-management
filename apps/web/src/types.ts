@@ -18,6 +18,17 @@ export type Account = {
 export type Payee = {
   id: string
   name: string
+  _count?: { transactions: number }
+  defaultCategory?: { id: string; name: string; groupId: string } | null
+}
+
+export type Tag = {
+  id: string
+  name: string
+  description?: string | null
+  backgroundColor: string
+  textColor: string
+  isArchived: boolean
 }
 
 export type Category = {
@@ -40,6 +51,7 @@ export type TransactionSplit = {
   amountMinor: number
   category: Category & { group: { id: string; name: string } }
   payee?: Payee | null
+  tags?: Array<{ tag: Tag }>
 }
 
 export type Transaction = {
@@ -49,12 +61,14 @@ export type Transaction = {
   note?: string | null
   cleared: boolean
   isTransfer: boolean
+  transferPairId?: string | null
   transferAccountId?: string | null
   account: Account
   transferAccount?: Account | null
   payee?: Payee | null
   category?: Category | null
   splits: TransactionSplit[]
+  tags: Array<{ tag: Tag }>
   origins: Array<{ originType: "MANUAL" | "CSV_IMPORT" }>
 }
 
@@ -112,7 +126,9 @@ export type UpdateTransactionMutationInput = {
       payeeId?: string
       note?: string
       amountMinor: number
+      tagIds?: string[]
     }>
+    tagIds?: string[]
   }
 }
 
@@ -132,6 +148,7 @@ export const APP_TAB_VALUES = [
   "transactions",
   "accounts",
   "payees",
+  "tags",
   "imports",
   "planning",
   "reports",

@@ -68,14 +68,16 @@ model LoanProfile {
 }
 
 model Payee {
-  id             String         @id @default(cuid())
-  name           String
-  normalizedName String
-  isArchived     Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  transactions   Transaction[]
+  id                String         @id @default(cuid())
+  name              String
+  normalizedName    String
+  isArchived        Boolean        @default(false)
+  defaultCategoryId String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  transactions      Transaction[]
   transactionSplits TransactionSplit[]
+  defaultCategory   Category?      @relation("PayeeDefaultCategory", fields: [defaultCategoryId], references: [id], onDelete: SetNull)
 
   @@index([normalizedName])
 }
@@ -102,8 +104,9 @@ model Category {
   updatedAt        DateTime             @updatedAt
   assignments      CategoryAssignment[]
   group            CategoryGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  transactions     Transaction[]
+  transactions      Transaction[]
   transactionSplits TransactionSplit[]
+  payeesWithDefault Payee[]            @relation("PayeeDefaultCategory")
 
   @@unique([groupId, name])
 }
@@ -130,6 +133,7 @@ model Transaction {
   transferAccount Account?           @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
   origins        TransactionOrigin[]
   splits         TransactionSplit[]
+  tags           TransactionTag[]
   matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
 
   @@index([accountId, date])
@@ -210,22 +214,60 @@ model CategoryAssignment {
   @@index([categoryId, budgetMonthId])
 }
 
-model TransactionSplit {
+model Tag {
+  id              String           @id @default(cuid())
+  name            String
+  normalizedName  String           @unique
+  description     String?
+  backgroundColor String           @default("#374151")
+  textColor       String           @default("#FFFFFF")
+  isArchived      Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  transactions    TransactionTag[]
+  splits          SplitTag[]
+}
+
+model TransactionTag {
   id            String      @id @default(cuid())
+  transactionId String
+  tagId         String
+  createdAt     DateTime    @default(now())
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, tagId])
+  @@index([tagId])
+}
+
+model TransactionSplit {
+  id            String         @id @default(cuid())
   transactionId String
   categoryId    String
   payeeId       String?
   note          String?
   amountMinor   Int
-  sortOrder     Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  payee         Payee?      @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  transaction   Transaction    @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category      Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  payee         Payee?         @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  tags          SplitTag[]
 
   @@index([transactionId])
   @@index([categoryId, transactionId])
+}
+
+model SplitTag {
+  id      String           @id @default(cuid())
+  splitId String
+  tagId   String
+  split   TransactionSplit @relation(fields: [splitId], references: [id], onDelete: Cascade)
+  tag     Tag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([splitId, tagId])
+  @@index([tagId])
 }
 
