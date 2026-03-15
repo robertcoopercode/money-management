@@ -4,7 +4,7 @@ import { AccountCombobox } from "./account-combobox.js"
 import { PayeeAutocomplete, type PayeeOption } from "./payee-autocomplete.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
 import { TagCombobox } from "./tag-combobox.js"
-import { ClearedToggle } from "./cleared-toggle.js"
+import { ClearingStatusToggle } from "./clearing-status-toggle.js"
 import { DatePicker } from "./date-picker.js"
 import { SplitEditor } from "./split-editor.js"
 import type { Tag } from "../types.js"
@@ -36,20 +36,20 @@ type TransactionEditRowProps = {
   onCreatePayee?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingPayee?: boolean
   onManagePayees?: () => void
-  onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
+  onCreateCategory?: (input: { name: string; groupName: string }) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
   onCreateTag?: (name: string) => Promise<Tag>
 }
 
 const FIELD_TO_COLUMN: Record<EditableField, number> = {
-  account: 0,
-  date: 1,
-  payee: 2,
-  category: 3,
-  note: 4,
-  amount: 5,
-  tags: 6,
-  cleared: 7,
+  account: 1,
+  date: 2,
+  payee: 3,
+  category: 4,
+  note: 5,
+  amount: 6,
+  tags: 7,
+  clearingStatus: 8,
 }
 
 export const TransactionEditRow = ({
@@ -217,6 +217,7 @@ export const TransactionEditRow = ({
         }
       }}
     >
+      <div className="transaction-cell transaction-cell-checkbox" />
       <div className="transaction-cell" data-field="account">
         <AccountCombobox
           accounts={accounts}
@@ -258,7 +259,7 @@ export const TransactionEditRow = ({
                 payeeId: selection.id,
                 transferAccountId: "",
               }
-              if (selectedPayee?.defaultCategory && !draft.categoryId) {
+              if (selectedPayee?.defaultCategory) {
                 patch.categoryId = selectedPayee.defaultCategory.id
               }
               update(patch)
@@ -358,9 +359,14 @@ export const TransactionEditRow = ({
       </div>
       <div className="transaction-cell">
         <div className="row-actions">
-          <ClearedToggle
-            pressed={draft.cleared}
-            onPressedChange={(pressed) => update({ cleared: pressed })}
+          <ClearingStatusToggle
+            status={draft.clearingStatus}
+            onToggle={() =>
+              update({
+                clearingStatus:
+                  draft.clearingStatus === "UNCLEARED" ? "CLEARED" : "UNCLEARED",
+              })
+            }
           />
           <button
             type="submit"

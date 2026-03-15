@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { parseMoneyInputToMinor } from "@ledgr/shared"
 import { toast } from "sonner"
@@ -14,18 +14,27 @@ import {
 } from "../lib/transaction-entry.js"
 import { useTransactionMutations } from "../hooks/use-transaction-mutations.js"
 import { useTagMutations } from "../hooks/use-tag-mutations.js"
+import { useImportApprovalMutations } from "../hooks/use-import-approval-mutations.js"
+import { useTransactionSelection } from "../hooks/use-transaction-selection.js"
+import { useBulkTransactionMutations } from "../hooks/use-bulk-transaction-mutations.js"
 import { AccountCombobox } from "../components/account-combobox.js"
 import { AccountFilterSelect } from "../components/account-filter-select.js"
 import { useLocalStorage } from "../hooks/use-local-storage.js"
 import { CategoryAutocomplete } from "../components/category-autocomplete.js"
 import { PayeeAutocomplete } from "../components/payee-autocomplete.js"
 import { TagCombobox } from "../components/tag-combobox.js"
-import { ClearedToggle } from "../components/cleared-toggle.js"
+import { ClearingStatusToggle } from "../components/clearing-status-toggle.js"
+import { AccountBalanceBar } from "../components/account-balance-bar.js"
+import { ReconcileDialog } from "../components/reconcile-dialog.js"
+import { CsvImportDialog } from "../components/csv-import-dialog.js"
+import { ReconciledEditWarning } from "../components/reconciled-edit-warning.js"
+import { useReconciliationMutation } from "../hooks/use-reconciliation-mutation.js"
 import { DatePicker } from "../components/date-picker.js"
 import { TransactionEditRow } from "../components/transaction-edit-row.js"
 import { SplitEditor } from "../components/split-editor.js"
 import { TransactionDisplayRow } from "../components/transaction-display-row.js"
 import { TransactionContextMenu } from "../components/transaction-context-menu.js"
+import { BulkActionBar } from "../components/bulk-action-bar.js"
 import { buildDuplicateBody } from "../lib/build-duplicate-body.js"
 import type {
   Transaction,
@@ -54,7 +63,7 @@ const DEFAULT_SORT_DIRS: Record<string, "asc" | "desc"> = {
   payee: "asc",
   category: "asc",
   account: "asc",
-  cleared: "asc",
+  clearingStatus: "asc",
 }
 
 export const TransactionsTab = ({
@@ -79,6 +88,7 @@ export const TransactionsTab = ({
   const [filterAccountId, setFilterAccountId] = useLocalStorage("ledgr:filter-account", "")
   const [sortBy, setSortBy] = useLocalStorage("ledgr:sort-by", "date")
   const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("ledgr:sort-dir", "desc")
+  const [showReconciled, setShowReconciled] = useState(false)
 
   const handleSort = useCallback(
     (column: string) => {
@@ -94,7 +104,7 @@ export const TransactionsTab = ({
   )
 
   const transactionsQuery = useQuery({
-    queryKey: ["transactions", transactionOffset, filterAccountId, sortBy, sortDir],
+    queryKey: ["transactions", transactionOffset, filterAccountId, sortBy, sortDir, showReconciled],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(TRANSACTION_PAGE_SIZE),
@@ -104,6 +114,9 @@ export const TransactionsTab = ({
       })
       if (filterAccountId) {
         params.set("accountId", filterAccountId)
+      }
+      if (showReconciled) {
+        params.set("includeReconciled", "true")
       }
       return apiFetch<Transaction[]>(`/api/transactions?${params}`)
     },
@@ -126,7 +139,36 @@ export const TransactionsTab = ({
     },
   })
 
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false)
+  const [reconciledWarningOpen, setReconciledWarningOpen] = useState(false)
+  const [pendingReconciledEdit, setPendingReconciledEdit] = useState<{
+    transaction: Transaction
+    field: EditableField
+    splitIndex?: number
+  } | null>(null)
+
   const { createTagMutation } = useTagMutations({ refetchCoreData })
+  const { approveMutation, rejectMutation, unmatchMutation } = useImportApprovalMutations()
+  const { reconcileMutation } = useReconciliationMutation({ refetchCoreData })
+
+  const transactions = transactionsQuery.data ?? []
+  const {
+    selectedIds,
+    toggleSelection,
+    rangeSelect,
+    toggleSelectAll,
+    clearSelection,
+    allSelected,
+    someSelected,
+  } = useTransactionSelection(transactions)
+
+  const { bulkApproveMutation, bulkRejectMutation, bulkDeleteMutation } =
+    useBulkTransactionMutations({ onSuccess: clearSelection })
+
+  useEffect(() => {
+    clearSelection()
+  }, [transactionOffset, filterAccountId, sortBy, sortDir, showReconciled, clearSelection])
 
   const payeeSelection = useMemo(
     () =>
@@ -179,6 +221,12 @@ export const TransactionsTab = ({
     field: EditableField,
     splitIndex?: number,
   ) => {
+    if (transaction.clearingStatus === "RECONCILED") {
+      setPendingReconciledEdit({ transaction, field, splitIndex })
+      setReconciledWarningOpen(true)
+      return
+    }
+    clearSelection()
     setEditingTransaction({
       transactionId: transaction.id,
       draft: transactionToEditDraft(transaction),
@@ -221,7 +269,7 @@ export const TransactionsTab = ({
       transactionId,
       patch: {
         accountId: draft.accountId || undefined,
-        transferAccountId: draft.transferAccountId || undefined,
+        transferAccountId: draft.transferAccountId || null,
         date: draft.date,
         amountMinor: draft.isExpense
           ? -Math.abs(parseMoneyInputToMinor(draft.amount))
@@ -229,7 +277,7 @@ export const TransactionsTab = ({
         payeeId: draft.payeeId || undefined,
         categoryId: hasSplits ? undefined : draft.categoryId || undefined,
         note: draft.note,
-        cleared: draft.cleared,
+        clearingStatus: draft.clearingStatus,
         splits: hasSplits
           ? draft.splits.map((s) => ({
               categoryId: s.categoryId,
@@ -262,7 +310,7 @@ export const TransactionsTab = ({
         ? undefined
         : newTransaction.categoryId || undefined,
       note: newTransaction.note || undefined,
-      cleared: newTransaction.cleared,
+      clearingStatus: newTransaction.clearingStatus,
       splits: hasSplits
         ? newTransaction.splits.map((s) => ({
             categoryId: s.categoryId,
@@ -357,7 +405,7 @@ export const TransactionsTab = ({
                   ...current,
                   payeeId: selection.id,
                   transferAccountId: "",
-                  ...(selectedPayee?.defaultCategory && !current.categoryId
+                  ...(selectedPayee?.defaultCategory
                     ? { categoryId: selectedPayee.defaultCategory.id }
                     : {}),
                 }
@@ -422,8 +470,8 @@ export const TransactionsTab = ({
                 Boolean(newTransaction.transferAccountId) &&
                 !isNewTransactionLoanTransfer
               }
-              onCreateCategory={(name) =>
-                createCategoryMutation.mutateAsync({ name })
+              onCreateCategory={({ name, groupName }) =>
+                createCategoryMutation.mutateAsync({ name, groupName })
               }
               isCreating={createCategoryMutation.isPending}
               onSplit={
@@ -508,12 +556,13 @@ export const TransactionsTab = ({
               createTagMutation.mutateAsync({ name })
             }
           />
-          <ClearedToggle
-            pressed={newTransaction.cleared}
-            onPressedChange={(pressed) =>
+          <ClearingStatusToggle
+            status={newTransaction.clearingStatus}
+            onToggle={() =>
               setNewTransaction((current) => ({
                 ...current,
-                cleared: pressed,
+                clearingStatus:
+                  current.clearingStatus === "UNCLEARED" ? "CLEARED" : "UNCLEARED",
               }))
             }
           />
@@ -554,8 +603,8 @@ export const TransactionsTab = ({
               payees={payees}
               accounts={accounts}
               categoryGroups={categoryGroups}
-              onCreateCategory={(name) =>
-                createCategoryMutation.mutateAsync({ name })
+              onCreateCategory={({ name, groupName }) =>
+                createCategoryMutation.mutateAsync({ name, groupName })
               }
               isCreatingCategory={createCategoryMutation.isPending}
               tags={tags}
@@ -568,32 +617,67 @@ export const TransactionsTab = ({
       </section>
 
       <div className="transaction-filter-bar">
-        <AccountFilterSelect
-          accounts={accounts}
-          value={filterAccountId}
-          onChange={(value) => {
-            setFilterAccountId(value)
-            setTransactionOffset(0)
-          }}
-        />
-        {filterAccountId && (
-          <button
-            type="button"
-            className="filter-clear-button"
-            onClick={() => {
-              setFilterAccountId("")
+        <div className="filter-bar-row">
+          <AccountFilterSelect
+            accounts={accounts}
+            value={filterAccountId}
+            onChange={(value) => {
+              setFilterAccountId(value)
               setTransactionOffset(0)
             }}
+          />
+          <button
+            type="button"
+            disabled={!filterAccountId}
+            onClick={() => setCsvImportOpen(true)}
           >
-            Clear filter
+            Import CSV
           </button>
-        )}
+          {filterAccountId && (
+            <button
+              type="button"
+              className="filter-clear-button"
+              onClick={() => {
+                setFilterAccountId("")
+                setTransactionOffset(0)
+                setShowReconciled(false)
+              }}
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+        {filterAccountId && (() => {
+          const selectedAccount = accounts.find((a) => a.id === filterAccountId)
+          return selectedAccount ? (
+            <AccountBalanceBar
+              account={selectedAccount}
+              onReconcile={() => setReconcileDialogOpen(true)}
+              showReconciled={showReconciled}
+              onToggleShowReconciled={() => {
+                setShowReconciled((v) => !v)
+                setTransactionOffset(0)
+              }}
+            />
+          ) : null
+        })()}
       </div>
 
       <section className="card">
         <div className="table-wrap">
           <div className="transaction-list" role="table">
             <div className="transaction-header" role="row">
+              <div className="transaction-cell transaction-cell-checkbox" role="columnheader">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected
+                  }}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all transactions"
+                />
+              </div>
               {([
                 ["account", "Account"],
                 ["date", "Date"],
@@ -676,8 +760,8 @@ export const TransactionsTab = ({
                       createTransactionPayeeMutation.isPending
                     }
                     onManagePayees={onNavigateToPayees}
-                    onCreateCategory={(name) =>
-                      createCategoryMutation.mutateAsync({ name })
+                    onCreateCategory={({ name, groupName }) =>
+                      createCategoryMutation.mutateAsync({ name, groupName })
                     }
                     isCreatingCategory={createCategoryMutation.isPending}
                     onCreateTag={(name) =>
@@ -688,10 +772,10 @@ export const TransactionsTab = ({
                   <TransactionContextMenu
                     key={transaction.id}
                     transaction={transaction}
-                    onToggleCleared={(id, cleared) =>
+                    onToggleClearingStatus={(id, clearingStatus) =>
                       updateTransactionMutation.mutate({
                         transactionId: id,
-                        patch: { cleared },
+                        patch: { clearingStatus },
                       })
                     }
                     onDuplicate={(t) =>
@@ -708,13 +792,24 @@ export const TransactionsTab = ({
                       onStartEditing={startEditing}
                       onJumpToTransfer={handleJumpToTransfer}
                       onToggleSplitExpand={toggleSplitExpand}
-                      onClearedChange={(id, cleared) =>
+                      onClearingStatusChange={(id, clearingStatus) =>
                         updateTransactionMutation.mutate({
                           transactionId: id,
-                          patch: { cleared },
+                          patch: { clearingStatus },
                         })
                       }
-                      isUpdatePending={updateTransactionMutation.isPending}
+                      isUpdatePending={updateTransactionMutation.isPending && updateTransactionMutation.variables?.transactionId === transaction.id}
+                      isSelected={selectedIds.has(transaction.id)}
+                      onToggleSelect={(id, shiftKey) => {
+                        if (shiftKey) {
+                          rangeSelect(id)
+                        } else {
+                          toggleSelection(id)
+                        }
+                      }}
+                      onApproveImport={(id) => approveMutation.mutate(id)}
+                      onRejectImport={(id) => rejectMutation.mutate(id)}
+                      onUnmatchImport={(id) => unmatchMutation.mutate(id)}
                     />
                   </TransactionContextMenu>
                 ),
@@ -780,6 +875,75 @@ export const TransactionsTab = ({
           </button>
         </nav>
       </section>
+
+      {filterAccountId && (() => {
+        const selectedAccount = accounts.find((a) => a.id === filterAccountId)
+        return selectedAccount ? (
+          <ReconcileDialog
+            open={reconcileDialogOpen}
+            onOpenChange={setReconcileDialogOpen}
+            clearedBalanceMinor={selectedAccount.clearedBalanceMinor}
+            onConfirm={(statementBalanceMinor) => {
+              reconcileMutation.mutate(
+                { accountId: filterAccountId, statementBalanceMinor },
+                { onSuccess: () => setReconcileDialogOpen(false) },
+              )
+            }}
+            isPending={reconcileMutation.isPending}
+          />
+        ) : null
+      })()}
+
+      <ReconciledEditWarning
+        open={reconciledWarningOpen}
+        onOpenChange={setReconciledWarningOpen}
+        onContinue={() => {
+          if (pendingReconciledEdit) {
+            clearSelection()
+            setEditingTransaction({
+              transactionId: pendingReconciledEdit.transaction.id,
+              draft: transactionToEditDraft(pendingReconciledEdit.transaction),
+              focusField: pendingReconciledEdit.field,
+              focusSplitIndex: pendingReconciledEdit.splitIndex,
+            })
+            setPendingReconciledEdit(null)
+          }
+        }}
+      />
+
+      <CsvImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        accountId={filterAccountId}
+        refetchCoreData={refetchCoreData}
+      />
+
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        hasPendingApproval={transactions
+          .filter((t) => selectedIds.has(t.id))
+          .some((t) => t.pendingApproval)}
+        onApprove={() => {
+          const ids = transactions
+            .filter((t) => selectedIds.has(t.id) && t.pendingApproval)
+            .map((t) => t.id)
+          if (ids.length > 0) bulkApproveMutation.mutate(ids)
+        }}
+        onReject={() => {
+          const ids = transactions
+            .filter((t) => selectedIds.has(t.id) && t.pendingApproval)
+            .map((t) => t.id)
+          if (ids.length > 0) bulkRejectMutation.mutate(ids)
+        }}
+        onDelete={() => {
+          const ids = [...selectedIds]
+          if (ids.length > 0) bulkDeleteMutation.mutate(ids)
+        }}
+        onDismiss={clearSelection}
+        isApproving={bulkApproveMutation.isPending}
+        isRejecting={bulkRejectMutation.isPending}
+        isDeleting={bulkDeleteMutation.isPending}
+      />
     </>
   )
 }

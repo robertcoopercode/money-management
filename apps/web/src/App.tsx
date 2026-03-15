@@ -11,10 +11,10 @@ import { useCoreQueries } from "./hooks/use-core-queries.js"
 import { AccountsTab } from "./tabs/accounts-tab.js"
 import { TransactionsTab } from "./tabs/transactions-tab.js"
 import { PayeesTab } from "./tabs/payees-tab.js"
-import { ImportsTab } from "./tabs/imports-tab.js"
 import { PlanningTab } from "./tabs/planning-tab.js"
 import { ReportsTab } from "./tabs/reports-tab.js"
 import { TagsTab } from "./tabs/tags-tab.js"
+import { CategoriesTab } from "./tabs/categories-tab.js"
 import { isAppTab, getInitialAppTab } from "./types.js"
 import type { AppTab } from "./types.js"
 import type { TransactionDraft } from "./lib/transaction-entry.js"
@@ -68,7 +68,7 @@ const AuthenticatedApp = () => {
     payeeId: "",
     categoryId: "",
     note: "",
-    cleared: false,
+    clearingStatus: "UNCLEARED",
     isExpense: true,
     splits: [],
     tagIds: [],
@@ -163,11 +163,11 @@ const AuthenticatedApp = () => {
           <Tabs.Tab className="tabs-tab" value="payees">
             Payees
           </Tabs.Tab>
+          <Tabs.Tab className="tabs-tab" value="categories">
+            Categories
+          </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="tags">
             Tags
-          </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="imports">
-            CSV Import
           </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="planning">
             Planning
@@ -208,6 +208,13 @@ const AuthenticatedApp = () => {
           <PayeesTab payeesQuery={payeesQuery} categoryGroups={categoriesQuery.data ?? []} refetchCoreData={refetchCoreData} />
         </Tabs.Panel>
 
+        <Tabs.Panel className="panel" value="categories">
+          <CategoriesTab
+            categoriesQuery={categoriesQuery}
+            refetchCoreData={refetchCoreData}
+          />
+        </Tabs.Panel>
+
         <Tabs.Panel className="panel" value="tags">
           <TagsTab
             tagsQuery={tagsQuery}
@@ -215,21 +222,7 @@ const AuthenticatedApp = () => {
           />
         </Tabs.Panel>
 
-        <Tabs.Panel className="panel" value="imports">
-          <ImportsTab
-            accountId={newTransaction.accountId}
-            onAccountIdChange={(accountId) =>
-              setNewTransaction((current) => ({
-                ...current,
-                accountId,
-              }))
-            }
-            accounts={accountsQuery.data ?? []}
-            refetchCoreData={refetchCoreData}
-          />
-        </Tabs.Panel>
-
-        <Tabs.Panel className="panel" value="planning">
+<Tabs.Panel className="panel" value="planning">
           <PlanningTab
             month={month}
             onMonthChange={setMonth}

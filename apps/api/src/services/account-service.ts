@@ -11,6 +11,7 @@ export const listAccounts = Effect.tryPromise({
         transactions: {
           select: {
             amountMinor: true,
+            clearingStatus: true,
           },
         },
         loanProfile: true,
@@ -25,9 +26,17 @@ export const listAccounts = Effect.tryPromise({
         (sum, item) => sum + item.amountMinor,
         0,
       )
+      const clearedAndReconciledTotal = transactions
+        .filter((t) => t.clearingStatus === "CLEARED" || t.clearingStatus === "RECONCILED")
+        .reduce((sum, item) => sum + item.amountMinor, 0)
+      const unclearedTotal = transactions
+        .filter((t) => t.clearingStatus === "UNCLEARED")
+        .reduce((sum, item) => sum + item.amountMinor, 0)
 
       return {
         ...rest,
+        clearedBalanceMinor: account.startingBalanceMinor + clearedAndReconciledTotal,
+        unclearedBalanceMinor: unclearedTotal,
         balanceMinor: account.startingBalanceMinor + transactionTotal,
         loanProfile: loanProfile
           ? {

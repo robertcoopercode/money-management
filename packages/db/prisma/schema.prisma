@@ -36,6 +36,12 @@ enum ImportRowAction {
   SKIPPED
 }
 
+enum ClearingStatus {
+  UNCLEARED
+  CLEARED
+  RECONCILED
+}
+
 model Session {
   id        String   @id @default(cuid())
   tokenHash String   @unique
@@ -112,32 +118,35 @@ model Category {
 }
 
 model Transaction {
-  id             String              @id @default(cuid())
-  accountId      String
-  date           DateTime
-  amountMinor    Int
-  payeeId        String?
-  categoryId     String?
-  note           String?
-  cleared        Boolean             @default(false)
-  manualCreated  Boolean             @default(true)
-  importLinked   Boolean             @default(false)
-  isTransfer     Boolean             @default(false)
-  transferAccountId String?
-  transferPairId String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  account        Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  category       Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  payee          Payee?              @relation(fields: [payeeId], references: [id], onDelete: SetNull)
-  transferAccount Account?           @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
-  origins        TransactionOrigin[]
-  splits         TransactionSplit[]
-  tags           TransactionTag[]
-  matchedImportRows ImportRowMatch[] @relation("MatchedTransaction")
+  id                    String              @id @default(cuid())
+  accountId             String
+  date                  DateTime
+  amountMinor           Int
+  payeeId               String?
+  categoryId            String?
+  note                  String?
+  clearingStatus        ClearingStatus      @default(UNCLEARED)
+  manualCreated         Boolean             @default(true)
+  importLinked          Boolean             @default(false)
+  pendingApproval       Boolean             @default(false)
+  importedTransactionId String?             @unique
+  isTransfer            Boolean             @default(false)
+  transferAccountId     String?
+  transferPairId        String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  account               Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category              Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  payee                 Payee?              @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  transferAccount       Account?            @relation("TransferTarget", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  importedTransaction   ImportedTransaction? @relation("ImportLink", fields: [importedTransactionId], references: [id], onDelete: SetNull)
+  origins               TransactionOrigin[]
+  splits                TransactionSplit[]
+  tags                  TransactionTag[]
+  matchedImportRows     ImportRowMatch[]    @relation("MatchedTransaction")
 
   @@index([accountId, date])
-  @@index([accountId, cleared, date])
+  @@index([accountId, clearingStatus, date])
   @@index([isTransfer, date])
   @@index([categoryId, date])
   @@index([amountMinor, date])
@@ -160,18 +169,37 @@ model TransactionOrigin {
 }
 
 model ImportBatch {
-  id          String              @id @default(cuid())
-  accountId   String
-  uploadedAt  DateTime            @default(now())
-  fileName    String
-  status      ImportBatchStatus   @default(PENDING)
-  rowsTotal   Int                 @default(0)
-  rowsMatched Int                 @default(0)
-  rowsCreated Int                 @default(0)
-  rowsSkipped Int                 @default(0)
-  account     Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  matches     ImportRowMatch[]
-  origins     TransactionOrigin[]
+  id                   String              @id @default(cuid())
+  accountId            String
+  uploadedAt           DateTime            @default(now())
+  fileName             String
+  status               ImportBatchStatus   @default(PENDING)
+  rowsTotal            Int                 @default(0)
+  rowsMatched          Int                 @default(0)
+  rowsCreated          Int                 @default(0)
+  rowsSkipped          Int                 @default(0)
+  account              Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  matches              ImportRowMatch[]
+  origins              TransactionOrigin[]
+  importedTransactions ImportedTransaction[]
+}
+
+model ImportedTransaction {
+  id            String       @id @default(cuid())
+  importBatchId String
+  rowIndex      Int
+  date          DateTime
+  amountMinor   Int
+  payeeName     String
+  note          String?
+  rawPayload    Json
+  createdAt     DateTime     @default(now())
+
+  importBatch   ImportBatch  @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation("ImportLink")
+
+  @@unique([importBatchId, rowIndex])
+  @@index([date, amountMinor])
 }
 
 model ImportRowMatch {

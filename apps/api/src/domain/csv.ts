@@ -14,6 +14,7 @@ export const parseCsvRecords = (csvText: string): CsvRecord[] => {
     skip_empty_lines: true,
     trim: true,
     relax_quotes: true,
+    bom: true,
   }) as Record<string, unknown>[]
 
   return records.map((record) => {

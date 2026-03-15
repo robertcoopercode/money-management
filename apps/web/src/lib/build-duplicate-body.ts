@@ -5,7 +5,7 @@ export function buildDuplicateBody(t: Transaction): Record<string, unknown> {
     accountId: t.account.id,
     date: t.date.slice(0, 10),
     amountMinor: t.amountMinor,
-    cleared: false,
+    clearingStatus: "UNCLEARED",
   }
 
   if (t.payee?.id) body.payeeId = t.payee.id

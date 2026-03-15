@@ -1,4 +1,5 @@
 import { parseMoneyInputToMinor, formatMoney } from "@ledgr/shared"
+import type { ClearingStatus } from "../types.js"
 import type { PayeeOption } from "../components/payee-autocomplete.js"
 
 export type SplitDraft = {
@@ -20,12 +21,12 @@ export type TransactionDraft = {
   payeeId: string
   categoryId: string
   note: string
-  cleared: boolean
+  clearingStatus: ClearingStatus
   splits: SplitDraft[]
   tagIds: string[]
 }
 
-export type EditableField = "date" | "account" | "amount" | "payee" | "category" | "note" | "tags" | "cleared"
+export type EditableField = "date" | "account" | "amount" | "payee" | "category" | "note" | "tags" | "clearingStatus"
 
 export const buildNextTransactionDraft = (
   current: TransactionDraft,
@@ -36,7 +37,7 @@ export const buildNextTransactionDraft = (
   transferAccountId: "",
   categoryId: "",
   note: "",
-  cleared: false,
+  clearingStatus: "UNCLEARED",
   splits: [],
   tagIds: [],
 })
@@ -44,7 +45,7 @@ export const buildNextTransactionDraft = (
 export const transactionToEditDraft = (transaction: {
   amountMinor: number
   date: string
-  cleared: boolean
+  clearingStatus: ClearingStatus
   note?: string | null
   transferAccountId?: string | null
   account: { id: string }
@@ -68,7 +69,7 @@ export const transactionToEditDraft = (transaction: {
   payeeId: transaction.payee?.id ?? "",
   categoryId: transaction.category?.id ?? "",
   note: transaction.note ?? "",
-  cleared: transaction.cleared,
+  clearingStatus: transaction.clearingStatus,
   splits: (transaction.splits ?? []).map((s) => ({
     id: s.id,
     categoryId: s.categoryId,

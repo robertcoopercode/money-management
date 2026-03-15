@@ -7,7 +7,11 @@ const makeTransaction = (overrides: Partial<Transaction> = {}): Transaction => (
   date: "2026-01-15",
   amountMinor: -2500,
   note: null,
-  cleared: true,
+  clearingStatus: "CLEARED",
+  manualCreated: true,
+  pendingApproval: false,
+  importedTransactionId: null,
+  importedTransaction: null,
   isTransfer: false,
   transferPairId: null,
   transferAccountId: null,
@@ -29,12 +33,12 @@ const makeTransaction = (overrides: Partial<Transaction> = {}): Transaction => (
 })
 
 describe("buildDuplicateBody", () => {
-  it("returns correct accountId, amountMinor, cleared: false, and same date", () => {
+  it("returns correct accountId, amountMinor, clearingStatus: UNCLEARED, and same date", () => {
     const body = buildDuplicateBody(makeTransaction({ date: "2026-01-15" }))
 
     expect(body.accountId).toBe("acc-1")
     expect(body.amountMinor).toBe(-2500)
-    expect(body.cleared).toBe(false)
+    expect(body.clearingStatus).toBe("UNCLEARED")
     expect(body.date).toBe("2026-01-15")
   })
 

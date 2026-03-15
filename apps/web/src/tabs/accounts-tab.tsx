@@ -93,10 +93,7 @@ export const AccountsTab = ({
             </p>
           ) : (
             (accountsQuery.data ?? []).map((account) => {
-              const displayBalance =
-                account.type === "LOAN"
-                  ? -account.balanceMinor
-                  : account.balanceMinor
+              const displayBalance = account.balanceMinor
               return (
                 <div className="list-item" key={account.id}>
                   <div className="account-item-main">

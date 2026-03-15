@@ -38,6 +38,7 @@ const transactionInclude = {
   category: { include: { group: true } },
   transferAccount: true,
   origins: true,
+  importedTransaction: true,
   splits: {
     include: {
       category: { include: { group: true } },
@@ -59,7 +60,11 @@ export const listTransactions = (filters: TransactionFilterInput) =>
           accountId: filters.accountId,
           categoryId: filters.categoryId,
           payeeId: filters.payeeId,
-          cleared: filters.cleared,
+          clearingStatus: filters.clearingStatus
+            ? filters.clearingStatus
+            : filters.includeReconciled
+              ? undefined
+              : { not: "RECONCILED" },
           date:
             filters.fromDate || filters.toDate
               ? {
@@ -81,13 +86,13 @@ export const listTransactions = (filters: TransactionFilterInput) =>
 
 export const createTransaction = (input: {
   accountId: string
-  transferAccountId?: string
+  transferAccountId?: string | null
   date: string
   amountMinor: number
   payeeId?: string
   categoryId?: string
   note?: string
-  cleared: boolean
+  clearingStatus: "UNCLEARED" | "CLEARED" | "RECONCILED"
   splits?: TransactionSplitInput[]
   tagIds?: string[]
 }) =>
@@ -134,7 +139,7 @@ export const createTransaction = (input: {
                   ? undefined
                   : input.categoryId,
               note: input.note,
-              cleared: input.cleared,
+              clearingStatus: input.clearingStatus,
               manualCreated: true,
               isTransfer: Boolean(input.transferAccountId),
             },
@@ -190,7 +195,7 @@ export const createTransaction = (input: {
                 payeeId: input.payeeId,
                 categoryId: isLoanTransfer ? input.categoryId : undefined,
                 note: input.note,
-                cleared: input.cleared,
+                clearingStatus: input.clearingStatus,
                 manualCreated: true,
                 isTransfer: true,
               },
@@ -229,13 +234,13 @@ export const updateTransaction = (
   transactionId: string,
   input: {
     accountId?: string
-    transferAccountId?: string
+    transferAccountId?: string | null
     date?: string
     amountMinor?: number
     payeeId?: string
     categoryId?: string
     note?: string
-    cleared?: boolean
+    clearingStatus?: "UNCLEARED" | "CLEARED" | "RECONCILED"
     splits?: TransactionSplitInput[]
     tagIds?: string[]
   },
@@ -251,6 +256,10 @@ export const updateTransaction = (
           categoryId: true,
           transferPairId: true,
           isTransfer: true,
+          amountMinor: true,
+          date: true,
+          note: true,
+          clearingStatus: true,
           account: { select: { type: true } },
           transferAccount: { select: { type: true } },
         },
@@ -262,6 +271,54 @@ export const updateTransaction = (
 
       if (input.splits && input.splits.length > 0 && existing.isTransfer) {
         throw new Error("Split transactions cannot be transfers.")
+      }
+
+      // Converting a transfer back to a regular transaction
+      const isRevertingFromTransfer =
+        existing.transferPairId &&
+        existing.isTransfer &&
+        input.transferAccountId !== undefined &&
+        !input.transferAccountId
+
+      if (isRevertingFromTransfer) {
+        return prisma.$transaction(async (transactionDb) => {
+          // Delete the mirror transaction
+          const mirror = await transactionDb.transaction.findFirst({
+            where: {
+              transferPairId: existing.transferPairId,
+              id: { not: transactionId },
+            },
+            select: { id: true },
+          })
+
+          if (mirror) {
+            await transactionDb.transaction.delete({
+              where: { id: mirror.id },
+            })
+          }
+
+          // Update source to non-transfer
+          await transactionDb.transaction.update({
+            where: { id: transactionId },
+            data: {
+              isTransfer: false,
+              transferAccountId: null,
+              transferPairId: null,
+              date: input.date ? toDate(input.date) : undefined,
+              amountMinor: input.amountMinor,
+              payeeId: input.payeeId,
+              categoryId: input.categoryId,
+              note: input.note,
+              clearingStatus: input.clearingStatus,
+              pendingApproval: false,
+            },
+          })
+
+          return transactionDb.transaction.findUniqueOrThrow({
+            where: { id: transactionId },
+            include: transactionInclude,
+          })
+        })
       }
 
       const existingIsLoanTransfer =
@@ -285,6 +342,88 @@ export const updateTransaction = (
 
       const hasSplits = input.splits !== undefined && input.splits.length > 0
 
+      // Converting a non-transfer into a transfer
+      const isConvertingToTransfer =
+        !existing.transferPairId &&
+        !existing.isTransfer &&
+        input.transferAccountId
+
+      if (isConvertingToTransfer) {
+        const effectiveAccountId = input.accountId ?? existing.accountId
+        const effectiveTransferAccountId = input.transferAccountId!
+        const [sourceAccount, targetAccount] = await Promise.all([
+          prisma.account.findUnique({
+            where: { id: effectiveAccountId },
+            select: { type: true },
+          }),
+          prisma.account.findUnique({
+            where: { id: effectiveTransferAccountId },
+            select: { type: true },
+          }),
+        ])
+        const isLoanTransfer =
+          sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+
+        const transferPairId = randomUUID()
+        const effectiveAmountMinor = input.amountMinor ?? existing.amountMinor
+        const effectiveDate = input.date
+          ? toDate(input.date)
+          : existing.date
+        const effectiveNote = input.note ?? existing.note
+
+        return prisma.$transaction(async (transactionDb) => {
+          // Remove splits when converting to transfer
+          await transactionDb.transactionSplit.deleteMany({
+            where: { transactionId },
+          })
+
+          await transactionDb.transaction.update({
+            where: { id: transactionId },
+            data: {
+              accountId: input.accountId,
+              transferAccountId: input.transferAccountId,
+              transferPairId,
+              isTransfer: true,
+              date: input.date ? toDate(input.date) : undefined,
+              amountMinor: input.amountMinor,
+              payeeId: input.payeeId,
+              categoryId: isLoanTransfer ? input.categoryId : null,
+              note: input.note,
+              clearingStatus: input.clearingStatus,
+              pendingApproval: false,
+            },
+          })
+
+          const mirror = await transactionDb.transaction.create({
+            data: {
+              accountId: input.transferAccountId!,
+              transferAccountId: effectiveAccountId,
+              transferPairId,
+              date: effectiveDate,
+              amountMinor: toMirrorTransferAmountMinor(effectiveAmountMinor),
+              payeeId: input.payeeId,
+              categoryId: isLoanTransfer ? input.categoryId : undefined,
+              note: effectiveNote,
+              clearingStatus: "UNCLEARED",
+              manualCreated: true,
+              isTransfer: true,
+            },
+          })
+
+          await transactionDb.transactionOrigin.create({
+            data: {
+              transactionId: mirror.id,
+              originType: OriginType.MANUAL,
+            },
+          })
+
+          return transactionDb.transaction.findUniqueOrThrow({
+            where: { id: transactionId },
+            include: transactionInclude,
+          })
+        })
+      }
+
       if (!existing.transferPairId) {
         return prisma.$transaction(async (transactionDb) => {
           await transactionDb.transaction.update({
@@ -301,7 +440,8 @@ export const updateTransaction = (
               payeeId: input.payeeId,
               categoryId: hasSplits ? null : input.categoryId,
               note: input.note,
-              cleared: input.cleared,
+              clearingStatus: input.clearingStatus,
+              pendingApproval: false,
             },
           })
 
@@ -372,7 +512,8 @@ export const updateTransaction = (
             payeeId: input.payeeId,
             categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
             note: input.note,
-            cleared: input.cleared,
+            clearingStatus: input.clearingStatus,
+            pendingApproval: false,
           },
         })
 
@@ -399,7 +540,7 @@ export const updateTransaction = (
                 input.note !== undefined
                   ? input.note
                   : undefined,
-              cleared: input.cleared,
+              clearingStatus: input.clearingStatus,
             },
           })
         }
@@ -426,6 +567,69 @@ export const updateTransaction = (
     },
     catch: (error) =>
       new Error(`Unable to update transaction: ${error instanceof Error ? error.message : String(error)}`),
+  })
+
+export const bulkApproveTransactions = (ids: string[]) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.transaction.updateMany({
+        where: { id: { in: ids }, pendingApproval: true },
+        data: { pendingApproval: false },
+      }),
+    catch: (error) =>
+      new Error(`Unable to bulk approve transactions: ${String(error)}`),
+  })
+
+export const bulkRejectTransactions = (ids: string[]) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.$transaction(async (tx) => {
+        const transactions = await tx.transaction.findMany({
+          where: { id: { in: ids }, pendingApproval: true },
+          select: { id: true, importedTransactionId: true },
+        })
+        const txIds = transactions.map((t) => t.id)
+        if (txIds.length === 0) return { count: 0 }
+
+        await tx.transaction.updateMany({
+          where: { id: { in: txIds } },
+          data: { importedTransactionId: null },
+        })
+
+        return tx.transaction.deleteMany({
+          where: { id: { in: txIds } },
+        })
+      }),
+    catch: (error) =>
+      new Error(`Unable to bulk reject transactions: ${String(error)}`),
+  })
+
+export const bulkDeleteTransactions = (ids: string[]) =>
+  Effect.tryPromise({
+    try: async () => {
+      const transactions = await prisma.transaction.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, transferPairId: true },
+      })
+
+      const allIds = new Set(transactions.map((t) => t.id))
+      const pairIds = transactions
+        .map((t) => t.transferPairId)
+        .filter((pid): pid is string => pid !== null)
+
+      return prisma.transaction.deleteMany({
+        where: {
+          OR: [
+            { id: { in: [...allIds] } },
+            ...(pairIds.length > 0
+              ? [{ transferPairId: { in: pairIds } }]
+              : []),
+          ],
+        },
+      })
+    },
+    catch: (error) =>
+      new Error(`Unable to bulk delete transactions: ${String(error)}`),
   })
 
 export const deleteTransaction = (transactionId: string) =>

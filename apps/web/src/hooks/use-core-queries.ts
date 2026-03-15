@@ -40,6 +40,7 @@ export const useCoreQueries = (month: string) => {
     void queryClient.invalidateQueries({ queryKey: ["accounts"] })
     void queryClient.invalidateQueries({ queryKey: ["transactions"] })
     void queryClient.invalidateQueries({ queryKey: ["payees"] })
+    void queryClient.invalidateQueries({ queryKey: ["categories"] })
     void queryClient.invalidateQueries({ queryKey: ["planning"] })
     void queryClient.invalidateQueries({ queryKey: ["tags"] })
     void queryClient.invalidateQueries({ queryKey: ["reports"] })

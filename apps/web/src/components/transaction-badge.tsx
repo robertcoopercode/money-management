@@ -15,8 +15,10 @@ export const TransactionBadge = ({
 
   return (
     <div className="badge-stack">
-      {transaction.cleared ? (
-        <span className="badge badge-cleared">Cleared</span>
+      {transaction.clearingStatus !== "UNCLEARED" ? (
+        <span className="badge badge-cleared">
+          {transaction.clearingStatus === "RECONCILED" ? "Reconciled" : "Cleared"}
+        </span>
       ) : null}
       {isImported ? (
         <span className="badge badge-imported">Imported</span>

@@ -33,7 +33,7 @@ export const ReportsTab = ({
     accountId: "",
     categoryId: "",
     payeeId: "",
-    cleared: "all" as "all" | "cleared" | "uncleared",
+    clearingStatus: "all" as "all" | "CLEARED" | "UNCLEARED" | "RECONCILED",
   })
 
   const reportingQuery = useQuery({
@@ -56,11 +56,8 @@ export const ReportsTab = ({
         query.set("payeeIds", reportFilters.payeeId)
       }
 
-      if (reportFilters.cleared !== "all") {
-        query.set(
-          "cleared",
-          reportFilters.cleared === "cleared" ? "true" : "false",
-        )
+      if (reportFilters.clearingStatus !== "all") {
+        query.set("clearingStatus", reportFilters.clearingStatus)
       }
 
       return apiFetch<ReportingResponse>(`/api/reports?${query.toString()}`)
@@ -181,20 +178,21 @@ export const ReportsTab = ({
           </select>
         </label>
         <label>
-          Cleared Status
+          Clearing Status
           <select
-            value={reportFilters.cleared}
+            value={reportFilters.clearingStatus}
             onChange={(event) =>
               setReportFilters((current) => ({
                 ...current,
-                cleared: event.target
-                  .value as "all" | "cleared" | "uncleared",
+                clearingStatus: event.target
+                  .value as "all" | "CLEARED" | "UNCLEARED" | "RECONCILED",
               }))
             }
           >
             <option value="all">All</option>
-            <option value="cleared">Cleared only</option>
-            <option value="uncleared">Uncleared only</option>
+            <option value="CLEARED">Cleared</option>
+            <option value="UNCLEARED">Uncleared</option>
+            <option value="RECONCILED">Reconciled</option>
           </select>
         </label>
       </div>

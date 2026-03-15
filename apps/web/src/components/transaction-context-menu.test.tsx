@@ -11,7 +11,11 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
     date: "2026-02-01",
     amountMinor: -5000,
     note: null,
-    cleared: false,
+    clearingStatus: "UNCLEARED",
+    manualCreated: true,
+    pendingApproval: false,
+    importedTransactionId: null,
+    importedTransaction: null,
     isTransfer: false,
     transferPairId: null,
     transferAccountId: null,
@@ -34,7 +38,7 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
 }
 
 const defaultCallbacks = {
-  onToggleCleared: vi.fn(),
+  onToggleClearingStatus: vi.fn(),
   onDuplicate: vi.fn(),
   onDelete: vi.fn(),
 }
@@ -61,7 +65,7 @@ describe("TransactionContextMenu", () => {
   it('shows "Mark as cleared" for uncleared transaction', async () => {
     render(
       <TransactionContextMenu
-        transaction={makeTransaction({ cleared: false })}
+        transaction={makeTransaction({ clearingStatus: "UNCLEARED" })}
         {...defaultCallbacks}
       >
         <div data-testid="trigger">Row</div>
@@ -77,7 +81,7 @@ describe("TransactionContextMenu", () => {
   it('shows "Mark as uncleared" for cleared transaction', async () => {
     render(
       <TransactionContextMenu
-        transaction={makeTransaction({ cleared: true })}
+        transaction={makeTransaction({ clearingStatus: "CLEARED" })}
         {...defaultCallbacks}
       >
         <div data-testid="trigger">Row</div>
@@ -92,12 +96,12 @@ describe("TransactionContextMenu", () => {
 
   it("calls onToggleCleared with id and toggled value", async () => {
     const user = userEvent.setup()
-    const onToggleCleared = vi.fn()
+    const onToggleClearingStatus = vi.fn()
 
     render(
       <TransactionContextMenu
-        transaction={makeTransaction({ id: "txn-42", cleared: false })}
-        onToggleCleared={onToggleCleared}
+        transaction={makeTransaction({ id: "txn-42", clearingStatus: "UNCLEARED" })}
+        onToggleClearingStatus={onToggleClearingStatus}
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
       >
@@ -110,7 +114,7 @@ describe("TransactionContextMenu", () => {
       name: /mark as cleared/i,
     })
     await user.click(item)
-    expect(onToggleCleared).toHaveBeenCalledWith("txn-42", true)
+    expect(onToggleClearingStatus).toHaveBeenCalledWith("txn-42", "CLEARED")
   })
 
   it("calls onDuplicate with the transaction", async () => {
@@ -121,7 +125,7 @@ describe("TransactionContextMenu", () => {
     render(
       <TransactionContextMenu
         transaction={transaction}
-        onToggleCleared={vi.fn()}
+        onToggleClearingStatus={vi.fn()}
         onDuplicate={onDuplicate}
         onDelete={vi.fn()}
       >
@@ -142,7 +146,7 @@ describe("TransactionContextMenu", () => {
     render(
       <TransactionContextMenu
         transaction={makeTransaction({ id: "txn-99" })}
-        onToggleCleared={vi.fn()}
+        onToggleClearingStatus={vi.fn()}
         onDuplicate={vi.fn()}
         onDelete={onDelete}
       >

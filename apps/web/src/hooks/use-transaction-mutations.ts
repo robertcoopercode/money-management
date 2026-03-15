@@ -78,7 +78,7 @@ export const useTransactionMutations = (opts: {
   })
 
   const createCategoryMutation = useMutation({
-    mutationFn: (input: { name: string }) =>
+    mutationFn: (input: { name: string; groupName?: string }) =>
       apiFetch<Category>("/api/categories", {
         method: "POST",
         body: JSON.stringify(input),

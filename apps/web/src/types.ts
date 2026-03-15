@@ -6,11 +6,15 @@ export type LoanProfile = {
   minimumPaymentMinor: number
 }
 
+export type ClearingStatus = "UNCLEARED" | "CLEARED" | "RECONCILED"
+
 export type Account = {
   id: string
   name: string
   type: "CASH" | "CREDIT" | "INVESTMENT" | "LOAN"
   startingBalanceMinor: number
+  clearedBalanceMinor: number
+  unclearedBalanceMinor: number
   balanceMinor: number
   loanProfile: LoanProfile | null
 }
@@ -59,7 +63,17 @@ export type Transaction = {
   date: string
   amountMinor: number
   note?: string | null
-  cleared: boolean
+  clearingStatus: ClearingStatus
+  manualCreated: boolean
+  pendingApproval: boolean
+  importedTransactionId?: string | null
+  importedTransaction?: {
+    id: string
+    date: string
+    amountMinor: number
+    payeeName: string
+    note?: string | null
+  } | null
   isTransfer: boolean
   transferPairId?: string | null
   transferAccountId?: string | null
@@ -120,7 +134,7 @@ export type UpdateTransactionMutationInput = {
     payeeId?: string
     categoryId?: string
     note?: string
-    cleared?: boolean
+    clearingStatus?: ClearingStatus
     splits?: Array<{
       categoryId: string
       payeeId?: string
@@ -148,8 +162,8 @@ export const APP_TAB_VALUES = [
   "transactions",
   "accounts",
   "payees",
+  "categories",
   "tags",
-  "imports",
   "planning",
   "reports",
 ] as const

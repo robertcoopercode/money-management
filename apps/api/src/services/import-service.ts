@@ -18,6 +18,7 @@ type ImportInput = {
     payee: string
     note?: string
   }
+  swapInflowOutflow?: boolean
 }
 
 const parseAmountMinor = (rawAmount: string): number | null => {
@@ -68,6 +69,8 @@ const parseDate = (rawDate: string): Date | null => {
 const normalizePayee = (name: string) =>
   name.trim().toLowerCase().replace(/\s+/gu, " ")
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 export const importTransactionsFromCsv = (input: ImportInput) =>
   Effect.tryPromise({
     try: async () => {
@@ -95,7 +98,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
       const matchedTransactionIds = new Set<string>()
 
       for (const [index, row] of rows.entries()) {
-        const amountMinor = parseAmountMinor(row[input.mapping.amount] ?? "")
+        let amountMinor = parseAmountMinor(row[input.mapping.amount] ?? "")
         const date = parseDate(row[input.mapping.date] ?? "")
 
         if (amountMinor === null || date === null) {
@@ -111,19 +114,62 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
           continue
         }
 
+        if (input.swapInflowOutflow) {
+          amountMinor = amountMinor * -1
+        }
+
         const payeeName = (row[input.mapping.payee] ?? "").trim()
         const note = input.mapping.note
           ? (row[input.mapping.note] ?? "").trim()
           : ""
+        const normalizedPayeeName = normalizePayee(payeeName)
 
+        // Dedup check: look for existing ImportedTransaction with same date + amount + payee + note
+        const existingImport = await prisma.importedTransaction.findFirst({
+          where: {
+            date,
+            amountMinor,
+            payeeName: normalizedPayeeName,
+            note: note || null,
+            importBatch: { accountId: input.accountId },
+          },
+        })
+
+        if (existingImport) {
+          rowsSkipped += 1
+          await prisma.importRowMatch.create({
+            data: {
+              importBatchId: importBatch.id,
+              rowIndex: index,
+              action: ImportRowAction.SKIPPED,
+              matchReason: "Duplicate of previously imported transaction.",
+            },
+          })
+          continue
+        }
+
+        // Create ImportedTransaction for dedup tracking
+        const importedTransaction = await prisma.importedTransaction.create({
+          data: {
+            importBatchId: importBatch.id,
+            rowIndex: index,
+            date,
+            amountMinor,
+            payeeName: normalizedPayeeName,
+            note: note || null,
+            rawPayload: row,
+          },
+        })
+
+        // Find match candidates: existing transactions with exact amount within ±10 day window
         const candidates = await prisma.transaction.findMany({
           where: {
             accountId: input.accountId,
             amountMinor,
-            manualCreated: true,
+            importedTransactionId: null,
             date: {
-              gte: new Date(date.getTime() - 3 * 24 * 60 * 60 * 1000),
-              lte: new Date(date.getTime() + 3 * 24 * 60 * 60 * 1000),
+              gte: new Date(date.getTime() - 10 * DAY_MS),
+              lte: new Date(date.getTime() + 10 * DAY_MS),
             },
           },
           include: { origins: true },
@@ -144,8 +190,9 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
             prisma.transaction.update({
               where: { id: bestMatchResult.candidateId },
               data: {
-                cleared: true,
-                importLinked: true,
+                clearingStatus: "CLEARED",
+                pendingApproval: true,
+                importedTransactionId: importedTransaction.id,
               },
             }),
             prisma.transactionOrigin.create({
@@ -162,7 +209,7 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
                 rowIndex: index,
                 matchedTransactionId: bestMatchResult.candidateId,
                 matchScore: bestMatchResult.score,
-                matchReason: "Matched by exact amount and ±3 day window.",
+                matchReason: "Matched by exact amount and ±10 day window.",
                 action: ImportRowAction.MERGED,
               },
             }),
@@ -171,21 +218,25 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
           continue
         }
 
+        // No match — find/create payee and create new transaction
         let payeeId: string | undefined
+        let categoryId: string | undefined
 
         if (payeeName) {
-          const normalizedName = normalizePayee(payeeName)
           const existingPayee = await prisma.payee.findFirst({
-            where: { normalizedName },
+            where: { normalizedName: normalizedPayeeName },
           })
 
           if (existingPayee) {
             payeeId = existingPayee.id
+            if (existingPayee.defaultCategoryId) {
+              categoryId = existingPayee.defaultCategoryId
+            }
           } else {
             const createdPayee = await prisma.payee.create({
               data: {
                 name: payeeName,
-                normalizedName,
+                normalizedName: normalizedPayeeName,
               },
             })
             payeeId = createdPayee.id
@@ -198,10 +249,12 @@ export const importTransactionsFromCsv = (input: ImportInput) =>
             date,
             amountMinor,
             payeeId,
+            categoryId,
             note: note || undefined,
             cleared: true,
             manualCreated: false,
-            importLinked: true,
+            pendingApproval: true,
+            importedTransactionId: importedTransaction.id,
           },
         })
 

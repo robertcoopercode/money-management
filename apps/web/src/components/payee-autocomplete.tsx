@@ -52,9 +52,13 @@ export const PayeeAutocomplete = ({
   const [inputValue, setInputValue] = useState(initialInputValue)
   const [open, setOpen] = useState(false)
   const justCreatedRef = useRef(false)
+  const clearedByInputRef = useRef(false)
 
   useEffect(() => {
-    if (!value && !justCreatedRef.current) setInputValue("")
+    if (!value && !justCreatedRef.current && !clearedByInputRef.current) {
+      setInputValue("")
+    }
+    clearedByInputRef.current = false
     if (value) justCreatedRef.current = false
   }, [value])
 
@@ -142,6 +146,7 @@ export const PayeeAutocomplete = ({
         if (justCreatedRef.current && details.reason !== "input-change") return
         setInputValue(newInputValue)
         if (details.reason === "input-change" && value) {
+          clearedByInputRef.current = true
           onChange(null)
         }
       }}

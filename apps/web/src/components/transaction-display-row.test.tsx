@@ -14,6 +14,8 @@ const defaultProps = {
   onToggleSplitExpand: noop,
   onClearedChange: noop,
   isUpdatePending: false,
+  isSelected: false,
+  onToggleSelect: noop,
 }
 
 function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
@@ -22,7 +24,11 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
     date: "2026-02-01",
     amountMinor: -5000,
     note: null,
-    cleared: false,
+    clearingStatus: "UNCLEARED",
+    manualCreated: true,
+    pendingApproval: false,
+    importedTransactionId: null,
+    importedTransaction: null,
     isTransfer: false,
     transferPairId: null,
     transferAccountId: null,
@@ -61,9 +67,9 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      // cells: account, date, payee, category, note, amount, badge, actions
-      expect(cells[2]!.textContent).toBe("Grocery Store")
-      expect(cells[3]!.textContent).toBe("Groceries")
+      // cells: checkbox, account, date, payee, category, note, amount, tags, actions
+      expect(cells[3]!.textContent).toBe("Grocery Store")
+      expect(cells[4]!.textContent).toBe("Groceries")
     })
 
     it("shows em-dash for null payee and empty for null category", () => {
@@ -74,8 +80,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("\u2014")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("\u2014")
+      expect(cells[4]!.textContent).toBe("")
     })
   })
 
@@ -100,8 +106,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Payment to WS Visa")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("Payment to WS Visa")
+      expect(cells[4]!.textContent).toBe("")
     })
 
     it("shows Transfer from in payee and empty category for incoming transfer", () => {
@@ -124,8 +130,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Transfer from Savings")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("Transfer from Savings")
+      expect(cells[4]!.textContent).toBe("")
     })
 
     it("shows Transfer to in payee for cash-to-cash outgoing transfer", () => {
@@ -148,8 +154,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Transfer to Savings")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("Transfer to Savings")
+      expect(cells[4]!.textContent).toBe("")
     })
   })
 
@@ -175,8 +181,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Payment to 2022 RAV4")
-      expect(cells[3]!.textContent).toBe("Interest")
+      expect(cells[3]!.textContent).toBe("Payment to 2022 RAV4")
+      expect(cells[4]!.textContent).toBe("Interest")
     })
 
     it("shows em-dash when cash-to-loan transfer has no category", () => {
@@ -199,8 +205,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Payment to 2022 RAV4")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("Payment to 2022 RAV4")
+      expect(cells[4]!.textContent).toBe("")
     })
 
     it("shows em-dash when loan-to-cash transfer has no category", () => {
@@ -231,8 +237,8 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[2]!.textContent).toBe("Payment from WS Cash")
-      expect(cells[3]!.textContent).toBe("")
+      expect(cells[3]!.textContent).toBe("Payment from WS Cash")
+      expect(cells[4]!.textContent).toBe("")
     })
   })
 
@@ -381,6 +387,132 @@ describe("TransactionDisplayRow", () => {
     })
   })
 
+  describe("import approval icons", () => {
+    it("renders chain-link icon when pendingApproval && importedTransactionId && manualCreated", () => {
+      const transaction = makeTransaction({
+        pendingApproval: true,
+        importedTransactionId: "imp-1",
+        manualCreated: true,
+      })
+
+      render(
+        <TransactionDisplayRow transaction={transaction} {...defaultProps} />,
+      )
+
+      expect(
+        screen.getByLabelText("Matched import - click to review"),
+      ).toBeTruthy()
+    })
+
+    it("renders info icon when pendingApproval && !manualCreated", () => {
+      const transaction = makeTransaction({
+        pendingApproval: true,
+        manualCreated: false,
+        importedTransactionId: "imp-2",
+      })
+
+      render(
+        <TransactionDisplayRow transaction={transaction} {...defaultProps} />,
+      )
+
+      expect(
+        screen.getByLabelText("New import - click to review"),
+      ).toBeTruthy()
+    })
+
+    it("renders no icon when pendingApproval is false", () => {
+      const transaction = makeTransaction({
+        pendingApproval: false,
+      })
+
+      render(
+        <TransactionDisplayRow transaction={transaction} {...defaultProps} />,
+      )
+
+      expect(
+        screen.queryByLabelText("Matched import - click to review"),
+      ).toBeNull()
+      expect(
+        screen.queryByLabelText("New import - click to review"),
+      ).toBeNull()
+    })
+  })
+
+  describe("selection behavior", () => {
+    it("renders a checkbox", () => {
+      const transaction = makeTransaction()
+      render(
+        <TransactionDisplayRow transaction={transaction} {...defaultProps} />,
+      )
+      expect(screen.getByRole("checkbox")).toBeTruthy()
+    })
+
+    it("first click on unselected row calls onToggleSelect, not onStartEditing", async () => {
+      const user = userEvent.setup()
+      const onStartEditing = vi.fn()
+      const onToggleSelect = vi.fn()
+      const transaction = makeTransaction({
+        payee: { id: "p1", name: "Test Payee" },
+      })
+
+      render(
+        <TransactionDisplayRow
+          transaction={transaction}
+          {...defaultProps}
+          isSelected={false}
+          onStartEditing={onStartEditing}
+          onToggleSelect={onToggleSelect}
+        />,
+      )
+
+      const cells = screen.getAllByRole("cell")
+      await user.click(cells[3]!) // payee cell
+      expect(onToggleSelect).toHaveBeenCalledWith("txn-1", false)
+      expect(onStartEditing).not.toHaveBeenCalled()
+    })
+
+    it("click on selected row calls onStartEditing", async () => {
+      const user = userEvent.setup()
+      const onStartEditing = vi.fn()
+      const onToggleSelect = vi.fn()
+      const transaction = makeTransaction({
+        payee: { id: "p1", name: "Test Payee" },
+      })
+
+      render(
+        <TransactionDisplayRow
+          transaction={transaction}
+          {...defaultProps}
+          isSelected={true}
+          onStartEditing={onStartEditing}
+          onToggleSelect={onToggleSelect}
+        />,
+      )
+
+      const cells = screen.getAllByRole("cell")
+      await user.click(cells[3]!) // payee cell
+      expect(onStartEditing).toHaveBeenCalledWith(transaction, "payee")
+      expect(onToggleSelect).not.toHaveBeenCalled()
+    })
+
+    it("checkbox click calls onToggleSelect", async () => {
+      const user = userEvent.setup()
+      const onToggleSelect = vi.fn()
+      const transaction = makeTransaction()
+
+      render(
+        <TransactionDisplayRow
+          transaction={transaction}
+          {...defaultProps}
+          onToggleSelect={onToggleSelect}
+        />,
+      )
+
+      await user.click(screen.getByRole("checkbox"))
+      expect(onToggleSelect).toHaveBeenCalledWith("txn-1", false)
+    })
+  })
+
   describe("split transactions", () => {
     it("shows Split transaction text in category cell", () => {
       const transaction = makeTransaction({
@@ -415,7 +547,7 @@ describe("TransactionDisplayRow", () => {
       )
 
       const cells = screen.getAllByRole("cell")
-      expect(cells[3]!.textContent).toContain("Split transaction")
+      expect(cells[4]!.textContent).toContain("Split transaction")
     })
   })
 })

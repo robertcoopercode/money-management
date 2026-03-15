@@ -1,5 +1,5 @@
 import type { Hono } from "hono"
-import { createAccountSchema, updateAccountSchema } from "@ledgr/shared"
+import { createAccountSchema, updateAccountSchema, reconcileAccountSchema } from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"
@@ -9,6 +9,7 @@ import {
   listAccounts,
   updateAccount,
 } from "../services/account-service.js"
+import { reconcileAccount } from "../services/reconciliation-service.js"
 
 export const registerAccountRoutes = (app: Hono) => {
   app.get("/api/accounts", async (context) => {
@@ -56,6 +57,15 @@ export const registerAccountRoutes = (app: Hono) => {
     )
 
     return context.json(account)
+  })
+
+  app.post("/api/accounts/:accountId/reconcile", async (context) => {
+    const accountId = context.req.param("accountId")
+    const payload = await parseJson(context, reconcileAccountSchema)
+    const result = await runApiEffect(
+      reconcileAccount(accountId, payload.statementBalanceMinor),
+    )
+    return context.json(result)
   })
 
   app.delete("/api/accounts/:accountId", async (context) => {

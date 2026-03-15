@@ -1,7 +1,8 @@
-import { Fragment, type ReactNode } from "react"
+import { Fragment, useState, type ReactNode } from "react"
 import { formatMoney } from "@ledgr/shared"
 import { Tooltip } from "@base-ui/react/tooltip"
-import { ClearedToggle } from "./cleared-toggle.js"
+import { Popover } from "@base-ui/react/popover"
+import { ClearingStatusToggle } from "./clearing-status-toggle.js"
 import type { Transaction, Tag } from "../types.js"
 import type { EditableField } from "../lib/transaction-entry.js"
 
@@ -33,9 +34,93 @@ type TransactionDisplayRowProps = {
     splitIndex?: number,
   ) => void
   onToggleSplitExpand: (id: string) => void
-  onClearedChange: (id: string, cleared: boolean) => void
+  onClearingStatusChange: (id: string, clearingStatus: "UNCLEARED" | "CLEARED" | "RECONCILED") => void
   onJumpToTransfer?: (transferPairId: string, sourceTransactionId: string) => void
   isUpdatePending: boolean
+  isSelected: boolean
+  onToggleSelect: (id: string, shiftKey: boolean) => void
+  onApproveImport?: (transactionId: string) => void
+  onRejectImport?: (transactionId: string) => void
+  onUnmatchImport?: (transactionId: string) => void
+}
+
+function ImportApprovalIcon({
+  transaction,
+  onApprove,
+  onReject,
+  onUnmatch,
+}: {
+  transaction: Transaction
+  onApprove?: (id: string) => void
+  onReject?: (id: string) => void
+  onUnmatch?: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const isMatched = transaction.pendingApproval && transaction.importedTransactionId && transaction.manualCreated
+  const isNewImport = transaction.pendingApproval && !transaction.manualCreated
+
+  if (!isMatched && !isNewImport) return null
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
+        render={
+          <button
+            type="button"
+            className={`import-approval-trigger ${isMatched ? "import-matched" : "import-new"}`}
+            aria-label={isMatched ? "Matched import - click to review" : "New import - click to review"}
+          />
+        }
+      >
+        {isMatched ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        )}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner sideOffset={8}>
+          <Popover.Popup className="import-approval-popup">
+            <div className="import-approval-label">
+              {isMatched ? "Matched import" : "New import"}
+            </div>
+            <div className="import-approval-actions">
+              <button
+                type="button"
+                className="button-success import-approval-btn"
+                onClick={() => { onApprove?.(transaction.id); setOpen(false) }}
+              >
+                Approve
+              </button>
+              {isMatched && (
+                <button
+                  type="button"
+                  className="import-approval-btn"
+                  onClick={() => { onUnmatch?.(transaction.id); setOpen(false) }}
+                >
+                  Unmatch
+                </button>
+              )}
+              <button
+                type="button"
+                className="button-danger import-approval-btn"
+                onClick={() => { onReject?.(transaction.id); setOpen(false) }}
+              >
+                Reject
+              </button>
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  )
 }
 
 export function TransactionDisplayRow({
@@ -44,20 +129,44 @@ export function TransactionDisplayRow({
   expandedSplitIds,
   onStartEditing,
   onToggleSplitExpand,
-  onClearedChange,
+  onClearingStatusChange,
   onJumpToTransfer,
   isUpdatePending,
+  isSelected,
+  onToggleSelect,
+  onApproveImport,
+  onRejectImport,
+  onUnmatchImport,
 }: TransactionDisplayRowProps) {
+  const handleCellClick = (field: EditableField) => {
+    if (isSelected) {
+      onStartEditing(transaction, field)
+    } else {
+      onToggleSelect(transaction.id, false)
+    }
+  }
+
   return (
     <Fragment>
-      <div className="transaction-row" role="row">
+      <div className={`transaction-row${isSelected ? " selected" : ""}`} role="row">
+        <div className="transaction-cell transaction-cell-checkbox" role="cell">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => {}}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect(transaction.id, e.shiftKey)
+            }}
+          />
+        </div>
         <div
           className="transaction-cell clickable-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "account")}
+          onClick={() => handleCellClick("account")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "account")
+            if (e.key === "Enter") handleCellClick("account")
           }}
         >
           {transaction.account.name}
@@ -66,9 +175,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "date")}
+          onClick={() => handleCellClick("date")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "date")
+            if (e.key === "Enter") handleCellClick("date")
           }}
         >
           {new Date(transaction.date).toISOString().slice(0, 10)}
@@ -77,9 +186,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "payee")}
+          onClick={() => handleCellClick("payee")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "payee")
+            if (e.key === "Enter") handleCellClick("payee")
           }}
         >
           <span className="payee-cell-content">
@@ -147,9 +256,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "category")}
+          onClick={() => handleCellClick("category")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "category")
+            if (e.key === "Enter") handleCellClick("category")
           }}
         >
           {transaction.splits?.length > 0 ? (
@@ -199,9 +308,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "note")}
+          onClick={() => handleCellClick("note")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "note")
+            if (e.key === "Enter") handleCellClick("note")
           }}
         >
           <TruncatedText text={transaction.note || ""} />
@@ -212,9 +321,9 @@ export function TransactionDisplayRow({
           }`}
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "amount")}
+          onClick={() => handleCellClick("amount")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "amount")
+            if (e.key === "Enter") handleCellClick("amount")
           }}
         >
           {formatMoney(transaction.amountMinor)}
@@ -223,9 +332,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell tag-display-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => onStartEditing(transaction, "tags")}
+          onClick={() => handleCellClick("tags")}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onStartEditing(transaction, "tags")
+            if (e.key === "Enter") handleCellClick("tags")
           }}
         >
           {transaction.tags?.length > 0 && (
@@ -247,10 +356,19 @@ export function TransactionDisplayRow({
         </div>
         <div className="transaction-cell" role="cell">
           <div className="row-actions">
-            <ClearedToggle
-              pressed={transaction.cleared}
-              onPressedChange={(pressed) =>
-                onClearedChange(transaction.id, pressed)
+            <ImportApprovalIcon
+              transaction={transaction}
+              onApprove={onApproveImport}
+              onReject={onRejectImport}
+              onUnmatch={onUnmatchImport}
+            />
+            <ClearingStatusToggle
+              status={transaction.clearingStatus}
+              onToggle={() =>
+                onClearingStatusChange(
+                  transaction.id,
+                  transaction.clearingStatus === "UNCLEARED" ? "CLEARED" : "UNCLEARED",
+                )
               }
               disabled={isUpdatePending}
             />

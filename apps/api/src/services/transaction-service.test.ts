@@ -85,6 +85,8 @@ const ACCOUNT_CHECKING = { id: "acc-checking", type: "CASH" }
 const ACCOUNT_SAVINGS = { id: "acc-savings", type: "CASH" }
 const ACCOUNT_LOAN = { id: "acc-loan", type: "LOAN" }
 
+type ClearingStatus = "UNCLEARED" | "CLEARED" | "RECONCILED"
+
 const makeCreateInput = (overrides: Record<string, unknown> = {}) => ({
   accountId: ACCOUNT_CHECKING.id,
   date: "2026-01-15",
@@ -92,8 +94,8 @@ const makeCreateInput = (overrides: Record<string, unknown> = {}) => ({
   payeeId: "payee-1",
   categoryId: "cat-1",
   note: "Test transaction",
-  cleared: false,
   ...overrides,
+  clearingStatus: ((overrides.clearingStatus as ClearingStatus) ?? "UNCLEARED") as ClearingStatus,
 })
 
 const makeTransferInput = (overrides: Record<string, unknown> = {}) => ({
@@ -101,6 +103,7 @@ const makeTransferInput = (overrides: Record<string, unknown> = {}) => ({
   transferAccountId: ACCOUNT_SAVINGS.id,
   note: "Transfer to savings",
   ...overrides,
+  clearingStatus: ((overrides.clearingStatus as ClearingStatus) ?? "UNCLEARED") as ClearingStatus,
 })
 
 const makeFullTransaction = (overrides: Record<string, unknown> = {}) => ({
@@ -111,7 +114,7 @@ const makeFullTransaction = (overrides: Record<string, unknown> = {}) => ({
   payeeId: "payee-1",
   categoryId: "cat-1",
   note: "Test transaction",
-  cleared: false,
+  clearingStatus: "UNCLEARED",
   manualCreated: true,
   isTransfer: false,
   transferAccountId: null,
@@ -132,6 +135,10 @@ const makeExistingForUpdate = (overrides: Record<string, unknown> = {}) => ({
   categoryId: "cat-1",
   transferPairId: null,
   isTransfer: false,
+  amountMinor: -5000,
+  date: new Date("2026-01-15T00:00:00.000Z"),
+  note: "Test transaction",
+  clearingStatus: "UNCLEARED",
   account: { type: "CASH" },
   transferAccount: null,
   ...overrides,
@@ -394,7 +401,7 @@ describe("transaction-service", () => {
             payeeId: "payee-2",
             categoryId: "cat-2",
             note: "Updated",
-            cleared: true,
+            clearingStatus: "CLEARED",
           }),
         )
 
@@ -403,7 +410,7 @@ describe("transaction-service", () => {
         expect(data.amountMinor).toBe(-9999)
         expect(data.categoryId).toBe("cat-2")
         expect(data.note).toBe("Updated")
-        expect(data.cleared).toBe(true)
+        expect(data.clearingStatus).toBe("CLEARED")
       })
 
       it("replaces splits on update", async () => {
@@ -465,6 +472,209 @@ describe("transaction-service", () => {
 
         expect(mockPrisma.transactionTag.deleteMany).not.toHaveBeenCalled()
         expect(mockPrisma.transactionTag.createMany).not.toHaveBeenCalled()
+      })
+    })
+
+    describe("convert to transfer", () => {
+      it("creates a mirror transaction when setting transferAccountId on a non-transfer", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "CASH" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true, transferAccountId: ACCOUNT_SAVINGS.id }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", {
+            transferAccountId: ACCOUNT_SAVINGS.id,
+            amountMinor: -5000,
+          }),
+        )
+
+        // Source should be updated
+        expect(mockPrisma.transaction.update).toHaveBeenCalledOnce()
+        const sourceData = callArg(mockPrisma.transaction.update).data
+        expect(sourceData.isTransfer).toBe(true)
+        expect(sourceData.transferAccountId).toBe(ACCOUNT_SAVINGS.id)
+        expect(sourceData.transferPairId).toBeTruthy()
+
+        // Mirror should be created
+        expect(mockPrisma.transaction.create).toHaveBeenCalledOnce()
+        const mirrorData = callArg(mockPrisma.transaction.create).data
+        expect(mirrorData.accountId).toBe(ACCOUNT_SAVINGS.id)
+        expect(mirrorData.transferAccountId).toBe(ACCOUNT_CHECKING.id)
+        expect(mirrorData.amountMinor).toBe(5000)
+        expect(mirrorData.isTransfer).toBe(true)
+        expect(mirrorData.transferPairId).toBe(sourceData.transferPairId)
+      })
+
+      it("creates MANUAL origin for the mirror transaction", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "CASH" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", { transferAccountId: ACCOUNT_SAVINGS.id }),
+        )
+
+        expect(mockPrisma.transactionOrigin.create).toHaveBeenCalledOnce()
+        const originData = callArg(mockPrisma.transactionOrigin.create).data
+        expect(originData.transactionId).toBe("txn-mirror")
+        expect(originData.originType).toBe("MANUAL")
+      })
+
+      it("clears categoryId on source for non-loan transfer conversion", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(
+          makeExistingForUpdate({ categoryId: "cat-1" }),
+        )
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "CASH" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", {
+            transferAccountId: ACCOUNT_SAVINGS.id,
+            categoryId: "cat-1",
+          }),
+        )
+
+        const sourceData = callArg(mockPrisma.transaction.update).data
+        expect(sourceData.categoryId).toBeNull()
+
+        const mirrorData = callArg(mockPrisma.transaction.create).data
+        expect(mirrorData.categoryId).toBeUndefined()
+      })
+
+      it("preserves categoryId on both sides for loan transfer conversion", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "LOAN" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", {
+            transferAccountId: ACCOUNT_LOAN.id,
+            categoryId: "cat-interest",
+          }),
+        )
+
+        const sourceData = callArg(mockPrisma.transaction.update).data
+        expect(sourceData.categoryId).toBe("cat-interest")
+
+        const mirrorData = callArg(mockPrisma.transaction.create).data
+        expect(mirrorData.categoryId).toBe("cat-interest")
+      })
+
+      it("removes existing splits when converting to transfer", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "CASH" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transactionSplit.deleteMany.mockResolvedValue({ count: 2 })
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", { transferAccountId: ACCOUNT_SAVINGS.id }),
+        )
+
+        expect(mockPrisma.transactionSplit.deleteMany).toHaveBeenCalledWith({
+          where: { transactionId: "txn-1" },
+        })
+      })
+
+      it("uses existing transaction values for mirror when not provided in input", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(
+          makeExistingForUpdate({
+            amountMinor: -7500,
+            date: new Date("2026-02-20T00:00:00.000Z"),
+            note: "Original note",
+            clearingStatus: "CLEARED",
+          }),
+        )
+        mockPrisma.account.findUnique
+          .mockResolvedValueOnce({ type: "CASH" })
+          .mockResolvedValueOnce({ type: "CASH" })
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.create.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transactionOrigin.create.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction({ isTransfer: true }),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", { transferAccountId: ACCOUNT_SAVINGS.id }),
+        )
+
+        const mirrorData = callArg(mockPrisma.transaction.create).data
+        expect(mirrorData.amountMinor).toBe(7500)
+        expect(mirrorData.date).toEqual(new Date("2026-02-20T00:00:00.000Z"))
+        expect(mirrorData.note).toBe("Original note")
+        expect(mirrorData.clearingStatus).toBe("CLEARED")
+      })
+    })
+
+    describe("convert transfer back to regular", () => {
+      it("deletes mirror and clears transfer fields when transferAccountId is set to null", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(
+          makeExistingForUpdate({
+            transferPairId: "pair-1",
+            isTransfer: true,
+            transferAccountId: ACCOUNT_SAVINGS.id,
+          }),
+        )
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.findFirst.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transaction.delete.mockResolvedValue({})
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(
+          makeFullTransaction(),
+        )
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", {
+            transferAccountId: null as unknown as string,
+            payeeId: "payee-new",
+          }),
+        )
+
+        // Mirror should be deleted
+        expect(mockPrisma.transaction.delete).toHaveBeenCalledWith({
+          where: { id: "txn-mirror" },
+        })
+
+        // Source should be updated to non-transfer
+        const sourceData = callArg(mockPrisma.transaction.update).data
+        expect(sourceData.isTransfer).toBe(false)
+        expect(sourceData.transferAccountId).toBeNull()
+        expect(sourceData.transferPairId).toBeNull()
+        expect(sourceData.payeeId).toBe("payee-new")
       })
     })
 
@@ -608,10 +818,10 @@ describe("transaction-service", () => {
       })
 
       it("syncs cleared status to mirror", async () => {
-        await Effect.runPromise(updateTransaction("txn-1", { cleared: true }))
+        await Effect.runPromise(updateTransaction("txn-1", { clearingStatus: "CLEARED" }))
 
         const mirrorData = callArg(mockPrisma.transaction.update, 1).data
-        expect(mirrorData.cleared).toBe(true)
+        expect(mirrorData.clearingStatus).toBe("CLEARED")
       })
 
       it("syncs payeeId to mirror", async () => {

@@ -3,7 +3,7 @@ import type { Transaction } from "../types.js"
 
 type TransactionContextMenuProps = {
   transaction: Transaction
-  onToggleCleared: (id: string, cleared: boolean) => void
+  onToggleClearingStatus: (id: string, clearingStatus: "UNCLEARED" | "CLEARED" | "RECONCILED") => void
   onDuplicate: (transaction: Transaction) => void
   onDelete: (id: string) => void
   children: React.ReactNode
@@ -11,7 +11,7 @@ type TransactionContextMenuProps = {
 
 export function TransactionContextMenu({
   transaction,
-  onToggleCleared,
+  onToggleClearingStatus,
   onDuplicate,
   onDelete,
   children,
@@ -29,10 +29,13 @@ export function TransactionContextMenu({
             <ContextMenu.Item
               className="context-menu-item"
               onClick={() =>
-                onToggleCleared(transaction.id, !transaction.cleared)
+                onToggleClearingStatus(
+                  transaction.id,
+                  transaction.clearingStatus === "UNCLEARED" ? "CLEARED" : "UNCLEARED",
+                )
               }
             >
-              {transaction.cleared ? "Mark as uncleared" : "Mark as cleared"}
+              {transaction.clearingStatus === "UNCLEARED" ? "Mark as cleared" : "Mark as uncleared"}
             </ContextMenu.Item>
             <ContextMenu.Item
               className="context-menu-item"

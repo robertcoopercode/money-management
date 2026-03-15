@@ -75,7 +75,7 @@ type TransactionSeed = {
   categoryPath: [string, string]
   amountMinor: number
   daysAgo: number
-  cleared?: boolean
+  clearingStatus?: "UNCLEARED" | "CLEARED" | "RECONCILED"
   note?: string
 }
 
@@ -87,7 +87,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Groceries & Household"],
     amountMinor: -14523,
     daysAgo: 2,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -95,7 +95,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Vehicle", "Fuel + Parking"],
     amountMinor: -7845,
     daysAgo: 4,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -103,7 +103,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Fixed / Annual", "Hydro"],
     amountMinor: -18900,
     daysAgo: 7,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -111,7 +111,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Fixed / Annual", "Internet"],
     amountMinor: -11499,
     daysAgo: 7,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -119,7 +119,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Home", "Yard & Garden"],
     amountMinor: -4599,
     daysAgo: 10,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -127,7 +127,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Groceries & Household"],
     amountMinor: -23150,
     daysAgo: 14,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "TD Chequing",
@@ -135,7 +135,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Eating Out"],
     amountMinor: -1285,
     daysAgo: 1,
-    cleared: false,
+    clearingStatus: "UNCLEARED",
   },
   // Credit card transactions
   {
@@ -144,7 +144,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Home", "Furniture & Home Goods"],
     amountMinor: -8999,
     daysAgo: 3,
-    cleared: true,
+    clearingStatus: "CLEARED",
     note: "Desk lamp",
   },
   {
@@ -153,7 +153,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Fixed / Annual", "Phone"],
     amountMinor: -2099,
     daysAgo: 5,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "Visa Infinite",
@@ -161,7 +161,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Home", "Furniture & Home Goods"],
     amountMinor: -34900,
     daysAgo: 8,
-    cleared: true,
+    clearingStatus: "CLEARED",
     note: "Bookshelf",
   },
   {
@@ -170,7 +170,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Groceries & Household"],
     amountMinor: -18720,
     daysAgo: 11,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "Visa Infinite",
@@ -178,7 +178,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Groceries & Household"],
     amountMinor: -9845,
     daysAgo: 15,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "Visa Infinite",
@@ -186,7 +186,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Vehicle", "Fuel + Parking"],
     amountMinor: -6530,
     daysAgo: 18,
-    cleared: true,
+    clearingStatus: "CLEARED",
   },
   {
     accountName: "Visa Infinite",
@@ -194,7 +194,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Food", "Eating Out"],
     amountMinor: -875,
     daysAgo: 0,
-    cleared: false,
+    clearingStatus: "UNCLEARED",
   },
   // Income
   {
@@ -203,7 +203,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Income", "Ready to Assign"],
     amountMinor: 325000,
     daysAgo: 15,
-    cleared: true,
+    clearingStatus: "CLEARED",
     note: "Paycheque",
   },
   {
@@ -212,7 +212,7 @@ const transactions: TransactionSeed[] = [
     categoryPath: ["Income", "Ready to Assign"],
     amountMinor: 325000,
     daysAgo: 30,
-    cleared: true,
+    clearingStatus: "CLEARED",
     note: "Paycheque",
   },
 ]
@@ -297,7 +297,7 @@ const main = async () => {
           categoryId: categoryMap.get(categoryKey)!,
           amountMinor: tx.amountMinor,
           date,
-          cleared: tx.cleared ?? false,
+          clearingStatus: tx.clearingStatus ?? "UNCLEARED",
           note: tx.note ?? null,
           origins: {
             create: { originType: "MANUAL" },

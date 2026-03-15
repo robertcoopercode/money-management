@@ -16,7 +16,7 @@ describe("buildNextTransactionDraft", () => {
       payeeId: "payee-1",
       categoryId: "category-1",
       note: "Lunch",
-      cleared: true,
+      clearingStatus: "CLEARED",
       isExpense: true,
       splits: [],
     })
@@ -30,7 +30,7 @@ describe("buildNextTransactionDraft", () => {
       payeeId: "",
       categoryId: "",
       note: "",
-      cleared: false,
+      clearingStatus: "UNCLEARED",
       splits: [],
       tagIds: [],
     })
@@ -42,7 +42,7 @@ describe("transactionToEditDraft", () => {
     const draft = transactionToEditDraft({
       amountMinor: -1550,
       date: "2026-03-10T00:00:00.000Z",
-      cleared: true,
+      clearingStatus: "CLEARED",
       note: "Coffee",
       transferAccountId: null,
       account: { id: "acc-1" },
@@ -59,7 +59,7 @@ describe("transactionToEditDraft", () => {
       payeeId: "payee-1",
       categoryId: "cat-1",
       note: "Coffee",
-      cleared: true,
+      clearingStatus: "CLEARED",
       splits: [],
       tagIds: [],
     })
@@ -69,7 +69,7 @@ describe("transactionToEditDraft", () => {
     const draft = transactionToEditDraft({
       amountMinor: 5000,
       date: "2026-01-15T00:00:00.000Z",
-      cleared: false,
+      clearingStatus: "UNCLEARED",
       note: null,
       transferAccountId: "acc-2",
       account: { id: "acc-1" },
@@ -86,7 +86,7 @@ describe("transactionToEditDraft", () => {
       payeeId: "",
       categoryId: "",
       note: "",
-      cleared: false,
+      clearingStatus: "UNCLEARED",
       splits: [],
       tagIds: [],
     })

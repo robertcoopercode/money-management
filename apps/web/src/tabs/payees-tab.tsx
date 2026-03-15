@@ -214,7 +214,7 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
             <p className="muted">No payees match your search.</p>
           ) : (
             <>
-              <div className="list-item" style={{ padding: "0.35rem 0.75rem" }}>
+              <div style={{ padding: "0.25rem 0.75rem" }}>
                 <label className="payee-checkbox-label">
                   <input
                     type="checkbox"
@@ -222,13 +222,21 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
                     onChange={toggleAll}
                     aria-label="Select all visible payees"
                   />
-                  <span className="muted" style={{ fontSize: "0.8rem" }}>
+                  <span className="muted" style={{ fontSize: "0.78rem" }}>
                     Select all
                   </span>
                 </label>
               </div>
               {visiblePayees.map((payee) => (
-                <div className="list-item" key={payee.id}>
+                <div
+                  className={`list-item${selectedPayeeIds.has(payee.id) ? " selected" : ""}`}
+                  key={payee.id}
+                  style={{ cursor: "pointer" }}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("[data-payee-category]")) return
+                    togglePayee(payee.id)
+                  }}
+                >
                   <label className="payee-checkbox-label">
                     <input
                       type="checkbox"

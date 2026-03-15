@@ -2,7 +2,7 @@ export type ImportCandidate = {
   id: string
   amountMinor: number
   date: Date
-  cleared: boolean
+  clearingStatus: "UNCLEARED" | "CLEARED" | "RECONCILED"
 }
 
 export type MatchResult = {
@@ -10,7 +10,7 @@ export type MatchResult = {
   score: number
 } | null
 
-export const MAX_MATCH_DAY_WINDOW = 3
+export const MAX_MATCH_DAY_WINDOW = 10
 
 export const dayDiff = (left: Date, right: Date) =>
   Math.abs(
@@ -47,8 +47,9 @@ export const findBestImportCandidate = ({
       return leftDateDiff - rightDateDiff
     }
 
-    if (left.cleared !== right.cleared) {
-      return Number(left.cleared) - Number(right.cleared)
+    const statusOrder = { UNCLEARED: 0, CLEARED: 1, RECONCILED: 2 }
+    if (left.clearingStatus !== right.clearingStatus) {
+      return statusOrder[left.clearingStatus] - statusOrder[right.clearingStatus]
     }
 
     return left.id.localeCompare(right.id)

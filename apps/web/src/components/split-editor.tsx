@@ -19,7 +19,7 @@ type SplitEditorProps = {
   payees: Array<{ id: string; name: string }>
   accounts: Array<{ id: string; name: string; type: string }>
   categoryGroups: CategoryGroup[]
-  onCreateCategory?: (name: string) => Promise<{ id: string; name: string }>
+  onCreateCategory?: (input: { name: string; groupName: string }) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
   tags: Tag[]
   onCreateTag?: (name: string) => Promise<Tag>

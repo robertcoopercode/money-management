@@ -1,5 +1,6 @@
 import type { Hono } from "hono"
 import {
+  bulkTransactionIdsSchema,
   createTransactionSchema,
   transactionFilterSchema,
   transactionIdSchema,
@@ -9,6 +10,9 @@ import {
 import { parseJson, parseQuery } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"
 import {
+  bulkApproveTransactions,
+  bulkDeleteTransactions,
+  bulkRejectTransactions,
   createTransaction,
   deleteTransaction,
   listTransactions,
@@ -16,6 +20,24 @@ import {
 } from "../services/transaction-service.js"
 
 export const registerTransactionRoutes = (app: Hono) => {
+  app.post("/api/transactions/bulk-approve", async (context) => {
+    const { transactionIds } = await parseJson(context, bulkTransactionIdsSchema)
+    const result = await runApiEffect(bulkApproveTransactions(transactionIds))
+    return context.json({ count: result.count })
+  })
+
+  app.post("/api/transactions/bulk-reject", async (context) => {
+    const { transactionIds } = await parseJson(context, bulkTransactionIdsSchema)
+    const result = await runApiEffect(bulkRejectTransactions(transactionIds))
+    return context.json({ count: result.count })
+  })
+
+  app.post("/api/transactions/bulk-delete", async (context) => {
+    const { transactionIds } = await parseJson(context, bulkTransactionIdsSchema)
+    const result = await runApiEffect(bulkDeleteTransactions(transactionIds))
+    return context.json({ count: result.count })
+  })
+
   app.get("/api/transactions", async (context) => {
     const filters = parseQuery(context, transactionFilterSchema)
     const transactions = await runApiEffect(listTransactions(filters))
@@ -33,7 +55,7 @@ export const registerTransactionRoutes = (app: Hono) => {
         payeeId: payload.payeeId,
         categoryId: payload.categoryId,
         note: payload.note,
-        cleared: payload.cleared,
+        clearingStatus: payload.clearingStatus,
         splits: payload.splits,
         tagIds: payload.tagIds,
       }),
@@ -56,7 +78,7 @@ export const registerTransactionRoutes = (app: Hono) => {
         payeeId: payload.payeeId,
         categoryId: payload.categoryId,
         note: payload.note,
-        cleared: payload.cleared,
+        clearingStatus: payload.clearingStatus,
         splits: payload.splits,
         tagIds: payload.tagIds,
       }),

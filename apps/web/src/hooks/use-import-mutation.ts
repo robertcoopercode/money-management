@@ -12,13 +12,14 @@ type ImportResult = {
 
 export const useImportMutation = (opts: {
   refetchCoreData: () => void
-  onSuccess?: () => void
+  onSuccess?: (result: ImportResult) => void
 }) => {
   const uploadCsvMutation = useMutation({
     mutationFn: async (input: {
       file: File
       accountId: string
-      mapping: { date: string; amount: string; payee: string; note: string }
+      mapping: { date: string; amount: string; payee: string; note?: string }
+      swapInflowOutflow?: boolean
     }) => {
       const csvText = await parseCsvFile(input.file)
       return apiFetch<ImportResult>("/api/imports/csv", {
@@ -27,7 +28,13 @@ export const useImportMutation = (opts: {
           accountId: input.accountId,
           fileName: input.file.name,
           csvText,
-          mapping: input.mapping,
+          mapping: {
+            date: input.mapping.date,
+            amount: input.mapping.amount,
+            payee: input.mapping.payee,
+            ...(input.mapping.note ? { note: input.mapping.note } : {}),
+          },
+          swapInflowOutflow: input.swapInflowOutflow ?? false,
         }),
       })
     },
@@ -35,7 +42,7 @@ export const useImportMutation = (opts: {
       toast.success(
         `Imported ${result.rowsTotal} rows (${result.rowsMatched} matched, ${result.rowsCreated} created, ${result.rowsSkipped} skipped).`,
       )
-      opts.onSuccess?.()
+      opts.onSuccess?.(result)
       opts.refetchCoreData()
     },
     onError: (error) => {
