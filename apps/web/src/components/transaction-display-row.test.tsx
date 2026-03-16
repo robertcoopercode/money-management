@@ -242,6 +242,8 @@ describe("TransactionDisplayRow", () => {
           name: "WS Cash",
           type: "CASH",
           startingBalanceMinor: 0,
+          clearedBalanceMinor: 0,
+          unclearedBalanceMinor: 10000,
           balanceMinor: 10000,
           loanProfile: null,
         },

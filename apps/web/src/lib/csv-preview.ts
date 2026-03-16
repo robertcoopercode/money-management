@@ -31,7 +31,7 @@ export const parseCsvFile = async (file: File) => {
   return file.text()
 }
 
-const FIELD_PATTERNS: Record<string, string[]> = {
+const FIELD_PATTERNS: Record<"date" | "amount" | "payee" | "note", string[]> = {
   date: ["date", "transaction date", "trans date", "posting date", "posted date"],
   amount: ["amount", "total", "sum", "debit", "credit"],
   payee: ["payee", "description", "merchant", "name", "vendor"],

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { buildDuplicateBody } from "./build-duplicate-body.js"
 import type { Transaction } from "../types.js"
 
@@ -20,6 +20,8 @@ const makeTransaction = (overrides: Partial<Transaction> = {}): Transaction => (
     name: "Chequing",
     type: "CASH",
     startingBalanceMinor: 0,
+    clearedBalanceMinor: 0,
+    unclearedBalanceMinor: 10000,
     balanceMinor: 10000,
     loanProfile: null,
   },
@@ -108,6 +110,8 @@ describe("buildDuplicateBody", () => {
           name: "Savings",
           type: "CASH",
           startingBalanceMinor: 0,
+          clearedBalanceMinor: 0,
+          unclearedBalanceMinor: 5000,
           balanceMinor: 5000,
           loanProfile: null,
         },

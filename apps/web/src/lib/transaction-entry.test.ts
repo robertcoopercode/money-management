@@ -19,6 +19,7 @@ describe("buildNextTransactionDraft", () => {
       clearingStatus: "CLEARED",
       isExpense: true,
       splits: [],
+      tagIds: [],
     })
 
     expect(nextDraft).toEqual({

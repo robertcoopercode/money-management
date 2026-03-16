@@ -269,7 +269,7 @@ export const TransactionsTab = ({
       transactionId,
       patch: {
         accountId: draft.accountId || undefined,
-        transferAccountId: draft.transferAccountId || null,
+        transferAccountId: draft.transferAccountId || undefined,
         date: draft.date,
         amountMinor: draft.isExpense
           ? -Math.abs(parseMoneyInputToMinor(draft.amount))
