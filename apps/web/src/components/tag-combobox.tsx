@@ -65,11 +65,10 @@ export function TagCombobox({
   }
 
   return (
-    <Combobox.Root<TagItem>
+    <Combobox.Root<TagItem, true>
       multiple
       value={selectedTags}
-      onValueChange={(values) => {
-        const tagValues = values as TagItem[]
+      onValueChange={(tagValues) => {
         const createItem = tagValues.find((t) => t.kind === "create")
         if (createItem) {
           void handleCreate()

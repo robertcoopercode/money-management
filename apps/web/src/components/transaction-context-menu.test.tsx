@@ -25,6 +25,8 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
       name: "Checking",
       type: "CASH",
       startingBalanceMinor: 0,
+      clearedBalanceMinor: 0,
+      unclearedBalanceMinor: 10000,
       balanceMinor: 10000,
       loanProfile: null,
     },
