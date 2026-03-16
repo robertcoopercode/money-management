@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Switch } from "@base-ui/react/switch"
+import { TextInput } from "../components/text-input.js"
 import { useTagMutations } from "../hooks/use-tag-mutations.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import type { Tag } from "../types.js"
@@ -90,7 +91,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
           <div className="tag-form-fields">
             <label>
               Name
-              <input
+              <TextInput
                 value={newTag.name}
                 onChange={(e) =>
                   setNewTag((s) => ({ ...s, name: e.target.value }))
@@ -101,7 +102,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
             </label>
             <label>
               Description
-              <input
+              <TextInput
                 value={newTag.description}
                 onChange={(e) =>
                   setNewTag((s) => ({ ...s, description: e.target.value }))
@@ -187,7 +188,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
       <section className="card">
         <h2>Tags</h2>
         <div style={{ display: "flex", gap: "0.55rem", alignItems: "center", marginBottom: "0.8rem" }}>
-          <input
+          <TextInput
             value={tagSearch}
             onChange={(e) => setTagSearch(e.target.value)}
             placeholder="Search..."
@@ -218,7 +219,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
               editingTagId === tag.id ? (
                 <div className="list-item" key={tag.id} style={{ flexWrap: "wrap", gap: "0.5rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 0 }}>
-                    <input
+                    <TextInput
                       value={editForm.name}
                       onChange={(e) =>
                         setEditForm((s) => ({ ...s, name: e.target.value }))
@@ -226,7 +227,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
                       required
                       style={{ width: "10rem" }}
                     />
-                    <input
+                    <TextInput
                       value={editForm.description}
                       onChange={(e) =>
                         setEditForm((s) => ({ ...s, description: e.target.value }))

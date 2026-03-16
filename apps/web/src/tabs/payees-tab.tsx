@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { TextInput } from "../components/text-input.js"
+import { AppCheckbox } from "../components/app-checkbox.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { usePayeeMutations } from "../hooks/use-payee-mutations.js"
 import { CategoryAutocomplete } from "../components/category-autocomplete.js"
+import { InlineEditName } from "../components/inline-edit-name.js"
 import type { Payee, CategoryGroup } from "../types.js"
 import type { UseQueryResult } from "@tanstack/react-query"
 
@@ -18,6 +21,7 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
   )
   const [combineName, setCombineName] = useState("")
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showUnused, setShowUnused] = useState(false)
 
   const focusPayeeIdRef = useRef<string | null>(null)
   const focusExpectedCategoryRef = useRef<string | null>(null)
@@ -53,14 +57,16 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
 
   const visiblePayees = useMemo(() => {
     const normalizedSearch = payeeSearch.trim().toLowerCase()
-    const filtered = (payeesQuery.data ?? []).filter((payee) =>
-      payee.name.toLowerCase().includes(normalizedSearch),
-    )
+    const filtered = (payeesQuery.data ?? []).filter((payee) => {
+      if (!payee.name.toLowerCase().includes(normalizedSearch)) return false
+      if (showUnused && (payee._count?.transactions ?? 0) > 0) return false
+      return true
+    })
 
     filtered.sort((left, right) => left.name.localeCompare(right.name))
 
     return filtered
-  }, [payeesQuery.data, payeeSearch])
+  }, [payeesQuery.data, payeeSearch, showUnused])
 
   const togglePayee = (id: string) => {
     setSelectedPayeeIds((prev) => {
@@ -134,7 +140,7 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
           <div className="payee-header-left">
             <h2>Payees</h2>
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <input
+              <TextInput
                 value={payeeSearch}
                 onChange={(event) => setPayeeSearch(event.target.value)}
                 placeholder="Search..."
@@ -154,13 +160,24 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
             </div>
           </div>
           <div className="payee-header-right">
+            <label className="payee-toggle" style={{ alignSelf: "flex-end" }}>
+              <input
+                type="checkbox"
+                checked={showUnused}
+                onChange={(e) => setShowUnused(e.target.checked)}
+              />
+              <span className="payee-toggle-track">
+                <span className="payee-toggle-thumb" />
+              </span>
+              <span className="payee-toggle-label">Unused</span>
+            </label>
             {showCombineForm ? (
               <div className="combine-form">
                 <strong style={{ fontSize: "0.85rem" }}>
                   Combine {selectedPayeeIds.size} payees into:
                 </strong>
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
-                  <input
+                  <TextInput
                     value={combineName}
                     onChange={(e) => setCombineName(e.target.value)}
                     placeholder="New payee name"
@@ -216,10 +233,9 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
             <>
               <div style={{ padding: "0.25rem 0.75rem" }}>
                 <label className="payee-checkbox-label">
-                  <input
-                    type="checkbox"
+                  <AppCheckbox
                     checked={allVisibleSelected}
-                    onChange={toggleAll}
+                    onCheckedChange={() => toggleAll()}
                     aria-label="Select all visible payees"
                   />
                   <span className="muted" style={{ fontSize: "0.78rem" }}>
@@ -237,20 +253,31 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
                     togglePayee(payee.id)
                   }}
                 >
-                  <label className="payee-checkbox-label">
-                    <input
-                      type="checkbox"
+                  <div className="payee-checkbox-label">
+                    <AppCheckbox
                       checked={selectedPayeeIds.has(payee.id)}
-                      onChange={() => togglePayee(payee.id)}
+                      onCheckedChange={() => togglePayee(payee.id)}
                       aria-label={`Select ${payee.name}`}
                     />
-                    <strong>{payee.name}</strong>
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <InlineEditName
+                        value={payee.name}
+                        onSave={(name) =>
+                          updatePayeeMutation.mutate({
+                            payeeId: payee.id,
+                            name,
+                          })
+                        }
+                        isSaving={updatePayeeMutation.isPending}
+                        ariaLabel={`Rename ${payee.name}`}
+                      />
+                    </span>
                     {(payee._count?.transactions ?? 0) > 0 ? (
-                      <span className="muted" style={{ fontSize: "0.8rem" }}>
-                        {payee._count?.transactions} txn{payee._count?.transactions === 1 ? "" : "s"}
+                      <span className="payee-txn-pill" title={`${payee._count?.transactions} transaction${payee._count?.transactions === 1 ? "" : "s"}`}>
+                        {payee._count?.transactions}
                       </span>
                     ) : null}
-                  </label>
+                  </div>
                   <div
                     key={`${payee.id}-${payee.defaultCategory?.id ?? "none"}`}
                     style={{ minWidth: 170, marginLeft: "auto" }}

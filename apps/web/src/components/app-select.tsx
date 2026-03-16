@@ -1,32 +1,39 @@
 import { Select } from "@base-ui/react/select"
 import { ScrollArea } from "./scroll-area.js"
 
-type AccountFilterSelectProps = {
-  accounts: { id: string; name: string }[]
+type AppSelectOption = {
   value: string
-  onChange: (value: string) => void
+  label: string
 }
 
-export const AccountFilterSelect = ({
-  accounts,
+type AppSelectProps = {
+  options: AppSelectOption[]
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+}
+
+export function AppSelect({
+  options,
   value,
   onChange,
-}: AccountFilterSelectProps) => {
+  placeholder = "Select…",
+  disabled,
+}: AppSelectProps) {
   return (
     <Select.Root
       value={value}
-      onValueChange={(value) => onChange(value ?? "")}
+      onValueChange={(v) => onChange(v ?? "")}
+      disabled={disabled}
     >
-      <Select.Trigger className="account-filter-trigger">
-        <Select.Value
-          placeholder="All accounts"
-          className="account-filter-value"
-        >
+      <Select.Trigger className="app-select-trigger">
+        <Select.Value placeholder={placeholder} className="app-select-value">
           {value
-            ? (accounts.find((a) => a.id === value)?.name ?? value)
+            ? (options.find((o) => o.value === value)?.label ?? value)
             : null}
         </Select.Value>
-        <Select.Icon className="account-filter-icon">
+        <Select.Icon className="app-select-icon">
           <svg
             width="12"
             height="12"
@@ -43,25 +50,22 @@ export const AccountFilterSelect = ({
       </Select.Trigger>
       <Select.Portal>
         <Select.Positioner
-          className="account-filter-positioner"
+          className="app-select-positioner"
           sideOffset={6}
           alignItemWithTrigger={false}
           side="bottom"
           align="start"
         >
-          <Select.Popup className="account-filter-popup">
+          <Select.Popup className="app-select-popup">
             <ScrollArea>
-              <Select.Item value="" className="account-filter-option">
-                <Select.ItemText>All accounts</Select.ItemText>
-              </Select.Item>
-              {accounts.map((account) => (
+              {options.map((option) => (
                 <Select.Item
-                  key={account.id}
-                  value={account.id}
-                  className="account-filter-option"
+                  key={option.value}
+                  value={option.value}
+                  className="app-select-option"
                 >
-                  <Select.ItemText>{account.name}</Select.ItemText>
-                  <Select.ItemIndicator className="account-filter-check">
+                  <Select.ItemText>{option.label}</Select.ItemText>
+                  <Select.ItemIndicator className="app-select-check">
                     <svg
                       width="14"
                       height="14"

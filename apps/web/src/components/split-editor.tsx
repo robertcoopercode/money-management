@@ -1,4 +1,5 @@
 import { formatMoney } from "@ledgr/shared"
+import { TextInput } from "./text-input.js"
 import type { SplitDraft } from "../lib/transaction-entry.js"
 import { getSplitBalanceStatus } from "../lib/transaction-entry.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
@@ -139,7 +140,7 @@ export const SplitEditor = ({
             />
           </div>
           <div className="split-cell split-cell-note">
-            <input
+            <TextInput
               value={split.note}
               onChange={(e) => updateSplit(index, { note: e.target.value })}
               placeholder="Note"
@@ -158,7 +159,7 @@ export const SplitEditor = ({
               >
                 {split.isExpense ? "\u2212" : "+"}
               </button>
-              <input
+              <TextInput
                 value={split.amount}
                 onChange={(e) => updateSplit(index, { amount: e.target.value })}
                 placeholder="0.00"

@@ -1,8 +1,10 @@
 import { useState } from "react"
-import { toast } from "sonner"
 import { formatMoney } from "@ledgr/shared"
+import { TextInput } from "../components/text-input.js"
+import { AppSelect } from "../components/app-select.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { useAccountMutations } from "../hooks/use-account-mutations.js"
+import { InlineEditName } from "../components/inline-edit-name.js"
 import type { Account, LoanProfile } from "../types.js"
 import type { UseQueryResult } from "@tanstack/react-query"
 
@@ -29,19 +31,6 @@ export const AccountsTab = ({
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] =
     useState(false)
   const [newAccount, setNewAccount] = useState(emptyNewAccount)
-  const [editingAccountId, setEditingAccountId] = useState("")
-  const [accountNameDrafts, setAccountNameDrafts] = useState<
-    Record<string, string>
-  >({})
-
-  const clearAccountNameDraft = (accountId: string) => {
-    setAccountNameDrafts((current) => {
-      const next = { ...current }
-      delete next[accountId]
-      return next
-    })
-  }
-
   const {
     createAccountMutation,
     updateAccountNameMutation,
@@ -53,10 +42,7 @@ export const AccountsTab = ({
       setNewAccount(emptyNewAccount)
       onAccountCreated(account.id)
     },
-    onAccountNameUpdated: (accountId) => {
-      setEditingAccountId("")
-      clearAccountNameDraft(accountId)
-    },
+    onAccountNameUpdated: () => {},
     onCreateReset: () => {},
   })
 
@@ -97,49 +83,17 @@ export const AccountsTab = ({
               return (
                 <div className="list-item" key={account.id}>
                   <div className="account-item-main">
-                    {editingAccountId === account.id ? (
-                      <form
-                        className="account-name-form"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          const nextName = (
-                            accountNameDrafts[account.id] ?? account.name
-                          ).trim()
-
-                          if (!nextName) {
-                            toast.error("Account name cannot be blank.")
-                            return
-                          }
-
-                          if (nextName === account.name) {
-                            setEditingAccountId("")
-                            clearAccountNameDraft(account.id)
-                            return
-                          }
-
-                          updateAccountNameMutation.mutate({
-                            accountId: account.id,
-                            name: nextName,
-                          })
-                        }}
-                      >
-                        <input
-                          value={
-                            accountNameDrafts[account.id] ?? account.name
-                          }
-                          onChange={(event) =>
-                            setAccountNameDrafts((current) => ({
-                              ...current,
-                              [account.id]: event.target.value,
-                            }))
-                          }
-                          aria-label={`Account name for ${account.name}`}
-                          disabled={updateAccountNameMutation.isPending}
-                        />
-                      </form>
-                    ) : (
-                      <strong>{account.name}</strong>
-                    )}
+                    <InlineEditName
+                      value={account.name}
+                      onSave={(name) =>
+                        updateAccountNameMutation.mutate({
+                          accountId: account.id,
+                          name,
+                        })
+                      }
+                      isSaving={updateAccountNameMutation.isPending}
+                      ariaLabel={`Account name for ${account.name}`}
+                    />
                   </div>
                   <div className="account-item-meta">
                     <span className="muted">
@@ -156,134 +110,36 @@ export const AccountsTab = ({
                     >
                       {formatMoney(displayBalance)}
                     </strong>
-                    {editingAccountId === account.id ? (
-                      <>
-                        <button
-                          type="submit"
-                          className="edit-icon-button button-success"
-                          onClick={() => {
-                            const nextName = (
-                              accountNameDrafts[account.id] ?? account.name
-                            ).trim()
-
-                            if (!nextName) {
-                              toast.error("Account name cannot be blank.")
-                              return
-                            }
-
-                            if (nextName === account.name) {
-                              setEditingAccountId("")
-                              clearAccountNameDraft(account.id)
-                              return
-                            }
-
-                            updateAccountNameMutation.mutate({
-                              accountId: account.id,
-                              name: nextName,
-                            })
-                          }}
-                          disabled={updateAccountNameMutation.isPending}
-                          aria-label="Save account name"
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M20 6 9 17l-5-5" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className="edit-icon-button button-danger"
-                          onClick={() => {
-                            setEditingAccountId("")
-                            clearAccountNameDraft(account.id)
-                          }}
-                          disabled={updateAccountNameMutation.isPending}
-                          aria-label="Cancel editing"
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className="edit-icon-button"
-                          onClick={() => {
-                            setEditingAccountId(account.id)
-                            setAccountNameDrafts((current) => ({
-                              ...current,
-                              [account.id]: account.name,
-                            }))
-                          }}
-                          disabled={updateAccountNameMutation.isPending}
-                          aria-label={`Edit ${account.name}`}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                            <path d="m15 5 4 4" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button-danger"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Delete account "${account.name}"? This will archive the account and hide it from the list.`,
-                              )
-                            ) {
-                              deleteAccountMutation.mutate(account.id)
-                            }
-                          }}
-                          disabled={deleteAccountMutation.isPending}
-                          aria-label={`Delete ${account.name}`}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M3 6h18" />
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      className="icon-button-danger"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete account "${account.name}"? This will archive the account and hide it from the list.`,
+                          )
+                        ) {
+                          deleteAccountMutation.mutate(account.id)
+                        }
+                      }}
+                      disabled={deleteAccountMutation.isPending}
+                      aria-label={`Delete ${account.name}`}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               )
@@ -325,7 +181,7 @@ export const AccountsTab = ({
             >
               <label>
                 Name
-                <input
+                <TextInput
                   value={newAccount.name}
                   onChange={(event) =>
                     setNewAccount((current) => ({
@@ -338,42 +194,43 @@ export const AccountsTab = ({
               </label>
               <label>
                 Type
-                <select
+                <AppSelect
+                  options={[
+                    { value: "CASH", label: "Cash" },
+                    { value: "CREDIT", label: "Credit" },
+                    { value: "INVESTMENT", label: "Investment" },
+                    { value: "LOAN", label: "Loan" },
+                  ]}
                   value={newAccount.type}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setNewAccount((current) => ({
                       ...current,
-                      type: event.target.value as Account["type"],
+                      type: value as Account["type"],
                     }))
                   }
-                >
-                  <option value="CASH">Cash</option>
-                  <option value="CREDIT">Credit</option>
-                  <option value="INVESTMENT">Investment</option>
-                  <option value="LOAN">Loan</option>
-                </select>
+                />
               </label>
               {newAccount.type === "LOAN" ? (
                 <>
                   <label>
                     Loan Type
-                    <select
+                    <AppSelect
+                      options={[
+                        { value: "MORTGAGE", label: "Mortgage" },
+                        { value: "AUTO", label: "Auto" },
+                      ]}
                       value={newAccount.loanType}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setNewAccount((current) => ({
                           ...current,
-                          loanType: event.target
-                            .value as LoanProfile["loanType"],
+                          loanType: value as LoanProfile["loanType"],
                         }))
                       }
-                    >
-                      <option value="MORTGAGE">Mortgage</option>
-                      <option value="AUTO">Auto</option>
-                    </select>
+                    />
                   </label>
                   <label>
                     Interest Rate (%)
-                    <input
+                    <TextInput
                       type="number"
                       step="0.01"
                       min="0"
@@ -390,7 +247,7 @@ export const AccountsTab = ({
                   </label>
                   <label>
                     Minimum Payment
-                    <input
+                    <TextInput
                       value={newAccount.minimumPayment}
                       onChange={(event) =>
                         setNewAccount((current) => ({
@@ -404,7 +261,7 @@ export const AccountsTab = ({
               ) : null}
               <label>
                 Starting Balance
-                <input
+                <TextInput
                   value={newAccount.startingBalance}
                   onChange={(event) =>
                     setNewAccount((current) => ({

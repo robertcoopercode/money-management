@@ -1,6 +1,8 @@
 import { useState, useRef, useMemo } from "react"
 import { formatMoney } from "@ledgr/shared"
 import { Select } from "@base-ui/react/select"
+import { ScrollArea } from "./scroll-area.js"
+import { AppCheckbox } from "./app-checkbox.js"
 import { buildCsvPreview, guessColumnMapping, parseCsvFile } from "../lib/csv-preview.js"
 import { useImportMutation } from "../hooks/use-import-mutation.js"
 import type { CsvPreview } from "../lib/csv-preview.js"
@@ -230,34 +232,36 @@ export function CsvImportDialog({
                           align="start"
                         >
                           <Select.Popup className="account-filter-popup">
-                            <Select.Item value="" className="account-filter-option">
-                              <Select.ItemText>
-                                {field === "note" ? "— (none)" : "—"}
-                              </Select.ItemText>
-                            </Select.Item>
-                            {csvPreview.headers.map((header) => (
-                              <Select.Item
-                                key={header}
-                                value={header}
-                                className="account-filter-option"
-                              >
-                                <Select.ItemText>{header}</Select.ItemText>
-                                <Select.ItemIndicator className="account-filter-check">
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <path d="M20 6 9 17l-5-5" />
-                                  </svg>
-                                </Select.ItemIndicator>
+                            <ScrollArea>
+                              <Select.Item value="" className="account-filter-option">
+                                <Select.ItemText>
+                                  {field === "note" ? "— (none)" : "—"}
+                                </Select.ItemText>
                               </Select.Item>
-                            ))}
+                              {csvPreview.headers.map((header) => (
+                                <Select.Item
+                                  key={header}
+                                  value={header}
+                                  className="account-filter-option"
+                                >
+                                  <Select.ItemText>{header}</Select.ItemText>
+                                  <Select.ItemIndicator className="account-filter-check">
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M20 6 9 17l-5-5" />
+                                    </svg>
+                                  </Select.ItemIndicator>
+                                </Select.Item>
+                              ))}
+                            </ScrollArea>
                           </Select.Popup>
                         </Select.Positioner>
                       </Select.Portal>
@@ -269,16 +273,15 @@ export function CsvImportDialog({
 
             <div className="import-section">
               <label className="import-swap-toggle">
-                <input
-                  type="checkbox"
+                <AppCheckbox
                   checked={swapInflowOutflow}
-                  onChange={(e) => setSwapInflowOutflow(e.target.checked)}
+                  onCheckedChange={(checked) => setSwapInflowOutflow(checked)}
                 />
                 <span>Swap inflow/outflow</span>
               </label>
             </div>
 
-            <div className="table-wrap import-table-wrap">
+            <ScrollArea orientation="both" className="table-wrap import-table-wrap">
               <table className="import-table">
                 <thead>
                   <tr>
@@ -309,7 +312,7 @@ export function CsvImportDialog({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollArea>
 
             <div className="import-actions">
               <button

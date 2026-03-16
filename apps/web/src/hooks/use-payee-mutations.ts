@@ -77,10 +77,13 @@ export const usePayeeMutations = (opts: {
   })
 
   const updatePayeeMutation = useMutation({
-    mutationFn: (input: { payeeId: string; defaultCategoryId: string | null }) =>
+    mutationFn: (input: { payeeId: string; name?: string; defaultCategoryId?: string | null }) =>
       apiFetch<Payee>(`/api/payees/${input.payeeId}`, {
         method: "PATCH",
-        body: JSON.stringify({ defaultCategoryId: input.defaultCategoryId }),
+        body: JSON.stringify({
+          ...(input.name != null ? { name: input.name } : {}),
+          ...(input.defaultCategoryId !== undefined ? { defaultCategoryId: input.defaultCategoryId } : {}),
+        }),
       }),
     onSuccess: () => {
       toast.success("Payee updated")

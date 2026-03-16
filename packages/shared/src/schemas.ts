@@ -65,7 +65,8 @@ export const updateCategoryGroupSchema = z.object({
 })
 
 export const updatePayeeSchema = z.object({
-  defaultCategoryId: z.string().min(1).nullable(),
+  name: z.string().min(1).max(120).optional(),
+  defaultCategoryId: z.string().min(1).nullable().optional(),
 })
 
 export const mergePayeesSchema = z.object({

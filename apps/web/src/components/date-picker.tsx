@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react"
 import { Popover } from "@base-ui/react/popover"
+import { TextInput } from "./text-input.js"
 import { DayPicker } from "react-day-picker"
 import * as chrono from "chrono-node"
 import { format, parse } from "date-fns"
@@ -67,7 +68,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(function
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <div className="date-picker">
-        <input
+        <TextInput
           ref={inputRef}
           className="date-picker-input"
           value={inputValue}

@@ -1,4 +1,5 @@
 import { isPayeeMergeSelectionValid } from "../lib/payee-merge.js"
+import { AppSelect } from "./app-select.js"
 
 export type PayeeMergeSelection = {
   sourcePayeeId: string
@@ -55,43 +56,37 @@ export const PayeeMergeForm = ({
     >
       <label>
         Source (duplicate)
-        <select
+        <AppSelect
+          options={[
+            { value: "", label: "Select payee" },
+            ...payees.map((payee) => ({ value: payee.id, label: payee.name })),
+          ]}
           value={selection.sourcePayeeId}
-          onChange={(event) =>
+          onChange={(value) =>
             onSelectionChange({
               ...selection,
-              sourcePayeeId: event.target.value,
+              sourcePayeeId: value,
             })
           }
-          required
-        >
-          <option value="">Select payee</option>
-          {payees.map((payee) => (
-            <option key={payee.id} value={payee.id}>
-              {payee.name}
-            </option>
-          ))}
-        </select>
+          placeholder="Select payee"
+        />
       </label>
       <label>
         Target (keep)
-        <select
+        <AppSelect
+          options={[
+            { value: "", label: "Select payee" },
+            ...payees.map((payee) => ({ value: payee.id, label: payee.name })),
+          ]}
           value={selection.targetPayeeId}
-          onChange={(event) =>
+          onChange={(value) =>
             onSelectionChange({
               ...selection,
-              targetPayeeId: event.target.value,
+              targetPayeeId: value,
             })
           }
-          required
-        >
-          <option value="">Select payee</option>
-          {payees.map((payee) => (
-            <option key={payee.id} value={payee.id}>
-              {payee.name}
-            </option>
-          ))}
-        </select>
+          placeholder="Select payee"
+        />
       </label>
       <button type="submit" disabled={!canMergePayees || isPending}>
         {isPending ? "Merging..." : "Merge Payees"}

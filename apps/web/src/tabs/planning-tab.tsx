@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
+import { TextInput } from "../components/text-input.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { shiftMonth } from "../lib/date-helpers.js"
 import { usePlanningMutations } from "../hooks/use-planning-mutations.js"
@@ -101,7 +102,7 @@ export const PlanningTab = ({
                   <tr key={row.categoryId}>
                     <td>{row.categoryName}</td>
                     <td>
-                      <input
+                      <TextInput
                         className="small-input"
                         defaultValue={(row.assignedMinor / 100).toString()}
                         onBlur={(event) =>

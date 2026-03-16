@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import { parseMoneyInputToMinor } from "@ledgr/shared"
+import { TextInput } from "./text-input.js"
+import { AppCheckbox } from "./app-checkbox.js"
 import { AccountCombobox } from "./account-combobox.js"
 import { PayeeAutocomplete, type PayeeOption } from "./payee-autocomplete.js"
 import { CategoryAutocomplete } from "./category-autocomplete.js"
@@ -137,7 +139,7 @@ export const TransactionEditRow = ({
     )
     const cell = cells[colIndex]
     if (!cell) return
-    const input = cell.querySelector<HTMLElement>("input, button")
+    const input = cell.querySelector<HTMLElement>("input") ?? cell.querySelector<HTMLElement>("button")
     input?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only on mount
   }, [])
@@ -217,7 +219,9 @@ export const TransactionEditRow = ({
         }
       }}
     >
-      <div className="transaction-cell transaction-cell-checkbox" />
+      <div className="transaction-cell transaction-cell-checkbox" role="cell">
+        <AppCheckbox checked={true} onCheckedChange={() => {}} />
+      </div>
       <div className="transaction-cell" data-field="account">
         <AccountCombobox
           accounts={accounts}
@@ -275,7 +279,7 @@ export const TransactionEditRow = ({
       <div className="transaction-cell" data-field="category">
         {hasSplits ? (
           <div className="split-category-input-wrapper">
-            <input
+            <TextInput
               className="split-category-input"
               value="Split transaction"
               readOnly
@@ -303,7 +307,7 @@ export const TransactionEditRow = ({
             </button>
           </div>
         ) : isTransfer && !isLoanTransfer ? (
-          <input
+          <TextInput
             value="Not applicable"
             readOnly
             tabIndex={-1}
@@ -324,7 +328,7 @@ export const TransactionEditRow = ({
         )}
       </div>
       <div className="transaction-cell" data-field="note">
-        <input
+        <TextInput
           value={draft.note}
           onChange={(e) => update({ note: e.target.value })}
           placeholder="Note"
@@ -341,7 +345,7 @@ export const TransactionEditRow = ({
           >
             {draft.isExpense ? "\u2212" : "+"}
           </button>
-          <input
+          <TextInput
             value={draft.amount}
             onChange={(e) => update({ amount: e.target.value })}
             placeholder="Amount"

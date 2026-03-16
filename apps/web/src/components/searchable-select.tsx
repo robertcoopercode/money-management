@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Combobox } from "@base-ui/react/combobox"
+import { ScrollArea } from "./scroll-area.js"
 
 export type SearchableSelectGroup<T,> = {
   label: string
@@ -65,7 +66,7 @@ export function SearchableSelect<T>({
       <Combobox.Portal>
         <Combobox.Positioner sideOffset={4} align="start" className="combobox-positioner">
           <Combobox.Popup className="searchable-select-popup">
-            <div className="searchable-select-scroll">
+            <ScrollArea className="searchable-select-scroll">
               <Combobox.List>
                 <Combobox.Collection>
                   {(group: SearchableSelectGroup<T>) => (
@@ -89,6 +90,20 @@ export function SearchableSelect<T>({
                             className="searchable-select-option"
                           >
                             {renderItem(item)}
+                            <Combobox.ItemIndicator className="searchable-select-check">
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                            </Combobox.ItemIndicator>
                           </Combobox.Item>
                         )}
                       </Combobox.Collection>
@@ -99,7 +114,7 @@ export function SearchableSelect<T>({
               <Combobox.Empty>
                 <p className="searchable-select-empty">{emptyMessage}</p>
               </Combobox.Empty>
-            </div>
+            </ScrollArea>
             {bottomAction && (
               <div className="searchable-select-bottom">{bottomAction}</div>
             )}

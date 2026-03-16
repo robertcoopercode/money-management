@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Combobox } from "@base-ui/react/combobox"
+import { ScrollArea } from "./scroll-area.js"
 import type { Tag } from "../types.js"
 
 type TagItem = Tag & { kind?: "create" }
@@ -131,7 +132,7 @@ export function TagCombobox({
           className="combobox-positioner"
         >
           <Combobox.Popup className="searchable-select-popup">
-            <div className="searchable-select-scroll">
+            <ScrollArea className="searchable-select-scroll">
               <Combobox.List>
                 {(tag: TagItem) => (
                   <Combobox.Item
@@ -168,7 +169,7 @@ export function TagCombobox({
                         >
                           {tag.name}
                         </span>
-                        <Combobox.ItemIndicator className="tag-check-indicator">
+                        <Combobox.ItemIndicator className="searchable-select-check">
                           <svg
                             width="14"
                             height="14"
@@ -190,7 +191,7 @@ export function TagCombobox({
               <Combobox.Empty>
                 <p className="searchable-select-empty">No tags found.</p>
               </Combobox.Empty>
-            </div>
+            </ScrollArea>
           </Combobox.Popup>
         </Combobox.Positioner>
       </Combobox.Portal>

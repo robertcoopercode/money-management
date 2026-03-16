@@ -1,5 +1,6 @@
 import { Fragment, useState, type ReactNode } from "react"
 import { formatMoney } from "@ledgr/shared"
+import { AppCheckbox } from "./app-checkbox.js"
 import { Tooltip } from "@base-ui/react/tooltip"
 import { Popover } from "@base-ui/react/popover"
 import { ClearingStatusToggle } from "./clearing-status-toggle.js"
@@ -150,15 +151,18 @@ export function TransactionDisplayRow({
     <Fragment>
       <div className={`transaction-row${isSelected ? " selected" : ""}`} role="row">
         <div className="transaction-cell transaction-cell-checkbox" role="cell">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => {}}
+          <div
             onClick={(e) => {
               e.stopPropagation()
               onToggleSelect(transaction.id, e.shiftKey)
             }}
-          />
+            style={{ display: "contents" }}
+          >
+            <AppCheckbox
+              checked={isSelected}
+              onCheckedChange={() => {}}
+            />
+          </div>
         </div>
         <div
           className="transaction-cell clickable-cell"

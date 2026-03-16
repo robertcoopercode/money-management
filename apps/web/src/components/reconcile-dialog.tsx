@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { formatMoney } from "@ledgr/shared"
+import { TextInput } from "./text-input.js"
 
 type ReconcileDialogProps = {
   open: boolean
@@ -52,7 +53,7 @@ export function ReconcileDialog({
 
           <label className="reconcile-input-label">
             Bank statement balance:
-            <input
+            <TextInput
               type="text"
               className="reconcile-input"
               value={statementAmount}

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ScrollArea } from "../components/scroll-area.js"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { parseMoneyInputToMinor } from "@ledgr/shared"
+import { TextInput } from "../components/text-input.js"
+import { AppCheckbox } from "../components/app-checkbox.js"
 import { toast } from "sonner"
 import { apiFetch, TRANSACTION_PAGE_SIZE } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
@@ -35,6 +38,7 @@ import { SplitEditor } from "../components/split-editor.js"
 import { TransactionDisplayRow } from "../components/transaction-display-row.js"
 import { TransactionContextMenu } from "../components/transaction-context-menu.js"
 import { BulkActionBar } from "../components/bulk-action-bar.js"
+import { Switch } from "@base-ui/react/switch"
 import { buildDuplicateBody } from "../lib/build-duplicate-body.js"
 import type {
   Transaction,
@@ -169,6 +173,17 @@ export const TransactionsTab = ({
   useEffect(() => {
     clearSelection()
   }, [transactionOffset, filterAccountId, sortBy, sortDir, showReconciled, clearSelection])
+
+  useEffect(() => {
+    if (!editingTransaction) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setEditingTransaction(null)
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [editingTransaction])
 
   const payeeSelection = useMemo(
     () =>
@@ -423,7 +438,7 @@ export const TransactionsTab = ({
           />
           {newTransaction.splits.length > 0 ? (
             <div className="split-category-input-wrapper">
-              <input
+              <TextInput
                 className="split-category-input"
                 value="Split transaction"
                 readOnly
@@ -504,7 +519,7 @@ export const TransactionsTab = ({
               }
             />
           )}
-          <input
+          <TextInput
             value={newTransaction.note}
             onChange={(event) =>
               setNewTransaction((current) => ({
@@ -531,7 +546,7 @@ export const TransactionsTab = ({
             >
               {newTransaction.isExpense ? "\u2212" : "+"}
             </button>
-            <input
+            <TextInput
               value={newTransaction.amount}
               onChange={(event) =>
                 setNewTransaction((current) => ({
@@ -633,19 +648,19 @@ export const TransactionsTab = ({
           >
             Import CSV
           </button>
-          {filterAccountId && (
-            <button
-              type="button"
-              className="filter-clear-button"
-              onClick={() => {
-                setFilterAccountId("")
+          <label className="show-reconciled-toggle">
+            <Switch.Root
+              className="reconciled-switch"
+              checked={showReconciled}
+              onCheckedChange={() => {
+                setShowReconciled((v) => !v)
                 setTransactionOffset(0)
-                setShowReconciled(false)
               }}
             >
-              Clear filter
-            </button>
-          )}
+              <Switch.Thumb className="reconciled-switch-thumb" />
+            </Switch.Root>
+            <span>Show reconciled</span>
+          </label>
         </div>
         {filterAccountId && (() => {
           const selectedAccount = accounts.find((a) => a.id === filterAccountId)
@@ -653,28 +668,20 @@ export const TransactionsTab = ({
             <AccountBalanceBar
               account={selectedAccount}
               onReconcile={() => setReconcileDialogOpen(true)}
-              showReconciled={showReconciled}
-              onToggleShowReconciled={() => {
-                setShowReconciled((v) => !v)
-                setTransactionOffset(0)
-              }}
             />
           ) : null
         })()}
       </div>
 
       <section className="card">
-        <div className="table-wrap">
+        <ScrollArea orientation="both" className="table-wrap">
           <div className="transaction-list" role="table">
             <div className="transaction-header" role="row">
               <div className="transaction-cell transaction-cell-checkbox" role="columnheader">
-                <input
-                  type="checkbox"
+                <AppCheckbox
                   checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected && !allSelected
-                  }}
-                  onChange={toggleSelectAll}
+                  indeterminate={someSelected && !allSelected}
+                  onCheckedChange={() => toggleSelectAll()}
                   aria-label="Select all transactions"
                 />
               </div>
@@ -816,7 +823,7 @@ export const TransactionsTab = ({
               )
             )}
           </div>
-        </div>
+        </ScrollArea>
         <nav className="pagination">
           <button
             type="button"

@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react"
+import { TextInput } from "../components/text-input.js"
+import { AppSelect } from "../components/app-select.js"
 import { useCategoryMutations } from "../hooks/use-category-mutations.js"
 import { apiFetch } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
+import { InlineEditName } from "../components/inline-edit-name.js"
 import type { CategoryGroup } from "../types.js"
 import type { UseQueryResult } from "@tanstack/react-query"
 import type {
@@ -25,10 +28,6 @@ export const CategoriesTab = ({
 }: CategoriesTabProps) => {
   const [search, setSearch] = useState("")
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
-  const [editCategoryName, setEditCategoryName] = useState("")
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
-  const [editGroupName, setEditGroupName] = useState("")
   const [movingCategoryId, setMovingCategoryId] = useState<string | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [loadingImpact, setLoadingImpact] = useState(false)
@@ -41,11 +40,10 @@ export const CategoriesTab = ({
   } = useCategoryMutations({
     refetchCoreData,
     onCategoryUpdated: () => {
-      setEditingCategoryId(null)
       setMovingCategoryId(null)
     },
     onCategoryDeleted: () => setDeleteDialog(null),
-    onGroupUpdated: () => setEditingGroupId(null),
+    onGroupUpdated: () => {},
     onGroupDeleted: () => setDeleteDialog(null),
   })
 
@@ -134,7 +132,7 @@ export const CategoriesTab = ({
         <div className="payee-header">
           <div className="payee-header-left">
             <h2>Categories</h2>
-            <input
+            <TextInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
@@ -184,57 +182,18 @@ export const CategoriesTab = ({
                     </svg>
                   </button>
 
-                  {editingGroupId === group.id ? (
-                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flex: 1 }}>
-                      <input
-                        value={editGroupName}
-                        onChange={(e) => setEditGroupName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && editGroupName.trim()) {
-                            updateCategoryGroupMutation.mutate({
-                              groupId: group.id,
-                              name: editGroupName.trim(),
-                            })
-                          }
-                          if (e.key === "Escape") setEditingGroupId(null)
-                        }}
-                        autoFocus
-                        style={{ width: "14rem" }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (editGroupName.trim()) {
-                            updateCategoryGroupMutation.mutate({
-                              groupId: group.id,
-                              name: editGroupName.trim(),
-                            })
-                          }
-                        }}
-                        disabled={updateCategoryGroupMutation.isPending}
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingGroupId(null)}
-                        style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <strong
-                      className="category-group-name"
-                      onClick={() => {
-                        setEditingGroupId(group.id)
-                        setEditGroupName(group.name)
-                      }}
-                      title="Click to rename group"
-                    >
-                      {group.name}
-                    </strong>
-                  )}
+                  <InlineEditName
+                    value={group.name}
+                    onSave={(name) =>
+                      updateCategoryGroupMutation.mutate({
+                        groupId: group.id,
+                        name,
+                      })
+                    }
+                    isSaving={updateCategoryGroupMutation.isPending}
+                    className="category-group-name"
+                    inputWidth="14rem"
+                  />
 
                   <span className="muted" style={{ fontSize: "0.8rem", marginLeft: "0.5rem" }}>
                     {group.categories.length} categor{group.categories.length === 1 ? "y" : "ies"}
@@ -269,83 +228,38 @@ export const CategoriesTab = ({
                       group.categories.map((cat) => (
                         <div className="list-item" key={cat.id}>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 0 }}>
-                            {editingCategoryId === cat.id ? (
-                              <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                                <input
-                                  value={editCategoryName}
-                                  onChange={(e) => setEditCategoryName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" && editCategoryName.trim()) {
-                                      updateCategoryMutation.mutate({
-                                        categoryId: cat.id,
-                                        name: editCategoryName.trim(),
-                                      })
-                                    }
-                                    if (e.key === "Escape") setEditingCategoryId(null)
-                                  }}
-                                  autoFocus
-                                  style={{ width: "12rem" }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (editCategoryName.trim()) {
-                                      updateCategoryMutation.mutate({
-                                        categoryId: cat.id,
-                                        name: editCategoryName.trim(),
-                                      })
-                                    }
-                                  }}
-                                  disabled={updateCategoryMutation.isPending}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingCategoryId(null)}
-                                  style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <span
-                                className="category-name-editable"
-                                onClick={() => {
-                                  setEditingCategoryId(cat.id)
-                                  setEditCategoryName(cat.name)
-                                }}
-                                title="Click to rename"
-                              >
-                                {cat.name}
-                              </span>
-                            )}
+                            <InlineEditName
+                              value={cat.name}
+                              onSave={(name) =>
+                                updateCategoryMutation.mutate({
+                                  categoryId: cat.id,
+                                  name,
+                                })
+                              }
+                              isSaving={updateCategoryMutation.isPending}
+                              className="category-name-editable"
+                            />
 
                             {movingCategoryId === cat.id ? (
                               <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                                <select
-                                  defaultValue=""
-                                  onChange={(e) => {
-                                    if (e.target.value) {
+                                <AppSelect
+                                  options={[
+                                    { value: "", label: "Move to..." },
+                                    ...groups
+                                      .filter((g) => g.id !== group.id)
+                                      .map((g) => ({ value: g.id, label: g.name })),
+                                  ]}
+                                  value=""
+                                  onChange={(value) => {
+                                    if (value) {
                                       updateCategoryMutation.mutate({
                                         categoryId: cat.id,
-                                        groupId: e.target.value,
+                                        groupId: value,
                                       })
                                     }
                                   }}
-                                  style={{ fontSize: "0.85rem" }}
-                                >
-                                  <option value="" disabled>
-                                    Move to...
-                                  </option>
-                                  {groups
-                                    .filter((g) => g.id !== group.id)
-                                    .map((g) => (
-                                      <option key={g.id} value={g.id}>
-                                        {g.name}
-                                      </option>
-                                    ))}
-                                </select>
+                                  placeholder="Move to..."
+                                />
                                 <button
                                   type="button"
                                   onClick={() => setMovingCategoryId(null)}

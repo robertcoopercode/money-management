@@ -19,6 +19,7 @@ import { isAppTab, getInitialAppTab } from "./types.js"
 import type { AppTab } from "./types.js"
 import type { TransactionDraft } from "./lib/transaction-entry.js"
 
+import { ScrollArea } from "./components/scroll-area.js"
 import "./App.css"
 
 const App = () => {
@@ -179,67 +180,81 @@ const AuthenticatedApp = () => {
         </Tabs.List>
 
         <Tabs.Panel className="panel" value="accounts">
-          <AccountsTab
-            accountsQuery={accountsQuery}
-            refetchCoreData={refetchCoreData}
-            onAccountCreated={(accountId) =>
-              setNewTransaction((current) => ({
-                ...current,
-                accountId: current.accountId || accountId,
-              }))
-            }
-          />
+          <ScrollArea>
+            <AccountsTab
+              accountsQuery={accountsQuery}
+              refetchCoreData={refetchCoreData}
+              onAccountCreated={(accountId) =>
+                setNewTransaction((current) => ({
+                  ...current,
+                  accountId: current.accountId || accountId,
+                }))
+              }
+            />
+          </ScrollArea>
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="transactions">
-          <TransactionsTab
-            newTransaction={newTransaction}
-            setNewTransaction={setNewTransaction}
-            accounts={accountsQuery.data ?? []}
-            payees={payeesQuery.data ?? []}
-            tags={tagsQuery.data ?? []}
-            categoryGroups={categoriesQuery.data ?? []}
-            refetchCoreData={refetchCoreData}
-            onNavigateToPayees={() => setActiveTab("payees")}
-          />
+          <ScrollArea>
+            <TransactionsTab
+              newTransaction={newTransaction}
+              setNewTransaction={setNewTransaction}
+              accounts={accountsQuery.data ?? []}
+              payees={payeesQuery.data ?? []}
+              tags={tagsQuery.data ?? []}
+              categoryGroups={categoriesQuery.data ?? []}
+              refetchCoreData={refetchCoreData}
+              onNavigateToPayees={() => setActiveTab("payees")}
+            />
+          </ScrollArea>
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="payees">
-          <PayeesTab payeesQuery={payeesQuery} categoryGroups={categoriesQuery.data ?? []} refetchCoreData={refetchCoreData} />
+          <ScrollArea>
+            <PayeesTab payeesQuery={payeesQuery} categoryGroups={categoriesQuery.data ?? []} refetchCoreData={refetchCoreData} />
+          </ScrollArea>
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="categories">
-          <CategoriesTab
-            categoriesQuery={categoriesQuery}
-            refetchCoreData={refetchCoreData}
-          />
+          <ScrollArea>
+            <CategoriesTab
+              categoriesQuery={categoriesQuery}
+              refetchCoreData={refetchCoreData}
+            />
+          </ScrollArea>
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="tags">
-          <TagsTab
-            tagsQuery={tagsQuery}
-            refetchCoreData={refetchCoreData}
-          />
+          <ScrollArea>
+            <TagsTab
+              tagsQuery={tagsQuery}
+              refetchCoreData={refetchCoreData}
+            />
+          </ScrollArea>
         </Tabs.Panel>
 
-<Tabs.Panel className="panel" value="planning">
-          <PlanningTab
-            month={month}
-            onMonthChange={setMonth}
-            planningData={planningQuery.data}
-            planningIsLoading={planningQuery.isLoading}
-            planningIsError={planningQuery.isError}
-            planningError={planningQuery.error}
-            refetchCoreData={refetchCoreData}
-          />
+        <Tabs.Panel className="panel" value="planning">
+          <ScrollArea>
+            <PlanningTab
+              month={month}
+              onMonthChange={setMonth}
+              planningData={planningQuery.data}
+              planningIsLoading={planningQuery.isLoading}
+              planningIsError={planningQuery.isError}
+              planningError={planningQuery.error}
+              refetchCoreData={refetchCoreData}
+            />
+          </ScrollArea>
         </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="reports">
-          <ReportsTab
-            accounts={accountsQuery.data ?? []}
-            payees={payeesQuery.data ?? []}
-            categoryGroups={categoriesQuery.data ?? []}
-          />
+          <ScrollArea>
+            <ReportsTab
+              accounts={accountsQuery.data ?? []}
+              payees={payeesQuery.data ?? []}
+              categoryGroups={categoriesQuery.data ?? []}
+            />
+          </ScrollArea>
         </Tabs.Panel>
       </Tabs.Root>
 

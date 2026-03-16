@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Popover } from "@base-ui/react/popover"
+import { TextInput } from "./text-input.js"
 import {
   SearchableSelect,
   type SearchableSelectGroup,
@@ -295,7 +296,7 @@ export const CategoryAutocomplete = ({
               </div>
               <label className="create-category-field">
                 <span className="create-category-label">Name</span>
-                <input
+                <TextInput
                   ref={categoryNameInputRef}
                   className="create-category-input"
                   value={popoverCategoryName}

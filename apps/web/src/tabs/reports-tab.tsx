@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { ScrollArea } from "../components/scroll-area.js"
 import { useQuery } from "@tanstack/react-query"
 import { ParentSize } from "@visx/responsive"
 import {
@@ -12,6 +13,7 @@ import { formatMoney } from "@ledgr/shared"
 import { apiFetch } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { DatePicker } from "../components/date-picker.js"
+import { AppSelect } from "../components/app-select.js"
 import type { Account, Payee, CategoryGroup, ReportingResponse } from "../types.js"
 
 type ReportsTabProps = {
@@ -120,80 +122,51 @@ export const ReportsTab = ({
         </label>
         <label>
           Account
-          <select
+          <AppSelect
+            options={[
+              { value: "", label: "All accounts" },
+              ...accounts.map((account) => ({ value: account.id, label: account.name })),
+            ]}
             value={reportFilters.accountId}
-            onChange={(event) =>
-              setReportFilters((current) => ({
-                ...current,
-                accountId: event.target.value,
-              }))
-            }
-          >
-            <option value="">All accounts</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setReportFilters((current) => ({ ...current, accountId: value }))}
+          />
         </label>
         <label>
           Category
-          <select
+          <AppSelect
+            options={[
+              { value: "", label: "All categories" },
+              ...categoryGroups.flatMap((group) =>
+                group.categories.map((category) => ({ value: category.id, label: `${group.name} · ${category.name}` })),
+              ),
+            ]}
             value={reportFilters.categoryId}
-            onChange={(event) =>
-              setReportFilters((current) => ({
-                ...current,
-                categoryId: event.target.value,
-              }))
-            }
-          >
-            <option value="">All categories</option>
-            {categoryGroups.flatMap((group) =>
-              group.categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {group.name} · {category.name}
-                </option>
-              )),
-            )}
-          </select>
+            onChange={(value) => setReportFilters((current) => ({ ...current, categoryId: value }))}
+          />
         </label>
         <label>
           Payee
-          <select
+          <AppSelect
+            options={[
+              { value: "", label: "All payees" },
+              ...payees.map((payee) => ({ value: payee.id, label: payee.name })),
+            ]}
             value={reportFilters.payeeId}
-            onChange={(event) =>
-              setReportFilters((current) => ({
-                ...current,
-                payeeId: event.target.value,
-              }))
-            }
-          >
-            <option value="">All payees</option>
-            {payees.map((payee) => (
-              <option key={payee.id} value={payee.id}>
-                {payee.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setReportFilters((current) => ({ ...current, payeeId: value }))}
+          />
         </label>
         <label>
           Clearing Status
-          <select
+          <AppSelect
+            options={[
+              { value: "all", label: "All" },
+              { value: "CLEARED", label: "Cleared" },
+              { value: "UNCLEARED", label: "Uncleared" },
+              { value: "RECONCILED", label: "Reconciled" },
+            ]}
             value={reportFilters.clearingStatus}
-            onChange={(event) =>
-              setReportFilters((current) => ({
-                ...current,
-                clearingStatus: event.target
-                  .value as "all" | "CLEARED" | "UNCLEARED" | "RECONCILED",
-              }))
-            }
-          >
-            <option value="all">All</option>
-            <option value="CLEARED">Cleared</option>
-            <option value="UNCLEARED">Uncleared</option>
-            <option value="RECONCILED">Reconciled</option>
-          </select>
+            onChange={(value) => setReportFilters((current) => ({ ...current, clearingStatus: value as "all" | "CLEARED" | "UNCLEARED" | "RECONCILED" }))}
+          />
         </label>
       </div>
 
@@ -303,7 +276,7 @@ export const ReportsTab = ({
         )}
       </div>
 
-      <div className="table-wrap">
+      <ScrollArea orientation="both" className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -343,9 +316,9 @@ export const ReportsTab = ({
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
 
-      <div className="table-wrap" style={{ marginTop: "0.8rem" }}>
+      <ScrollArea orientation="both" className="table-wrap" style={{ marginTop: "0.8rem" }}>
         <table>
           <thead>
             <tr>
@@ -381,7 +354,7 @@ export const ReportsTab = ({
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </section>
   )
 }

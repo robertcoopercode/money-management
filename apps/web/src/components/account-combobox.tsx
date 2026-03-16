@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Combobox } from "@base-ui/react/combobox"
+import { ScrollArea } from "./scroll-area.js"
 
 type AccountOption = {
   id: string
@@ -61,22 +62,24 @@ export const AccountCombobox = ({
       <Combobox.Portal>
         <Combobox.Positioner sideOffset={4} className="combobox-positioner">
           <Combobox.Popup className="category-autocomplete-menu">
-            <Combobox.List>
-              {(account: AccountOption) => (
-                <Combobox.Item
-                  key={account.id}
-                  value={account}
-                  className="category-autocomplete-option"
-                >
-                  <span>{account.name}</span>
-                </Combobox.Item>
-              )}
-            </Combobox.List>
-            <Combobox.Empty>
-              <p className="category-autocomplete-empty">
-                No matching accounts.
-              </p>
-            </Combobox.Empty>
+            <ScrollArea>
+              <Combobox.List>
+                {(account: AccountOption) => (
+                  <Combobox.Item
+                    key={account.id}
+                    value={account}
+                    className="category-autocomplete-option"
+                  >
+                    <span>{account.name}</span>
+                  </Combobox.Item>
+                )}
+              </Combobox.List>
+              <Combobox.Empty>
+                <p className="category-autocomplete-empty">
+                  No matching accounts.
+                </p>
+              </Combobox.Empty>
+            </ScrollArea>
           </Combobox.Popup>
         </Combobox.Positioner>
       </Combobox.Portal>

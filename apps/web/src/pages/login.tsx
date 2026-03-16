@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { TextInput } from "../components/text-input.js"
 
 type LoginPageProps = {
   onSuccess: () => void
@@ -42,7 +43,7 @@ export const LoginPage = ({ onSuccess }: LoginPageProps) => {
         <img className="brand-mark" src="/ledgr-favicon.svg" alt="Ledgr logo" />
         <h1>Ledgr</h1>
         <form onSubmit={handleSubmit}>
-          <input
+          <TextInput
             type="password"
             placeholder="Password"
             value={password}

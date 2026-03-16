@@ -29,12 +29,15 @@ export const createPayee = (name: string) =>
     catch: (error) => new Error(`Unable to create payee: ${String(error)}`),
   })
 
-export const updatePayee = (payeeId: string, data: { defaultCategoryId: string | null }) =>
+export const updatePayee = (payeeId: string, data: { name?: string; defaultCategoryId?: string | null }) =>
   Effect.tryPromise({
     try: () =>
       prisma.payee.update({
         where: { id: payeeId },
-        data: { defaultCategoryId: data.defaultCategoryId },
+        data: {
+          ...(data.name != null ? { name: data.name.trim(), normalizedName: normalizePayeeName(data.name) } : {}),
+          ...(data.defaultCategoryId !== undefined ? { defaultCategoryId: data.defaultCategoryId } : {}),
+        },
         include: {
           _count: { select: { transactions: true } },
           defaultCategory: { select: { id: true, name: true, groupId: true } },
