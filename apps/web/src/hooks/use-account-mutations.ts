@@ -67,6 +67,21 @@ export const useAccountMutations = (opts: {
     },
   })
 
+  const toggleAccountActiveMutation = useMutation({
+    mutationFn: ({ accountId, isActive }: { accountId: string; isActive: boolean }) =>
+      apiFetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive }),
+      }),
+    onSuccess: (_, { isActive }) => {
+      toast.success(isActive ? "Account reactivated" : "Account marked inactive")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to update account: ${error.message}`)
+    },
+  })
+
   const deleteAccountMutation = useMutation({
     mutationFn: (accountId: string) =>
       apiFetch(`/api/accounts/${accountId}`, { method: "DELETE" }),
@@ -82,6 +97,7 @@ export const useAccountMutations = (opts: {
   return {
     createAccountMutation,
     updateAccountNameMutation,
+    toggleAccountActiveMutation,
     deleteAccountMutation,
   }
 }

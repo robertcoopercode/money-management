@@ -1,6 +1,7 @@
 import "../src/env.js"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../src/generated/prisma/client.js"
+import { generateNKeysBetween } from "@ledgr/shared"
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -221,30 +222,31 @@ const main = async () => {
   // Seed category groups and categories
   const categoryMap = new Map<string, string>() // "Group|Category" -> categoryId
 
+  const groupSortKeys = generateNKeysBetween(null, null, groups.length)
+
   for (const [groupIndex, group] of groups.entries()) {
     const upsertedGroup = await prisma.categoryGroup.upsert({
       where: { name: group.name },
-      update: { sortOrder: groupIndex },
-      create: { name: group.name, sortOrder: groupIndex },
+      update: { sortOrder: groupSortKeys[groupIndex] },
+      create: { name: group.name, sortOrder: groupSortKeys[groupIndex] },
     })
+
+    const categorySortKeys = generateNKeysBetween(null, null, group.categories.length)
 
     for (const [categoryIndex, category] of group.categories.entries()) {
       const upsertedCategory = await prisma.category.upsert({
         where: {
-          groupId_name: {
-            groupId: upsertedGroup.id,
-            name: category.name,
-          },
+          name: category.name,
         },
         update: {
           isIncomeCategory: category.isIncomeCategory ?? false,
-          sortOrder: categoryIndex,
+          sortOrder: categorySortKeys[categoryIndex],
         },
         create: {
           name: category.name,
           groupId: upsertedGroup.id,
           isIncomeCategory: category.isIncomeCategory ?? false,
-          sortOrder: categoryIndex,
+          sortOrder: categorySortKeys[categoryIndex],
         },
       })
       categoryMap.set(`${group.name}|${category.name}`, upsertedCategory.id)

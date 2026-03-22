@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Switch } from "@base-ui/react/switch"
 import { TextInput } from "../components/text-input.js"
 import { AppCheckbox } from "../components/app-checkbox.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
@@ -145,6 +146,16 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
                 onChange={(event) => setPayeeSearch(event.target.value)}
                 placeholder="Search..."
               />
+              <label className="app-switch-label">
+                <Switch.Root
+                  className="app-switch"
+                  checked={showUnused}
+                  onCheckedChange={setShowUnused}
+                >
+                  <Switch.Thumb className="app-switch-thumb" />
+                </Switch.Root>
+                Unused
+              </label>
               {selectedPayeeIds.size >= 1 ? (
                 <button
                   className="button-danger"
@@ -160,17 +171,6 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
             </div>
           </div>
           <div className="payee-header-right">
-            <label className="payee-toggle" style={{ alignSelf: "flex-end" }}>
-              <input
-                type="checkbox"
-                checked={showUnused}
-                onChange={(e) => setShowUnused(e.target.checked)}
-              />
-              <span className="payee-toggle-track">
-                <span className="payee-toggle-thumb" />
-              </span>
-              <span className="payee-toggle-label">Unused</span>
-            </label>
             {showCombineForm ? (
               <div className="combine-form">
                 <strong style={{ fontSize: "0.85rem" }}>

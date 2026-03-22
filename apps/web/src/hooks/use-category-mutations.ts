@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { apiFetch } from "../lib/api.js"
 import type { Category, CategoryGroup } from "../types.js"
@@ -7,6 +7,7 @@ type UpdateCategoryInput = {
   categoryId: string
   name?: string
   groupId?: string
+  isIncomeCategory?: boolean
 }
 
 type UpdateCategoryGroupInput = {
@@ -23,10 +24,6 @@ export type CategoryDeleteImpact = {
 
 export type CategoryGroupDeleteImpact = {
   categories: number
-  transactions: number
-  splits: number
-  assignments: number
-  payeeDefaults: number
 }
 
 export const useCategoryMutations = (opts: {
@@ -35,7 +32,10 @@ export const useCategoryMutations = (opts: {
   onCategoryDeleted?: () => void
   onGroupUpdated?: () => void
   onGroupDeleted?: () => void
+  onGroupCreated?: () => void
 }) => {
+  const queryClient = useQueryClient()
+
   const updateCategoryMutation = useMutation({
     mutationFn: ({ categoryId, ...body }: UpdateCategoryInput) =>
       apiFetch<Category>(`/api/categories/${categoryId}`, {
@@ -98,10 +98,78 @@ export const useCategoryMutations = (opts: {
     },
   })
 
+  const createCategoryGroupMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiFetch<CategoryGroup>("/api/category-groups", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: () => {
+      toast.success("Category group created")
+      opts.onGroupCreated?.()
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to create group: ${error.message}`)
+    },
+  })
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (input: { name: string; groupName?: string }) =>
+      apiFetch<Category>("/api/categories", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      toast.success("Category created")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to create category: ${error.message}`)
+    },
+  })
+
+  // Reorder mutations use optimistic updates — the caller patches the cache
+  // before calling mutate, so onSuccess just does a background refetch for
+  // eventual consistency. onError rolls back via the saved snapshot.
+  const reorderCategoryMutation = useMutation({
+    mutationFn: (input: { categoryId: string; sortOrder: string; groupId?: string | null }) =>
+      apiFetch(`/api/categories/${input.categoryId}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ sortOrder: input.sortOrder, groupId: input.groupId }),
+      }),
+    onError: (error) => {
+      toast.error(`Unable to reorder category: ${error.message}`)
+      opts.refetchCoreData()
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    },
+  })
+
+  const reorderCategoryGroupMutation = useMutation({
+    mutationFn: (input: { groupId: string; sortOrder: string }) =>
+      apiFetch(`/api/category-groups/${input.groupId}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ sortOrder: input.sortOrder }),
+      }),
+    onError: (error) => {
+      toast.error(`Unable to reorder group: ${error.message}`)
+      opts.refetchCoreData()
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["planning"] })
+    },
+  })
+
   return {
     updateCategoryMutation,
     deleteCategoryMutation,
     updateCategoryGroupMutation,
     deleteCategoryGroupMutation,
+    createCategoryGroupMutation,
+    createCategoryMutation,
+    reorderCategoryMutation,
+    reorderCategoryGroupMutation,
   }
 }

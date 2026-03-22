@@ -199,6 +199,7 @@ export const TransactionEditRow = ({
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault()
+          e.stopPropagation()
           onCancel()
           return
         }

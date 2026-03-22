@@ -15,7 +15,7 @@ type CategoryGroup = {
   }>
 }
 
-export type CreateCategoryInput = { name: string; groupName: string }
+export type CreateCategoryInput = { name: string; groupName?: string }
 
 type CategoryAutocompleteProps = {
   categoryGroups: CategoryGroup[]
@@ -169,7 +169,7 @@ export const CategoryAutocomplete = ({
     const name = popoverCategoryName.trim()
     if (!name || !onCreateCategory) return
 
-    let groupName: string
+    let groupName: string | undefined
     if (selectedGroup) {
       groupName =
         selectedGroup.kind === "create"
@@ -177,8 +177,6 @@ export const CategoryAutocomplete = ({
           : selectedGroup.name
     } else if (groupInputValue.trim()) {
       groupName = groupInputValue.trim()
-    } else {
-      groupName = "Uncategorized"
     }
 
     const category = await onCreateCategory({ name, groupName })

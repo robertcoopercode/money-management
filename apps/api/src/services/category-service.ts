@@ -1,20 +1,46 @@
 import { prisma } from "@ledgr/db"
 import { Effect } from "effect"
-import type { UpdateCategoryInput, UpdateCategoryGroupInput } from "@ledgr/shared"
+import { generateKeyBetween } from "@ledgr/shared"
+import type {
+  UpdateCategoryInput,
+  UpdateCategoryGroupInput,
+  ReorderCategoryInput,
+  ReorderCategoryGroupInput,
+} from "@ledgr/shared"
 
-const DEFAULT_CATEGORY_GROUP_NAME = "Uncategorized"
+export const UNCATEGORIZED_GROUP_ID = "__uncategorized__"
 
 export const listCategoryGroups = Effect.tryPromise({
-  try: () =>
-    prisma.categoryGroup.findMany({
-      orderBy: { sortOrder: "asc" },
-      include: {
-        categories: {
-          where: { isArchived: false },
-          orderBy: { sortOrder: "asc" },
+  try: async () => {
+    const [groups, ungrouped] = await Promise.all([
+      prisma.categoryGroup.findMany({
+        orderBy: { sortOrder: "asc" },
+        include: {
+          categories: {
+            where: { isArchived: false },
+            orderBy: { sortOrder: "asc" },
+          },
         },
-      },
-    }),
+      }),
+      prisma.category.findMany({
+        where: { groupId: null, isArchived: false },
+        orderBy: { sortOrder: "asc" },
+      }),
+    ])
+
+    if (ungrouped.length > 0) {
+      groups.push({
+        id: UNCATEGORIZED_GROUP_ID,
+        name: "Uncategorized",
+        sortOrder: "~",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        categories: ungrouped,
+      } as typeof groups[number])
+    }
+
+    return groups
+  },
   catch: (error) => new Error(`Unable to list categories: ${String(error)}`),
 })
 
@@ -22,37 +48,39 @@ export const createCategory = (name: string, groupName?: string) =>
   Effect.tryPromise({
     try: async () => {
       const trimmedName = name.trim()
-      const trimmedGroupName = (groupName ?? DEFAULT_CATEGORY_GROUP_NAME).trim()
+      const trimmedGroupName = groupName?.trim()
 
-      const group =
-        (await prisma.categoryGroup.findUnique({
-          where: { name: trimmedGroupName },
-        })) ??
-        (await prisma.categoryGroup.create({
-          data: {
-            name: trimmedGroupName,
-            sortOrder:
-              ((
-                await prisma.categoryGroup.aggregate({
-                  _max: { sortOrder: true },
-                })
-              )._max.sortOrder ?? 0) + 1,
-          },
-        }))
+      let groupId: string | null = null
 
-      const maxSortOrderInGroup =
-        (
-          await prisma.category.aggregate({
-            where: { groupId: group.id },
-            _max: { sortOrder: true },
-          })
-        )._max.sortOrder ?? 0
+      if (trimmedGroupName) {
+        const group =
+          (await prisma.categoryGroup.findUnique({
+            where: { name: trimmedGroupName },
+          })) ??
+          (await (async () => {
+            const lastGroup = await prisma.categoryGroup.findFirst({
+              orderBy: { sortOrder: "desc" },
+            })
+            return prisma.categoryGroup.create({
+              data: {
+                name: trimmedGroupName,
+                sortOrder: generateKeyBetween(lastGroup?.sortOrder ?? null, null),
+              },
+            })
+          })())
+        groupId = group.id
+      }
+
+      const lastCategory = await prisma.category.findFirst({
+        where: { groupId },
+        orderBy: { sortOrder: "desc" },
+      })
 
       return prisma.category.create({
         data: {
           name: trimmedName,
-          groupId: group.id,
-          sortOrder: maxSortOrderInGroup + 1,
+          groupId,
+          sortOrder: generateKeyBetween(lastCategory?.sortOrder ?? null, null),
         },
       })
     },
@@ -64,16 +92,14 @@ export const updateCategory = (id: string, input: UpdateCategoryInput) =>
     try: async () => {
       const data: Record<string, unknown> = {}
       if (input.name !== undefined) data.name = input.name.trim()
+      if (input.isIncomeCategory !== undefined) data.isIncomeCategory = input.isIncomeCategory
       if (input.groupId !== undefined) {
         data.groupId = input.groupId
-        const maxSort =
-          (
-            await prisma.category.aggregate({
-              where: { groupId: input.groupId },
-              _max: { sortOrder: true },
-            })
-          )._max.sortOrder ?? 0
-        data.sortOrder = maxSort + 1
+        const lastCategory = await prisma.category.findFirst({
+          where: { groupId: input.groupId },
+          orderBy: { sortOrder: "desc" },
+        })
+        data.sortOrder = generateKeyBetween(lastCategory?.sortOrder ?? null, null)
       }
       return prisma.category.update({ where: { id }, data })
     },
@@ -88,6 +114,43 @@ export const updateCategoryGroup = (id: string, input: UpdateCategoryGroupInput)
         data: { name: input.name.trim() },
       }),
     catch: (error) => new Error(`Unable to update category group: ${String(error)}`),
+  })
+
+export const createCategoryGroup = (name: string) =>
+  Effect.tryPromise({
+    try: async () => {
+      const trimmed = name.trim()
+      const lastGroup = await prisma.categoryGroup.findFirst({
+        orderBy: { sortOrder: "desc" },
+      })
+      return prisma.categoryGroup.create({
+        data: {
+          name: trimmed,
+          sortOrder: generateKeyBetween(lastGroup?.sortOrder ?? null, null),
+        },
+      })
+    },
+    catch: (error) => new Error(`Unable to create category group: ${String(error)}`),
+  })
+
+export const reorderCategory = (id: string, input: ReorderCategoryInput) =>
+  Effect.tryPromise({
+    try: () => {
+      const data: Record<string, unknown> = { sortOrder: input.sortOrder }
+      if (input.groupId !== undefined) data.groupId = input.groupId
+      return prisma.category.update({ where: { id }, data })
+    },
+    catch: (error) => new Error(`Unable to reorder category: ${String(error)}`),
+  })
+
+export const reorderCategoryGroup = (id: string, input: ReorderCategoryGroupInput) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.categoryGroup.update({
+        where: { id },
+        data: { sortOrder: input.sortOrder },
+      }),
+    catch: (error) => new Error(`Unable to reorder category group: ${String(error)}`),
   })
 
 export const getCategoryDeleteImpact = (id: string) =>
@@ -120,21 +183,8 @@ export const deleteCategory = (id: string) =>
 export const getCategoryGroupDeleteImpact = (groupId: string) =>
   Effect.tryPromise({
     try: async () => {
-      const categories = await prisma.category.findMany({
-        where: { groupId },
-        select: { id: true },
-      })
-      const categoryIds = categories.map((c) => c.id)
-      if (categoryIds.length === 0) {
-        return { categories: 0, transactions: 0, splits: 0, assignments: 0, payeeDefaults: 0 }
-      }
-      const [transactions, splits, assignments, payeeDefaults] = await Promise.all([
-        prisma.transaction.count({ where: { categoryId: { in: categoryIds } } }),
-        prisma.transactionSplit.count({ where: { categoryId: { in: categoryIds } } }),
-        prisma.categoryAssignment.count({ where: { categoryId: { in: categoryIds } } }),
-        prisma.payee.count({ where: { defaultCategoryId: { in: categoryIds } } }),
-      ])
-      return { categories: categoryIds.length, transactions, splits, assignments, payeeDefaults }
+      const categoryCount = await prisma.category.count({ where: { groupId } })
+      return { categories: categoryCount }
     },
     catch: (error) => new Error(`Unable to get group impact: ${String(error)}`),
   })
@@ -142,20 +192,7 @@ export const getCategoryGroupDeleteImpact = (groupId: string) =>
 export const deleteCategoryGroup = (groupId: string) =>
   Effect.tryPromise({
     try: () =>
-      prisma.$transaction(async (tx) => {
-        const categories = await tx.category.findMany({
-          where: { groupId },
-          select: { id: true },
-        })
-        const categoryIds = categories.map((c) => c.id)
-        if (categoryIds.length > 0) {
-          await tx.transaction.updateMany({
-            where: { categoryId: { in: categoryIds } },
-            data: { categoryId: null },
-          })
-        }
-        // Cascade delete handles categories, splits, assignments
-        await tx.categoryGroup.delete({ where: { id: groupId } })
-      }),
+      // onDelete: SetNull moves categories to ungrouped (Uncategorized)
+      prisma.categoryGroup.delete({ where: { id: groupId } }),
     catch: (error) => new Error(`Unable to delete category group: ${String(error)}`),
   })

@@ -11,7 +11,7 @@ describe("aggregateReportingMetrics", () => {
           date: new Date("2026-01-10T00:00:00.000Z"),
           amountMinor: 250_000,
           categoryId: "income",
-          category: { name: "Ready to Assign", group: { name: "Income" } },
+          category: { name: "Ready to Assign", group: { id: "g-income", name: "Income" } },
         },
         {
           date: new Date("2026-01-12T00:00:00.000Z"),
@@ -19,14 +19,14 @@ describe("aggregateReportingMetrics", () => {
           categoryId: "groceries",
           category: {
             name: "Groceries & Household",
-            group: { name: "Food" },
+            group: { id: "g-food", name: "Food" },
           },
         },
         {
           date: new Date("2026-02-05T00:00:00.000Z"),
           amountMinor: -50_000,
           categoryId: "rent",
-          category: { name: "Rent", group: { name: "Fixed / Annual" } },
+          category: { name: "Rent", group: { id: "g-fixed", name: "Fixed / Annual" } },
         },
       ],
     })

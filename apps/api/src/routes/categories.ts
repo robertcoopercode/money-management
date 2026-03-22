@@ -1,13 +1,23 @@
 import type { Hono } from "hono"
-import { createCategorySchema, updateCategorySchema, updateCategoryGroupSchema } from "@ledgr/shared"
+import {
+  createCategorySchema,
+  updateCategorySchema,
+  updateCategoryGroupSchema,
+  createCategoryGroupSchema,
+  reorderCategorySchema,
+  reorderCategoryGroupSchema,
+} from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"
 import {
   createCategory,
+  createCategoryGroup,
   listCategoryGroups,
   updateCategory,
   updateCategoryGroup,
+  reorderCategory,
+  reorderCategoryGroup,
   getCategoryDeleteImpact,
   deleteCategory,
   getCategoryGroupDeleteImpact,
@@ -35,6 +45,13 @@ export const registerCategoryRoutes = (app: Hono) => {
     return context.json(category)
   })
 
+  app.patch("/api/categories/:categoryId/reorder", async (context) => {
+    const { categoryId } = context.req.param()
+    const payload = await parseJson(context, reorderCategorySchema)
+    const category = await runApiEffect(reorderCategory(categoryId, payload))
+    return context.json(category)
+  })
+
   app.get("/api/categories/:categoryId/impact", async (context) => {
     const { categoryId } = context.req.param()
     const impact = await runApiEffect(getCategoryDeleteImpact(categoryId))
@@ -47,10 +64,23 @@ export const registerCategoryRoutes = (app: Hono) => {
     return context.json({ ok: true })
   })
 
+  app.post("/api/category-groups", async (context) => {
+    const payload = await parseJson(context, createCategoryGroupSchema)
+    const group = await runApiEffect(createCategoryGroup(payload.name))
+    return context.json(group, 201)
+  })
+
   app.patch("/api/category-groups/:groupId", async (context) => {
     const { groupId } = context.req.param()
     const payload = await parseJson(context, updateCategoryGroupSchema)
     const group = await runApiEffect(updateCategoryGroup(groupId, payload))
+    return context.json(group)
+  })
+
+  app.patch("/api/category-groups/:groupId/reorder", async (context) => {
+    const { groupId } = context.req.param()
+    const payload = await parseJson(context, reorderCategoryGroupSchema)
+    const group = await runApiEffect(reorderCategoryGroup(groupId, payload))
     return context.json(group)
   })
 

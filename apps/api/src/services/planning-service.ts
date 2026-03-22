@@ -23,32 +23,24 @@ const nextMonth = (month: string) => {
 
 const monthEndExclusive = (month: string) => monthStart(nextMonth(month))
 
-type PlanningCategory = {
-  categoryId: string
-  groupName: string
-  categoryName: string
-  assignedMinor: number
-  activityMinor: number
-  availableMinor: number
-}
+const UNCATEGORIZED_GROUP_ID = "__uncategorized__"
 
 export const getPlanningMonth = (month: string) =>
   Effect.tryPromise({
     try: async () => {
-      const [budgetMonth, categoryGroups] = await Promise.all([
-        prisma.budgetMonth.upsert({
-          where: { month },
-          update: {},
-          create: { month },
-        }),
+      const [categoryGroups, ungroupedCategories] = await Promise.all([
         prisma.categoryGroup.findMany({
           orderBy: { sortOrder: "asc" },
           include: {
             categories: {
-              where: { isArchived: false, isIncomeCategory: false },
+              where: { isArchived: false },
               orderBy: { sortOrder: "asc" },
             },
           },
+        }),
+        prisma.category.findMany({
+          where: { groupId: null, isArchived: false },
+          orderBy: { sortOrder: "asc" },
         }),
       ])
 
@@ -64,7 +56,7 @@ export const getPlanningMonth = (month: string) =>
         carryoverAssignments,
       ] = await Promise.all([
         prisma.categoryAssignment.findMany({
-          where: { budgetMonthId: budgetMonth.id },
+          where: { month },
         }),
         prisma.transaction.groupBy({
           by: ["categoryId"],
@@ -105,9 +97,7 @@ export const getPlanningMonth = (month: string) =>
         }),
         prisma.categoryAssignment.findMany({
           where: {
-            budgetMonth: {
-              month: { lt: month },
-            },
+            month: { lt: month },
           },
         }),
       ])
@@ -155,28 +145,40 @@ export const getPlanningMonth = (month: string) =>
         )
       }
 
-      const categories: PlanningCategory[] = []
-
-      for (const group of categoryGroups) {
-        for (const category of group.categories) {
-          const assignedMinor = assignmentMap.get(category.id) ?? 0
-          const activityMinor = activityMap.get(category.id) ?? 0
-          const availableMinor = calculateCategoryAvailableMinor({
-            priorAssignedMinor: priorAssignmentMap.get(category.id) ?? 0,
-            priorActivityMinor: priorActivityMap.get(category.id) ?? 0,
-            assignedMinor,
-            activityMinor,
-          })
-
-          categories.push({
-            categoryId: category.id,
-            groupName: group.name,
-            categoryName: category.name,
-            assignedMinor,
-            activityMinor,
-            availableMinor,
-          })
+      const buildCategoryItem = (category: { id: string; name: string; sortOrder: string; isIncomeCategory: boolean }) => {
+        const assignedMinor = assignmentMap.get(category.id) ?? 0
+        const activityMinor = activityMap.get(category.id) ?? 0
+        const availableMinor = calculateCategoryAvailableMinor({
+          priorAssignedMinor: priorAssignmentMap.get(category.id) ?? 0,
+          priorActivityMinor: priorActivityMap.get(category.id) ?? 0,
+          assignedMinor,
+          activityMinor,
+        })
+        return {
+          categoryId: category.id,
+          categoryName: category.name,
+          sortOrder: category.sortOrder,
+          assignedMinor,
+          activityMinor,
+          availableMinor,
+          isIncomeCategory: category.isIncomeCategory,
         }
+      }
+
+      const groups = categoryGroups.map((group) => ({
+        groupId: group.id,
+        groupName: group.name,
+        groupSortOrder: group.sortOrder,
+        categories: group.categories.map(buildCategoryItem),
+      }))
+
+      if (ungroupedCategories.length > 0) {
+        groups.push({
+          groupId: UNCATEGORIZED_GROUP_ID,
+          groupName: "Uncategorized",
+          groupSortOrder: "~",
+          categories: ungroupedCategories.map(buildCategoryItem),
+        })
       }
 
       const [
@@ -203,9 +205,7 @@ export const getPlanningMonth = (month: string) =>
         prisma.categoryAssignment.aggregate({
           _sum: { assignedMinor: true },
           where: {
-            budgetMonth: {
-              month: { lte: month },
-            },
+            month: { lte: month },
           },
         }),
       ])
@@ -218,15 +218,10 @@ export const getPlanningMonth = (month: string) =>
           totalAssignedThroughMonth._sum.assignedMinor ?? 0,
       })
 
-      await prisma.budgetMonth.update({
-        where: { id: budgetMonth.id },
-        data: { readyToAssignMinor },
-      })
-
       return {
         month,
         readyToAssignMinor,
-        categories,
+        groups,
       }
     },
     catch: (error) =>
@@ -240,22 +235,16 @@ export const setCategoryAssignment = (input: {
 }) =>
   Effect.tryPromise({
     try: async () => {
-      const budgetMonth = await prisma.budgetMonth.upsert({
-        where: { month: input.month },
-        update: {},
-        create: { month: input.month },
-      })
-
       return prisma.categoryAssignment.upsert({
         where: {
-          budgetMonthId_categoryId: {
-            budgetMonthId: budgetMonth.id,
+          month_categoryId: {
+            month: input.month,
             categoryId: input.categoryId,
           },
         },
         update: { assignedMinor: input.assignedMinor },
         create: {
-          budgetMonthId: budgetMonth.id,
+          month: input.month,
           categoryId: input.categoryId,
           assignedMinor: input.assignedMinor,
         },
@@ -263,4 +252,32 @@ export const setCategoryAssignment = (input: {
     },
     catch: (error) =>
       new Error(`Unable to set category assignment: ${String(error)}`),
+  })
+
+export const setBulkCategoryAssignments = (
+  inputs: { month: string; categoryId: string; assignedMinor: number }[],
+) =>
+  Effect.tryPromise({
+    try: async () => {
+      return prisma.$transaction(
+        inputs.map((input) =>
+          prisma.categoryAssignment.upsert({
+            where: {
+              month_categoryId: {
+                month: input.month,
+                categoryId: input.categoryId,
+              },
+            },
+            update: { assignedMinor: input.assignedMinor },
+            create: {
+              month: input.month,
+              categoryId: input.categoryId,
+              assignedMinor: input.assignedMinor,
+            },
+          }),
+        ),
+      )
+    },
+    catch: (error) =>
+      new Error(`Unable to set bulk category assignments: ${String(error)}`),
   })

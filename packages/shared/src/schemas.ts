@@ -44,7 +44,9 @@ const loanRefinement = (
 
 export const createAccountSchema = accountBaseSchema.superRefine(loanRefinement)
 
-export const updateAccountSchema = accountBaseSchema.partial()
+export const updateAccountSchema = accountBaseSchema.partial().extend({
+  isActive: z.boolean().optional(),
+})
 
 export const createPayeeSchema = z.object({
   name: z.string().min(1).max(160),
@@ -57,11 +59,25 @@ export const createCategorySchema = z.object({
 
 export const updateCategorySchema = z.object({
   name: z.string().min(1).max(160).optional(),
-  groupId: z.string().min(1).optional(),
+  groupId: z.string().min(1).nullable().optional(),
+  isIncomeCategory: z.boolean().optional(),
 })
 
 export const updateCategoryGroupSchema = z.object({
   name: z.string().min(1).max(120),
+})
+
+export const createCategoryGroupSchema = z.object({
+  name: z.string().min(1).max(120),
+})
+
+export const reorderCategorySchema = z.object({
+  sortOrder: z.string().min(1),
+  groupId: z.string().nullable().optional(),
+})
+
+export const reorderCategoryGroupSchema = z.object({
+  sortOrder: z.string().min(1),
 })
 
 export const updatePayeeSchema = z.object({
@@ -219,6 +235,10 @@ export const updateCategoryAssignmentSchema = z.object({
   assignedMinor: z.number().int(),
 })
 
+export const bulkUpdateCategoryAssignmentSchema = z.object({
+  assignments: z.array(updateCategoryAssignmentSchema).min(1).max(200),
+})
+
 export const importColumnMappingSchema = z.object({
   date: z.string().min(1),
   amount: z.string().min(1),
@@ -261,12 +281,16 @@ export type CreatePayeeInput = z.infer<typeof createPayeeSchema>
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>
 export type UpdateCategoryGroupInput = z.infer<typeof updateCategoryGroupSchema>
+export type CreateCategoryGroupInput = z.infer<typeof createCategoryGroupSchema>
+export type ReorderCategoryInput = z.infer<typeof reorderCategorySchema>
+export type ReorderCategoryGroupInput = z.infer<typeof reorderCategoryGroupSchema>
 export type MergePayeesInput = z.infer<typeof mergePayeesSchema>
 export type CombinePayeesInput = z.infer<typeof combinePayeesSchema>
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>
 export type TransactionFilterInput = z.infer<typeof transactionFilterSchema>
 export type UpdateCategoryAssignmentInput = z.infer<typeof updateCategoryAssignmentSchema>
+export type BulkUpdateCategoryAssignmentInput = z.infer<typeof bulkUpdateCategoryAssignmentSchema>
 export type TransactionSplitInput = z.infer<typeof transactionSplitInputSchema>
 export type CreateTagInput = z.infer<typeof createTagSchema>
 export type UpdateTagInput = z.infer<typeof updateTagSchema>
@@ -278,3 +302,23 @@ export type TransactionSortDir = z.infer<typeof transactionSortDirSchema>
 export const reconcileAccountSchema = z.object({
   statementBalanceMinor: z.number().int(),
 })
+
+export type CategoryReportRow = {
+  categoryId: string
+  categoryName: string
+  isIncomeCategory: boolean
+  monthlyAmounts: Record<string, number>
+  totalMinor: number
+  count: number
+}
+
+export type CategoryReportGroup = {
+  groupId: string | null
+  groupName: string
+  categories: CategoryReportRow[]
+}
+
+export type CategoryReportResponse = {
+  months: string[]
+  groups: CategoryReportGroup[]
+}

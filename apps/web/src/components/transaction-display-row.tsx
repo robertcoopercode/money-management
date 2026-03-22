@@ -139,38 +139,37 @@ export function TransactionDisplayRow({
   onRejectImport,
   onUnmatchImport,
 }: TransactionDisplayRowProps) {
-  const handleCellClick = (field: EditableField) => {
-    if (isSelected) {
+  const handleCellClick = (field: EditableField, shiftKey: boolean) => {
+    if (isSelected && !shiftKey) {
       onStartEditing(transaction, field)
     } else {
-      onToggleSelect(transaction.id, false)
+      onToggleSelect(transaction.id, shiftKey)
     }
   }
 
   return (
     <Fragment>
       <div className={`transaction-row${isSelected ? " selected" : ""}`} role="row">
-        <div className="transaction-cell transaction-cell-checkbox" role="cell">
-          <div
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleSelect(transaction.id, e.shiftKey)
-            }}
-            style={{ display: "contents" }}
-          >
-            <AppCheckbox
-              checked={isSelected}
-              onCheckedChange={() => {}}
-            />
-          </div>
+        <div
+          className="transaction-cell transaction-cell-checkbox"
+          role="cell"
+          onClickCapture={(e) => {
+            e.stopPropagation()
+            onToggleSelect(transaction.id, e.shiftKey)
+          }}
+        >
+          <AppCheckbox
+            checked={isSelected}
+            onCheckedChange={() => {}}
+          />
         </div>
         <div
           className="transaction-cell clickable-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("account")}
+          onClick={(e) => handleCellClick("account", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("account")
+            if (e.key === "Enter") handleCellClick("account", e.shiftKey)
           }}
         >
           {transaction.account.name}
@@ -179,9 +178,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("date")}
+          onClick={(e) => handleCellClick("date", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("date")
+            if (e.key === "Enter") handleCellClick("date", e.shiftKey)
           }}
         >
           {new Date(transaction.date).toISOString().slice(0, 10)}
@@ -190,9 +189,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("payee")}
+          onClick={(e) => handleCellClick("payee", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("payee")
+            if (e.key === "Enter") handleCellClick("payee", e.shiftKey)
           }}
         >
           <span className="payee-cell-content">
@@ -260,9 +259,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("category")}
+          onClick={(e) => handleCellClick("category", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("category")
+            if (e.key === "Enter") handleCellClick("category", e.shiftKey)
           }}
         >
           {transaction.splits?.length > 0 ? (
@@ -312,9 +311,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell truncated-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("note")}
+          onClick={(e) => handleCellClick("note", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("note")
+            if (e.key === "Enter") handleCellClick("note", e.shiftKey)
           }}
         >
           <TruncatedText text={transaction.note || ""} />
@@ -325,9 +324,9 @@ export function TransactionDisplayRow({
           }`}
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("amount")}
+          onClick={(e) => handleCellClick("amount", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("amount")
+            if (e.key === "Enter") handleCellClick("amount", e.shiftKey)
           }}
         >
           {formatMoney(transaction.amountMinor)}
@@ -336,9 +335,9 @@ export function TransactionDisplayRow({
           className="transaction-cell clickable-cell tag-display-cell"
           role="cell"
           tabIndex={0}
-          onClick={() => handleCellClick("tags")}
+          onClick={(e) => handleCellClick("tags", e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCellClick("tags")
+            if (e.key === "Enter") handleCellClick("tags", e.shiftKey)
           }}
         >
           {transaction.tags?.length > 0 && (

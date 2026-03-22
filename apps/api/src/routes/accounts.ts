@@ -53,6 +53,7 @@ export const registerAccountRoutes = (app: Hono) => {
         type: payload.type,
         startingBalanceMinor: payload.startingBalanceMinor,
         openedAt: payload.openedAt ? new Date(payload.openedAt) : undefined,
+        ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
       }),
     )
 

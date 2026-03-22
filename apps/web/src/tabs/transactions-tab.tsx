@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ScrollArea } from "../components/scroll-area.js"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { parseMoneyInputToMinor } from "@ledgr/shared"
 import { TextInput } from "../components/text-input.js"
@@ -175,15 +174,15 @@ export const TransactionsTab = ({
   }, [transactionOffset, filterAccountId, sortBy, sortDir, showReconciled, clearSelection])
 
   useEffect(() => {
-    if (!editingTransaction) return
+    if (editingTransaction) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setEditingTransaction(null)
+        clearSelection()
       }
     }
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [editingTransaction])
+  }, [editingTransaction, clearSelection])
 
   const payeeSelection = useMemo(
     () =>
@@ -241,7 +240,6 @@ export const TransactionsTab = ({
       setReconciledWarningOpen(true)
       return
     }
-    clearSelection()
     setEditingTransaction({
       transactionId: transaction.id,
       draft: transactionToEditDraft(transaction),
@@ -648,18 +646,18 @@ export const TransactionsTab = ({
           >
             Import CSV
           </button>
-          <label className="show-reconciled-toggle">
+          <label className="app-switch-label" style={{ marginLeft: "auto" }}>
             <Switch.Root
-              className="reconciled-switch"
+              className="app-switch"
               checked={showReconciled}
               onCheckedChange={() => {
                 setShowReconciled((v) => !v)
                 setTransactionOffset(0)
               }}
             >
-              <Switch.Thumb className="reconciled-switch-thumb" />
+              <Switch.Thumb className="app-switch-thumb" />
             </Switch.Root>
-            <span>Show reconciled</span>
+            Show reconciled
           </label>
         </div>
         {filterAccountId && (() => {
@@ -674,7 +672,7 @@ export const TransactionsTab = ({
       </div>
 
       <section className="card">
-        <ScrollArea orientation="both" className="table-wrap">
+        <div className="table-wrap">
           <div className="transaction-list" role="table">
             <div className="transaction-header" role="row">
               <div className="transaction-cell transaction-cell-checkbox" role="columnheader">
@@ -751,7 +749,10 @@ export const TransactionsTab = ({
                     tags={tags}
                     categoryGroups={categoryGroups}
                     onSave={handleSaveEdit}
-                    onCancel={() => setEditingTransaction(null)}
+                    onCancel={() => {
+                      toggleSelection(editingTransaction.transactionId)
+                      setEditingTransaction(null)
+                    }}
                     isSaving={updateTransactionMutation.isPending}
                     onCreatePayee={async (name) => {
                       const payee =
@@ -823,7 +824,7 @@ export const TransactionsTab = ({
               )
             )}
           </div>
-        </ScrollArea>
+        </div>
         <nav className="pagination">
           <button
             type="button"

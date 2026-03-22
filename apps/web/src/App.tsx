@@ -8,13 +8,10 @@ import { apiFetch } from "./lib/api.js"
 import { formatMonth } from "./lib/date-helpers.js"
 import { defaultTransactionDate } from "./lib/date-helpers.js"
 import { useCoreQueries } from "./hooks/use-core-queries.js"
-import { AccountsTab } from "./tabs/accounts-tab.js"
 import { TransactionsTab } from "./tabs/transactions-tab.js"
-import { PayeesTab } from "./tabs/payees-tab.js"
 import { PlanningTab } from "./tabs/planning-tab.js"
 import { ReportsTab } from "./tabs/reports-tab.js"
-import { TagsTab } from "./tabs/tags-tab.js"
-import { CategoriesTab } from "./tabs/categories-tab.js"
+import { ConfigureTab } from "./tabs/configure-tab.js"
 import { isAppTab, getInitialAppTab } from "./types.js"
 import type { AppTab } from "./types.js"
 import type { TransactionDraft } from "./lib/transaction-entry.js"
@@ -158,82 +155,34 @@ const AuthenticatedApp = () => {
           <Tabs.Tab className="tabs-tab" value="transactions">
             Transactions
           </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="accounts">
-            Accounts
-          </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="payees">
-            Payees
-          </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="categories">
-            Categories
-          </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="tags">
-            Tags
-          </Tabs.Tab>
-          <Tabs.Tab className="tabs-tab" value="planning">
-            Planning
+          <Tabs.Tab className="tabs-tab" value="budget">
+            Budget
           </Tabs.Tab>
           <Tabs.Tab className="tabs-tab" value="reports">
             Reporting
           </Tabs.Tab>
+          <Tabs.Tab className="tabs-tab" value="configure">
+            Configure
+          </Tabs.Tab>
           <Tabs.Indicator className="tabs-indicator" />
         </Tabs.List>
-
-        <Tabs.Panel className="panel" value="accounts">
-          <ScrollArea>
-            <AccountsTab
-              accountsQuery={accountsQuery}
-              refetchCoreData={refetchCoreData}
-              onAccountCreated={(accountId) =>
-                setNewTransaction((current) => ({
-                  ...current,
-                  accountId: current.accountId || accountId,
-                }))
-              }
-            />
-          </ScrollArea>
-        </Tabs.Panel>
 
         <Tabs.Panel className="panel" value="transactions">
           <ScrollArea>
             <TransactionsTab
               newTransaction={newTransaction}
               setNewTransaction={setNewTransaction}
-              accounts={accountsQuery.data ?? []}
+              accounts={(accountsQuery.data ?? []).filter((a) => a.isActive)}
               payees={payeesQuery.data ?? []}
               tags={tagsQuery.data ?? []}
               categoryGroups={categoriesQuery.data ?? []}
               refetchCoreData={refetchCoreData}
-              onNavigateToPayees={() => setActiveTab("payees")}
+              onNavigateToPayees={() => setActiveTab("configure")}
             />
           </ScrollArea>
         </Tabs.Panel>
 
-        <Tabs.Panel className="panel" value="payees">
-          <ScrollArea>
-            <PayeesTab payeesQuery={payeesQuery} categoryGroups={categoriesQuery.data ?? []} refetchCoreData={refetchCoreData} />
-          </ScrollArea>
-        </Tabs.Panel>
-
-        <Tabs.Panel className="panel" value="categories">
-          <ScrollArea>
-            <CategoriesTab
-              categoriesQuery={categoriesQuery}
-              refetchCoreData={refetchCoreData}
-            />
-          </ScrollArea>
-        </Tabs.Panel>
-
-        <Tabs.Panel className="panel" value="tags">
-          <ScrollArea>
-            <TagsTab
-              tagsQuery={tagsQuery}
-              refetchCoreData={refetchCoreData}
-            />
-          </ScrollArea>
-        </Tabs.Panel>
-
-        <Tabs.Panel className="panel" value="planning">
+        <Tabs.Panel className="panel" value="budget">
           <ScrollArea>
             <PlanningTab
               month={month}
@@ -253,6 +202,24 @@ const AuthenticatedApp = () => {
               accounts={accountsQuery.data ?? []}
               payees={payeesQuery.data ?? []}
               categoryGroups={categoriesQuery.data ?? []}
+            />
+          </ScrollArea>
+        </Tabs.Panel>
+
+        <Tabs.Panel className="panel" value="configure">
+          <ScrollArea>
+            <ConfigureTab
+              accountsQuery={accountsQuery}
+              payeesQuery={payeesQuery}
+              tagsQuery={tagsQuery}
+              categoryGroups={categoriesQuery.data ?? []}
+              refetchCoreData={refetchCoreData}
+              onAccountCreated={(accountId) =>
+                setNewTransaction((current) => ({
+                  ...current,
+                  accountId: current.accountId || accountId,
+                }))
+              }
             />
           </ScrollArea>
         </Tabs.Panel>

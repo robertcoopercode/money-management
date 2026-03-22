@@ -5,7 +5,6 @@ import { Effect } from "effect"
 export const listAccounts = Effect.tryPromise({
   try: () =>
     prisma.account.findMany({
-      where: { isActive: true },
       orderBy: { createdAt: "asc" },
       include: {
         transactions: {
@@ -35,6 +34,7 @@ export const listAccounts = Effect.tryPromise({
 
       return {
         ...rest,
+        isActive: account.isActive,
         clearedBalanceMinor: account.startingBalanceMinor + clearedAndReconciledTotal,
         unclearedBalanceMinor: unclearedTotal,
         balanceMinor: account.startingBalanceMinor + transactionTotal,

@@ -12,6 +12,7 @@ export type Account = {
   id: string
   name: string
   type: "CASH" | "CREDIT" | "INVESTMENT" | "LOAN"
+  isActive: boolean
   startingBalanceMinor: number
   clearedBalanceMinor: number
   unclearedBalanceMinor: number
@@ -38,12 +39,15 @@ export type Tag = {
 export type Category = {
   id: string
   name: string
-  groupId: string
+  groupId: string | null
+  sortOrder?: string
+  isIncomeCategory?: boolean
 }
 
 export type CategoryGroup = {
   id: string
   name: string
+  sortOrder?: string
   categories: Category[]
 }
 
@@ -86,38 +90,30 @@ export type Transaction = {
   origins: Array<{ originType: "MANUAL" | "CSV_IMPORT" }>
 }
 
-export type PlanningCategory = {
+export type PlanningCategoryItem = {
   categoryId: string
-  groupName: string
   categoryName: string
+  sortOrder: string
   assignedMinor: number
   activityMinor: number
   availableMinor: number
+  isIncomeCategory?: boolean
+}
+
+export type PlanningGroup = {
+  groupId: string
+  groupName: string
+  groupSortOrder: string
+  categories: PlanningCategoryItem[]
 }
 
 export type PlanningResponse = {
   month: string
   readyToAssignMinor: number
-  categories: PlanningCategory[]
+  groups: PlanningGroup[]
 }
 
-export type ReportingResponse = {
-  spendingByCategory: Array<{
-    categoryId: string
-    categoryName: string
-    groupName: string
-    totalMinor: number
-  }>
-  incomeExpenseByMonth: Array<{
-    month: string
-    incomeMinor: number
-    expenseMinor: number
-  }>
-  accountBalanceTrend: Array<{
-    month: string
-    balanceMinor: number
-  }>
-}
+export type { CategoryReportResponse } from "@ledgr/shared"
 
 export type AssignmentMutationInput = {
   categoryId: string
@@ -160,12 +156,9 @@ export type UpdateAccountNameMutationInput = {
 
 export const APP_TAB_VALUES = [
   "transactions",
-  "accounts",
-  "payees",
-  "categories",
-  "tags",
-  "planning",
+  "budget",
   "reports",
+  "configure",
 ] as const
 export type AppTab = (typeof APP_TAB_VALUES)[number]
 
@@ -182,5 +175,5 @@ export const getInitialAppTab = (): AppTab => {
     return tabParam
   }
 
-  return "accounts"
+  return "transactions"
 }

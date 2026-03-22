@@ -26,5 +26,26 @@ export const usePlanningMutations = (opts: {
     },
   })
 
-  return { assignMutation }
+  const autoCoverMutation = useMutation({
+    mutationFn: (inputs: AssignmentMutationInput[]) =>
+      apiFetch("/api/planning/assignments/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          assignments: inputs.map((input) => ({
+            month: opts.month,
+            categoryId: input.categoryId,
+            assignedMinor: input.assignedMinor,
+          })),
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Underfunded categories covered")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to auto-cover: ${error.message}`)
+    },
+  })
+
+  return { assignMutation, autoCoverMutation }
 }

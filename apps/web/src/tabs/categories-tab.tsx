@@ -6,6 +6,8 @@ import { apiFetch } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { InlineEditName } from "../components/inline-edit-name.js"
 import type { CategoryGroup } from "../types.js"
+
+const UNCATEGORIZED_GROUP_ID = "__uncategorized__"
 import type { UseQueryResult } from "@tanstack/react-query"
 import type {
   CategoryDeleteImpact,
@@ -107,7 +109,7 @@ export const CategoriesTab = ({
         type: "group",
         id: groupId,
         name: groupName,
-        impact: { categories: 0, transactions: 0, splits: 0, assignments: 0, payeeDefaults: 0 },
+        impact: { categories: 0 },
       })
     } finally {
       setLoadingImpact(false)
@@ -153,7 +155,9 @@ export const CategoriesTab = ({
           ) : filteredGroups.length === 0 ? (
             <p className="muted">No categories found.</p>
           ) : (
-            filteredGroups.map((group) => (
+            filteredGroups.map((group) => {
+              const isUncategorized = group.id === UNCATEGORIZED_GROUP_ID
+              return (
               <div key={group.id} className="category-group-section">
                 <div className="category-group-header">
                   <button
@@ -182,38 +186,46 @@ export const CategoriesTab = ({
                     </svg>
                   </button>
 
-                  <InlineEditName
-                    value={group.name}
-                    onSave={(name) =>
-                      updateCategoryGroupMutation.mutate({
-                        groupId: group.id,
-                        name,
-                      })
-                    }
-                    isSaving={updateCategoryGroupMutation.isPending}
-                    className="category-group-name"
-                    inputWidth="14rem"
-                  />
+                  {isUncategorized ? (
+                    <span className="category-group-name" style={{ fontWeight: 600 }}>
+                      {group.name}
+                    </span>
+                  ) : (
+                    <InlineEditName
+                      value={group.name}
+                      onSave={(name) =>
+                        updateCategoryGroupMutation.mutate({
+                          groupId: group.id,
+                          name,
+                        })
+                      }
+                      isSaving={updateCategoryGroupMutation.isPending}
+                      className="category-group-name"
+                      inputWidth="14rem"
+                    />
+                  )}
 
                   <span className="muted" style={{ fontSize: "0.8rem", marginLeft: "0.5rem" }}>
                     {group.categories.length} categor{group.categories.length === 1 ? "y" : "ies"}
                   </span>
 
-                  <div style={{ marginLeft: "auto", display: "flex", gap: "0.3rem" }}>
-                    <button
-                      type="button"
-                      className="icon-button-danger"
-                      title="Delete group"
-                      disabled={loadingImpact}
-                      onClick={() => void handleDeleteGroup(group.id, group.name)}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18" />
-                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                      </svg>
-                    </button>
-                  </div>
+                  {!isUncategorized && (
+                    <div style={{ marginLeft: "auto", display: "flex", gap: "0.3rem" }}>
+                      <button
+                        type="button"
+                        className="icon-button-danger"
+                        title="Delete group"
+                        disabled={loadingImpact}
+                        onClick={() => void handleDeleteGroup(group.id, group.name)}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {!collapsedGroups.has(group.id) && (
@@ -246,7 +258,7 @@ export const CategoriesTab = ({
                                   options={[
                                     { value: "", label: "Move to..." },
                                     ...groups
-                                      .filter((g) => g.id !== group.id)
+                                      .filter((g) => g.id !== group.id && g.id !== UNCATEGORIZED_GROUP_ID)
                                       .map((g) => ({ value: g.id, label: g.name })),
                                   ]}
                                   value=""
@@ -309,7 +321,8 @@ export const CategoriesTab = ({
                   </div>
                 )}
               </div>
-            ))
+              )
+            })
           )}
         </div>
       </section>
@@ -326,31 +339,38 @@ export const CategoriesTab = ({
               Delete {deleteDialog.type === "group" ? "group" : "category"} &ldquo;{deleteDialog.name}&rdquo;?
             </h3>
             <div style={{ margin: 0, fontSize: "0.88rem" }}>
-              {deleteDialog.type === "group" && "categories" in deleteDialog.impact ? (
+              {deleteDialog.type === "group" ? (
+                <>
+                  {deleteDialog.impact.categories > 0 ? (
+                    <p>
+                      {deleteDialog.impact.categories} categor{deleteDialog.impact.categories === 1 ? "y" : "ies"} will be moved to Uncategorized.
+                    </p>
+                  ) : (
+                    <p>This group has no categories.</p>
+                  )}
+                </>
+              ) : (
                 <p>
-                  This will delete {deleteDialog.impact.categories} categor{deleteDialog.impact.categories === 1 ? "y" : "ies"} in this group.
+                  {deleteDialog.impact.transactions > 0
+                    ? `${deleteDialog.impact.transactions} transaction${deleteDialog.impact.transactions === 1 ? "" : "s"} will have this category cleared. `
+                    : ""}
+                  {deleteDialog.impact.splits > 0
+                    ? `${deleteDialog.impact.splits} split line${deleteDialog.impact.splits === 1 ? "" : "s"} will be deleted. `
+                    : ""}
+                  {deleteDialog.impact.assignments > 0
+                    ? `${deleteDialog.impact.assignments} budget assignment${deleteDialog.impact.assignments === 1 ? "" : "s"} will be removed. `
+                    : ""}
+                  {deleteDialog.impact.payeeDefaults > 0
+                    ? `${deleteDialog.impact.payeeDefaults} payee default${deleteDialog.impact.payeeDefaults === 1 ? "" : "s"} will be cleared. `
+                    : ""}
+                  {deleteDialog.impact.transactions === 0 &&
+                  deleteDialog.impact.splits === 0 &&
+                  deleteDialog.impact.assignments === 0 &&
+                  deleteDialog.impact.payeeDefaults === 0
+                    ? "No transactions or assignments are affected."
+                    : ""}
                 </p>
-              ) : null}
-              <p>
-                {deleteDialog.impact.transactions > 0
-                  ? `${deleteDialog.impact.transactions} transaction${deleteDialog.impact.transactions === 1 ? "" : "s"} will have ${deleteDialog.type === "category" ? "this" : "their"} category cleared. `
-                  : ""}
-                {deleteDialog.impact.splits > 0
-                  ? `${deleteDialog.impact.splits} split line${deleteDialog.impact.splits === 1 ? "" : "s"} will be deleted. `
-                  : ""}
-                {deleteDialog.impact.assignments > 0
-                  ? `${deleteDialog.impact.assignments} budget assignment${deleteDialog.impact.assignments === 1 ? "" : "s"} will be removed. `
-                  : ""}
-                {deleteDialog.impact.payeeDefaults > 0
-                  ? `${deleteDialog.impact.payeeDefaults} payee default${deleteDialog.impact.payeeDefaults === 1 ? "" : "s"} will be cleared. `
-                  : ""}
-                {deleteDialog.impact.transactions === 0 &&
-                deleteDialog.impact.splits === 0 &&
-                deleteDialog.impact.assignments === 0 &&
-                deleteDialog.impact.payeeDefaults === 0
-                  ? "No transactions or assignments are affected."
-                  : ""}
-              </p>
+              )}
               <p>This cannot be undone.</p>
             </div>
             <div className="dialog-actions">

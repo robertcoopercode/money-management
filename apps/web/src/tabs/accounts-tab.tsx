@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { Switch } from "@base-ui/react/switch"
 import { formatMoney } from "@ledgr/shared"
 import { TextInput } from "../components/text-input.js"
 import { AppSelect } from "../components/app-select.js"
@@ -31,9 +32,11 @@ export const AccountsTab = ({
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] =
     useState(false)
   const [newAccount, setNewAccount] = useState(emptyNewAccount)
+  const [showInactive, setShowInactive] = useState(false)
   const {
     createAccountMutation,
     updateAccountNameMutation,
+    toggleAccountActiveMutation,
     deleteAccountMutation,
   } = useAccountMutations({
     refetchCoreData,
@@ -46,21 +49,39 @@ export const AccountsTab = ({
     onCreateReset: () => {},
   })
 
+  const visibleAccounts = useMemo(() => {
+    const all = accountsQuery.data ?? []
+    if (showInactive) return all
+    return all.filter((a) => a.isActive)
+  }, [accountsQuery.data, showInactive])
+
   return (
     <>
       <section className="card">
         <div className="section-header">
           <h2>Accounts</h2>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => setIsCreateAccountDialogOpen(true)}
-            aria-label="Create account"
-            aria-haspopup="dialog"
-            aria-expanded={isCreateAccountDialogOpen}
-          >
-            +
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label className="app-switch-label">
+              <Switch.Root
+                className="app-switch"
+                checked={showInactive}
+                onCheckedChange={setShowInactive}
+              >
+                <Switch.Thumb className="app-switch-thumb" />
+              </Switch.Root>
+              Show inactive
+            </label>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setIsCreateAccountDialogOpen(true)}
+              aria-label="Create account"
+              aria-haspopup="dialog"
+              aria-expanded={isCreateAccountDialogOpen}
+            >
+              +
+            </button>
+          </div>
         </div>
         {accountsQuery.isError ? (
           <p className="error-text">
@@ -73,15 +94,21 @@ export const AccountsTab = ({
         <div className="list" style={{ marginTop: "0.85rem" }}>
           {accountsQuery.isLoading ? (
             <p className="muted">Loading accounts...</p>
-          ) : (accountsQuery.data?.length ?? 0) === 0 ? (
+          ) : visibleAccounts.length === 0 ? (
             <p className="muted">
-              No accounts yet. Add one to get started.
+              {showInactive
+                ? "No accounts yet. Add one to get started."
+                : "No active accounts. Toggle \"Show inactive\" to see archived accounts."}
             </p>
           ) : (
-            (accountsQuery.data ?? []).map((account) => {
+            visibleAccounts.map((account) => {
               const displayBalance = account.balanceMinor
               return (
-                <div className="list-item" key={account.id}>
+                <div
+                  className="list-item"
+                  key={account.id}
+                  style={account.isActive ? undefined : { opacity: 0.5 }}
+                >
                   <div className="account-item-main">
                     <InlineEditName
                       value={account.name}
@@ -94,6 +121,22 @@ export const AccountsTab = ({
                       isSaving={updateAccountNameMutation.isPending}
                       ariaLabel={`Account name for ${account.name}`}
                     />
+                    {!account.isActive && (
+                      <span
+                        style={{
+                          fontSize: "0.65rem",
+                          padding: "0.05rem 0.35rem",
+                          borderRadius: "4px",
+                          background: "rgb(248 113 113 / 15%)",
+                          color: "rgb(248 113 113)",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          marginLeft: "0.35rem",
+                        }}
+                      >
+                        Inactive
+                      </span>
+                    )}
                   </div>
                   <div className="account-item-meta">
                     <span className="muted">
@@ -110,6 +153,50 @@ export const AccountsTab = ({
                     >
                       {formatMoney(displayBalance)}
                     </strong>
+                    <button
+                      type="button"
+                      className="edit-icon-button"
+                      title={account.isActive ? "Mark inactive" : "Reactivate"}
+                      onClick={() =>
+                        toggleAccountActiveMutation.mutate({
+                          accountId: account.id,
+                          isActive: !account.isActive,
+                        })
+                      }
+                      disabled={toggleAccountActiveMutation.isPending}
+                    >
+                      {account.isActive ? (
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18.36 6.64A9 9 0 0 1 20.77 15" />
+                          <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" />
+                          <path d="M12 2v4" />
+                          <path d="m2 2 20 20" />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+                          <path d="m9 11 3 3L22 4" />
+                        </svg>
+                      )}
+                    </button>
                     <button
                       type="button"
                       className="icon-button-danger"

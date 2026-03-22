@@ -91,7 +91,7 @@ model Payee {
 model CategoryGroup {
   id         String     @id @default(cuid())
   name       String
-  sortOrder  Int        @default(0)
+  sortOrder  String     @default("a0")
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
   categories Category[]
@@ -101,20 +101,18 @@ model CategoryGroup {
 
 model Category {
   id               String               @id @default(cuid())
-  name             String
-  groupId          String
+  name             String               @unique
+  groupId          String?
   isIncomeCategory Boolean              @default(false)
   isArchived       Boolean              @default(false)
-  sortOrder        Int                  @default(0)
+  sortOrder        String               @default("a0")
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   assignments      CategoryAssignment[]
-  group            CategoryGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group            CategoryGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
   transactions      Transaction[]
   transactionSplits TransactionSplit[]
   payeesWithDefault Payee[]            @relation("PayeeDefaultCategory")
-
-  @@unique([groupId, name])
 }
 
 model Transaction {
@@ -217,29 +215,17 @@ model ImportRowMatch {
   @@index([importBatchId, rowIndex])
 }
 
-model BudgetMonth {
-  id                 String               @id @default(cuid())
-  month              String
-  readyToAssignMinor Int                  @default(0)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  assignments        CategoryAssignment[]
-
-  @@unique([month])
-}
-
 model CategoryAssignment {
   id            String     @id @default(cuid())
-  budgetMonthId String
+  month         String
   categoryId    String
   assignedMinor Int        @default(0)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  budgetMonth   BudgetMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade)
   category      Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  @@unique([budgetMonthId, categoryId])
-  @@index([categoryId, budgetMonthId])
+  @@unique([month, categoryId])
+  @@index([categoryId, month])
 }
 
 model Tag {
