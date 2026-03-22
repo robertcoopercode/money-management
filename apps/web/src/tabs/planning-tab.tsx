@@ -299,12 +299,10 @@ export const PlanningTab = ({
 
     // Find which group the active cat is currently in (within dragGroups)
     let currentGroupId: string | undefined
-    let currentIndex = -1
     for (const g of dragGroups) {
       const idx = g.categories.findIndex((c) => c.categoryId === activeItem.id)
       if (idx !== -1) {
         currentGroupId = g.groupId
-        currentIndex = idx
         break
       }
     }
@@ -312,7 +310,7 @@ export const PlanningTab = ({
 
     // Determine the target group and index
     let targetGroupId: string | undefined
-    let targetIndex: number
+    let targetIndex: number = 0
 
     if (overItem.type === "group") {
       targetGroupId = overItem.id
@@ -407,8 +405,8 @@ export const PlanningTab = ({
       }
 
       const newSortOrder = generateKeyBetween(
-        newIndex < oldIndex ? (newIndex > 0 ? serverGroups[newIndex - 1].groupSortOrder : null) : serverGroups[newIndex].groupSortOrder,
-        newIndex < oldIndex ? serverGroups[newIndex].groupSortOrder : (newIndex < serverGroups.length - 1 ? serverGroups[newIndex + 1].groupSortOrder : null),
+        newIndex < oldIndex ? (newIndex > 0 ? serverGroups[newIndex - 1]?.groupSortOrder ?? null : null) : serverGroups[newIndex]!.groupSortOrder,
+        newIndex < oldIndex ? serverGroups[newIndex]!.groupSortOrder : (newIndex < serverGroups.length - 1 ? serverGroups[newIndex + 1]?.groupSortOrder ?? null : null),
       )
 
       patchPlanningCache((prev) => {
@@ -470,7 +468,7 @@ export const PlanningTab = ({
           const overIdx = cats.findIndex((c) => c.categoryId === overItem.id)
           if (activeIdx !== -1 && overIdx !== -1) {
             const [moved] = cats.splice(activeIdx, 1)
-            cats.splice(overIdx, 0, moved)
+            cats.splice(overIdx, 0, moved!)
           }
         }
         reorderedCats = cats

@@ -106,7 +106,7 @@ export function CategoryReportTable({ data }: CategoryReportTableProps) {
         {groups.map((group, gi) => {
           const groupKey = group.groupId ?? group.groupName
           const isCollapsed = collapsed.has(groupKey)
-          const agg = groupAggregates[gi]
+          const agg = groupAggregates[gi]!
 
           return (
             <tbody key={groupKey} className="rt-group-body">

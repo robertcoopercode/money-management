@@ -38,7 +38,7 @@ type TransactionEditRowProps = {
   onCreatePayee?: (name: string) => Promise<{ id: string; name: string }>
   isCreatingPayee?: boolean
   onManagePayees?: () => void
-  onCreateCategory?: (input: { name: string; groupName: string }) => Promise<{ id: string; name: string }>
+  onCreateCategory?: (input: { name: string; groupName?: string }) => Promise<{ id: string; name: string }>
   isCreatingCategory?: boolean
   onCreateTag?: (name: string) => Promise<Tag>
 }

@@ -24,6 +24,7 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
       id: "acc-cash",
       name: "Checking",
       type: "CASH",
+      isActive: true,
       startingBalanceMinor: 0,
       clearedBalanceMinor: 0,
       unclearedBalanceMinor: 10000,

@@ -18,7 +18,8 @@ export function AppCheckbox({
   return (
     <Checkbox.Root
       className="app-checkbox"
-      checked={indeterminate ? "mixed" : checked}
+      checked={checked}
+      indeterminate={indeterminate}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       aria-label={ariaLabel}
