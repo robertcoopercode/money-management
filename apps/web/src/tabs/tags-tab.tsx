@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Switch } from "@base-ui/react/switch"
 import { TextInput } from "../components/text-input.js"
+import { AppDialog } from "../components/app-dialog.js"
 import { useTagMutations } from "../hooks/use-tag-mutations.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import type { Tag } from "../types.js"
@@ -234,134 +235,128 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
         )}
       </section>
 
-      {modal && (
-        <div className="dialog-backdrop" onClick={closeModal}>
-          <div
-            className="dialog-card"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
+      <AppDialog
+        open={modal !== null}
+        onOpenChange={(open) => { if (!open) closeModal() }}
+        title={modal?.mode === "create" ? "New Tag" : "Edit Tag"}
+      >
+        {modal && (
+          <form
+            className="tag-create-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              handleSubmit()
+            }}
           >
-            <h3 style={{ margin: 0 }}>
-              {modal.mode === "create" ? "New Tag" : "Edit Tag"}
-            </h3>
-            <form
-              className="tag-create-form"
-              onSubmit={(event) => {
-                event.preventDefault()
-                handleSubmit()
-              }}
-            >
-              <div className="tag-form-fields">
-                <label>
-                  Name
-                  <TextInput
-                    autoFocus
-                    value={tagForm.name}
+            <div className="tag-form-fields">
+              <label>
+                Name
+                <TextInput
+                  autoFocus
+                  value={tagForm.name}
+                  onChange={(e) =>
+                    setTagForm((s) => ({ ...s, name: e.target.value }))
+                  }
+                  required
+                  maxLength={120}
+                />
+              </label>
+              <label>
+                Description
+                <TextInput
+                  value={tagForm.description}
+                  onChange={(e) =>
+                    setTagForm((s) => ({ ...s, description: e.target.value }))
+                  }
+                  maxLength={500}
+                  placeholder="Optional description"
+                />
+              </label>
+            </div>
+            <div className="tag-color-row">
+              <label>
+                Background
+                <div className="tag-color-picker">
+                  <input
+                    type="color"
+                    value={tagForm.backgroundColor}
                     onChange={(e) =>
-                      setTagForm((s) => ({ ...s, name: e.target.value }))
+                      setTagForm((s) => ({ ...s, backgroundColor: e.target.value }))
                     }
-                    required
-                    maxLength={120}
                   />
-                </label>
-                <label>
-                  Description
-                  <TextInput
-                    value={tagForm.description}
+                  <span className="tag-color-hex">{tagForm.backgroundColor}</span>
+                </div>
+              </label>
+              <label>
+                Text
+                <div className="tag-color-picker">
+                  <input
+                    type="color"
+                    value={tagForm.textColor}
                     onChange={(e) =>
-                      setTagForm((s) => ({ ...s, description: e.target.value }))
+                      setTagForm((s) => ({ ...s, textColor: e.target.value }))
                     }
-                    maxLength={500}
-                    placeholder="Optional description"
                   />
-                </label>
-              </div>
-              <div className="tag-color-row">
-                <label>
-                  Background
-                  <div className="tag-color-picker">
-                    <input
-                      type="color"
-                      value={tagForm.backgroundColor}
-                      onChange={(e) =>
-                        setTagForm((s) => ({ ...s, backgroundColor: e.target.value }))
+                  <span className="tag-color-hex">{tagForm.textColor}</span>
+                </div>
+              </label>
+              <div className="tag-color-presets">
+                <span className="tag-color-presets-label">Presets</span>
+                <div className="tag-color-presets-row">
+                  {COLOR_PRESETS.map((preset) => (
+                    <button
+                      key={`${preset.bg}-${preset.text}`}
+                      type="button"
+                      className="tag-chip tag-preset-button"
+                      style={{
+                        background: preset.bg,
+                        color: preset.text,
+                        borderColor: preset.bg,
+                      }}
+                      title={`${preset.bg} / ${preset.text}`}
+                      onClick={() =>
+                        setTagForm((s) => ({
+                          ...s,
+                          backgroundColor: preset.bg,
+                          textColor: preset.text,
+                        }))
                       }
-                    />
-                    <span className="tag-color-hex">{tagForm.backgroundColor}</span>
-                  </div>
-                </label>
-                <label>
-                  Text
-                  <div className="tag-color-picker">
-                    <input
-                      type="color"
-                      value={tagForm.textColor}
-                      onChange={(e) =>
-                        setTagForm((s) => ({ ...s, textColor: e.target.value }))
-                      }
-                    />
-                    <span className="tag-color-hex">{tagForm.textColor}</span>
-                  </div>
-                </label>
-                <div className="tag-color-presets">
-                  <span className="tag-color-presets-label">Presets</span>
-                  <div className="tag-color-presets-row">
-                    {COLOR_PRESETS.map((preset) => (
-                      <button
-                        key={`${preset.bg}-${preset.text}`}
-                        type="button"
-                        className="tag-chip tag-preset-button"
-                        style={{
-                          background: preset.bg,
-                          color: preset.text,
-                          borderColor: preset.bg,
-                        }}
-                        title={`${preset.bg} / ${preset.text}`}
-                        onClick={() =>
-                          setTagForm((s) => ({
-                            ...s,
-                            backgroundColor: preset.bg,
-                            textColor: preset.text,
-                          }))
-                        }
-                      >
-                        Aa
-                      </button>
-                    ))}
-                  </div>
+                    >
+                      Aa
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="tag-form-preview-row">
-                <span className="tag-form-preview-label">Preview:</span>
-                <span
-                  className="tag-chip"
-                  style={{
-                    backgroundColor: tagForm.backgroundColor,
-                    color: tagForm.textColor,
-                  }}
-                >
-                  {tagForm.name ? tagForm.name.toUpperCase() : "TAG NAME"}
-                </span>
-              </div>
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
-                >
-                  Cancel
-                </button>
-                <button type="submit" disabled={isPending}>
-                  {isPending
-                    ? (modal.mode === "create" ? "Creating..." : "Saving...")
-                    : (modal.mode === "create" ? "Create Tag" : "Save Changes")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="tag-form-preview-row">
+              <span className="tag-form-preview-label">Preview:</span>
+              <span
+                className="tag-chip"
+                style={{
+                  backgroundColor: tagForm.backgroundColor,
+                  color: tagForm.textColor,
+                }}
+              >
+                {tagForm.name ? tagForm.name.toUpperCase() : "TAG NAME"}
+              </span>
+            </div>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                onClick={closeModal}
+                style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
+              >
+                Cancel
+              </button>
+              <button type="submit" disabled={isPending}>
+                {isPending
+                  ? (modal.mode === "create" ? "Creating..." : "Saving...")
+                  : (modal.mode === "create" ? "Create Tag" : "Save Changes")}
+              </button>
+            </div>
+          </form>
+        )}
+      </AppDialog>
     </>
   )
 }

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Account" ADD COLUMN     "startingBalanceAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

@@ -185,6 +185,7 @@ export const getPlanningMonth = (month: string) =>
         incomeThroughMonth,
         incomeSplitsThroughMonth,
         totalAssignedThroughMonth,
+        accountStartingBalances,
       ] = await Promise.all([
         prisma.transaction.aggregate({
           _sum: { amountMinor: true },
@@ -208,12 +209,20 @@ export const getPlanningMonth = (month: string) =>
             month: { lte: month },
           },
         }),
+        prisma.account.aggregate({
+          _sum: { startingBalanceMinor: true },
+          where: {
+            type: { in: ["CASH", "CREDIT"] },
+            startingBalanceAt: { lt: endExclusive },
+          },
+        }),
       ])
 
       const readyToAssignMinor = calculateReadyToAssignMinor({
         incomeThroughMonthMinor:
           (incomeThroughMonth._sum.amountMinor ?? 0) +
-          (incomeSplitsThroughMonth._sum.amountMinor ?? 0),
+          (incomeSplitsThroughMonth._sum.amountMinor ?? 0) +
+          (accountStartingBalances._sum.startingBalanceMinor ?? 0),
         assignedThroughMonthMinor:
           totalAssignedThroughMonth._sum.assignedMinor ?? 0,
       })

@@ -15,7 +15,7 @@ const accountBaseSchema = z.object({
   name: z.string().min(1).max(120),
   type: accountTypeSchema,
   startingBalanceMinor: z.number().int(),
-  openedAt: z.iso.datetime().optional(),
+  startingBalanceAt: z.iso.datetime().optional(),
   loanType: loanTypeSchema.optional(),
   interestRateAnnual: z.number().min(0).max(100).optional(),
   minimumPaymentMinor: z.number().int().min(0).optional(),

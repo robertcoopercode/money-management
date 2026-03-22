@@ -1,3 +1,5 @@
+import { AppDialog } from "./app-dialog.js"
+
 export type CategoryDeleteImpact = {
   transactions: number
   splits: number
@@ -26,20 +28,18 @@ export const DeleteImpactDialog = ({
   onClose,
   onConfirm,
   isPending,
-}: DeleteImpactDialogProps) => {
-  if (!state) return null
-
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="dialog-card"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ margin: 0 }}>
-          Delete {state.type === "group" ? "group" : "category"} &ldquo;{state.name}&rdquo;?
-        </h3>
+}: DeleteImpactDialogProps) => (
+  <AppDialog
+    open={state !== null}
+    onOpenChange={(open) => { if (!open) onClose() }}
+    title={
+      state
+        ? `Delete ${state.type === "group" ? "group" : "category"} \u201c${state.name}\u201d?`
+        : "Delete"
+    }
+  >
+    {state && (
+      <>
         <div style={{ margin: 0, fontSize: "0.88rem" }}>
           {state.type === "group" ? (
             <>
@@ -90,9 +90,9 @@ export const DeleteImpactDialog = ({
             {isPending ? "Deleting..." : "Delete"}
           </button>
         </div>
-      </div>
-    </div>
-  )
-}
+      </>
+    )}
+  </AppDialog>
+)
 
 export type { DeleteDialogState }

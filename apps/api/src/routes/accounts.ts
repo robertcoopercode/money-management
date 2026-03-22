@@ -25,7 +25,9 @@ export const registerAccountRoutes = (app: Hono) => {
         name: payload.name,
         type: payload.type,
         startingBalanceMinor: payload.startingBalanceMinor,
-        openedAt: payload.openedAt ? new Date(payload.openedAt) : undefined,
+        ...(payload.startingBalanceAt
+          ? { startingBalanceAt: new Date(payload.startingBalanceAt) }
+          : {}),
         ...(payload.type === "LOAN" && payload.loanType
           ? {
               loanProfile: {
@@ -52,7 +54,9 @@ export const registerAccountRoutes = (app: Hono) => {
         name: payload.name,
         type: payload.type,
         startingBalanceMinor: payload.startingBalanceMinor,
-        openedAt: payload.openedAt ? new Date(payload.openedAt) : undefined,
+        ...(payload.startingBalanceAt
+          ? { startingBalanceAt: new Date(payload.startingBalanceAt) }
+          : {}),
         ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
       }),
     )

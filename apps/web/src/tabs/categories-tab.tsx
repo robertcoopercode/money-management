@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { TextInput } from "../components/text-input.js"
 import { AppSelect } from "../components/app-select.js"
+import { AppDialog } from "../components/app-dialog.js"
 import { useCategoryMutations } from "../hooks/use-category-mutations.js"
 import { apiFetch } from "../lib/api.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
@@ -327,17 +328,17 @@ export const CategoriesTab = ({
         </div>
       </section>
 
-      {deleteDialog ? (
-        <div className="dialog-backdrop" onClick={() => setDeleteDialog(null)}>
-          <div
-            className="dialog-card"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: 0 }}>
-              Delete {deleteDialog.type === "group" ? "group" : "category"} &ldquo;{deleteDialog.name}&rdquo;?
-            </h3>
+      <AppDialog
+        open={deleteDialog !== null}
+        onOpenChange={(open) => { if (!open) setDeleteDialog(null) }}
+        title={
+          deleteDialog
+            ? `Delete ${deleteDialog.type === "group" ? "group" : "category"} \u201c${deleteDialog.name}\u201d?`
+            : "Delete"
+        }
+      >
+        {deleteDialog && (
+          <>
             <div style={{ margin: 0, fontSize: "0.88rem" }}>
               {deleteDialog.type === "group" ? (
                 <>
@@ -388,9 +389,9 @@ export const CategoriesTab = ({
                 {isPendingDelete ? "Deleting..." : "Delete"}
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        )}
+      </AppDialog>
     </>
   )
 }

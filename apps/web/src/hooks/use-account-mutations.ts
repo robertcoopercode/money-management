@@ -8,6 +8,7 @@ type NewAccountState = {
   name: string
   type: Account["type"]
   startingBalance: string
+  startingBalanceAt: string
   loanType: LoanProfile["loanType"]
   interestRate: string
   minimumPayment: string
@@ -29,6 +30,9 @@ export const useAccountMutations = (opts: {
           startingBalanceMinor: parseMoneyInputToMinor(
             newAccount.startingBalance,
           ),
+          startingBalanceAt: new Date(
+            newAccount.startingBalanceAt + "T00:00:00.000Z",
+          ).toISOString(),
           ...(newAccount.type === "LOAN"
             ? {
                 loanType: newAccount.loanType,
@@ -82,6 +86,32 @@ export const useAccountMutations = (opts: {
     },
   })
 
+  const updateStartingBalanceMutation = useMutation({
+    mutationFn: ({
+      accountId,
+      startingBalanceMinor,
+      startingBalanceAt,
+    }: {
+      accountId: string
+      startingBalanceMinor: number
+      startingBalanceAt: string
+    }) =>
+      apiFetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          startingBalanceMinor,
+          startingBalanceAt: new Date(startingBalanceAt + "T00:00:00.000Z").toISOString(),
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Starting balance updated")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to update starting balance: ${error.message}`)
+    },
+  })
+
   const deleteAccountMutation = useMutation({
     mutationFn: (accountId: string) =>
       apiFetch(`/api/accounts/${accountId}`, { method: "DELETE" }),
@@ -98,6 +128,7 @@ export const useAccountMutations = (opts: {
     createAccountMutation,
     updateAccountNameMutation,
     toggleAccountActiveMutation,
+    updateStartingBalanceMutation,
     deleteAccountMutation,
   }
 }

@@ -17,6 +17,7 @@ import { apiFetch } from "../lib/api.js"
 import { usePlanningMutations } from "../hooks/use-planning-mutations.js"
 import { useCategoryMutations } from "../hooks/use-category-mutations.js"
 import { TextInput } from "../components/text-input.js"
+import { AppDialog } from "../components/app-dialog.js"
 import { PlanningToolbar } from "../components/planning-toolbar.js"
 import { PlanningGroupSection } from "../components/planning-group.js"
 import {
@@ -624,60 +625,58 @@ export const PlanningTab = ({
         </DndContext>
       )}
 
-      {newGroupPrompt && (
-        <div className="dialog-backdrop" onClick={() => setNewGroupPrompt(false)}>
-          <div className="dialog-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0 }}>New Category Group</h3>
-            <TextInput
-              autoFocus
-              placeholder="Group name"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitNewGroup()
-                if (e.key === "Escape") setNewGroupPrompt(false)
-              }}
-            />
-            <div className="dialog-actions">
-              <button onClick={() => setNewGroupPrompt(false)} style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}>
-                Cancel
-              </button>
-              <button onClick={submitNewGroup} disabled={createCategoryGroupMutation.isPending || !newGroupName.trim()}>
-                {createCategoryGroupMutation.isPending ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </div>
+      <AppDialog
+        open={newGroupPrompt}
+        onOpenChange={(open) => { if (!open) setNewGroupPrompt(false) }}
+        title="New Category Group"
+      >
+        <TextInput
+          autoFocus
+          placeholder="Group name"
+          value={newGroupName}
+          onChange={(e) => setNewGroupName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitNewGroup()
+            if (e.key === "Escape") setNewGroupPrompt(false)
+          }}
+        />
+        <div className="dialog-actions">
+          <button onClick={() => setNewGroupPrompt(false)} style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}>
+            Cancel
+          </button>
+          <button onClick={submitNewGroup} disabled={createCategoryGroupMutation.isPending || !newGroupName.trim()}>
+            {createCategoryGroupMutation.isPending ? "Creating..." : "Create"}
+          </button>
         </div>
-      )}
+      </AppDialog>
 
-      {addCategoryGroupId && (
-        <div className="dialog-backdrop" onClick={() => setAddCategoryGroupId(null)}>
-          <div className="dialog-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0 }}>New Category</h3>
-            <p className="muted" style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}>
-              in {groups.find((g) => g.groupId === addCategoryGroupId)?.groupName ?? "group"}
-            </p>
-            <TextInput
-              autoFocus
-              placeholder="Category name"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitNewCategory()
-                if (e.key === "Escape") setAddCategoryGroupId(null)
-              }}
-            />
-            <div className="dialog-actions">
-              <button onClick={() => setAddCategoryGroupId(null)} style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}>
-                Cancel
-              </button>
-              <button onClick={submitNewCategory} disabled={createCategoryMutation.isPending || !newCategoryName.trim()}>
-                {createCategoryMutation.isPending ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </div>
+      <AppDialog
+        open={addCategoryGroupId !== null}
+        onOpenChange={(open) => { if (!open) setAddCategoryGroupId(null) }}
+        title="New Category"
+      >
+        <p className="muted" style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}>
+          in {groups.find((g) => g.groupId === addCategoryGroupId)?.groupName ?? "group"}
+        </p>
+        <TextInput
+          autoFocus
+          placeholder="Category name"
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitNewCategory()
+            if (e.key === "Escape") setAddCategoryGroupId(null)
+          }}
+        />
+        <div className="dialog-actions">
+          <button onClick={() => setAddCategoryGroupId(null)} style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}>
+            Cancel
+          </button>
+          <button onClick={submitNewCategory} disabled={createCategoryMutation.isPending || !newCategoryName.trim()}>
+            {createCategoryMutation.isPending ? "Creating..." : "Create"}
+          </button>
         </div>
-      )}
+      </AppDialog>
 
       <AutoCoverDialog
         items={autoCoverItems}

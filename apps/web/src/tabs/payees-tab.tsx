@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Switch } from "@base-ui/react/switch"
 import { TextInput } from "../components/text-input.js"
+import { AppDialog } from "../components/app-dialog.js"
 import { AppCheckbox } from "../components/app-checkbox.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { usePayeeMutations } from "../hooks/use-payee-mutations.js"
@@ -308,37 +309,31 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
         </div>
       </section>
 
-      {showDeleteConfirm ? (
-        <div className="dialog-backdrop" onClick={() => setShowDeleteConfirm(false)}>
-          <div
-            className="dialog-card"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
+      <AppDialog
+        open={showDeleteConfirm}
+        onOpenChange={(open) => { if (!open) setShowDeleteConfirm(false) }}
+        title={`Delete ${selectedPayeeIds.size} payees?`}
+      >
+        <p style={{ margin: 0, fontSize: "0.88rem" }}>
+          This will remove the selected payees. Transactions linked to these
+          payees will have their payee cleared. This cannot be undone.
+        </p>
+        <div className="dialog-actions">
+          <button
+            onClick={() => setShowDeleteConfirm(false)}
+            style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
           >
-            <h3 style={{ margin: 0 }}>Delete {selectedPayeeIds.size} payees?</h3>
-            <p style={{ margin: 0, fontSize: "0.88rem" }}>
-              This will remove the selected payees. Transactions linked to these
-              payees will have their payee cleared. This cannot be undone.
-            </p>
-            <div className="dialog-actions">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
-              >
-                Cancel
-              </button>
-              <button
-                className="button-danger"
-                onClick={confirmDelete}
-                disabled={deletePayeeMutation.isPending}
-              >
-                {deletePayeeMutation.isPending ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
+            Cancel
+          </button>
+          <button
+            className="button-danger"
+            onClick={confirmDelete}
+            disabled={deletePayeeMutation.isPending}
+          >
+            {deletePayeeMutation.isPending ? "Deleting..." : "Delete"}
+          </button>
         </div>
-      ) : null}
+      </AppDialog>
     </>
   )
 }

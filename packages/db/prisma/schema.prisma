@@ -54,7 +54,7 @@ model Account {
   name                String
   type                AccountType
   startingBalanceMinor Int          @default(0)
-  openedAt            DateTime?
+  startingBalanceAt   DateTime     @default(now())
   isActive            Boolean       @default(true)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt

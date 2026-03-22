@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react"
 import { Switch } from "@base-ui/react/switch"
-import { formatMoney } from "@ledgr/shared"
+import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { TextInput } from "../components/text-input.js"
+import { DatePicker } from "../components/date-picker.js"
 import { AppSelect } from "../components/app-select.js"
+import { AppDialog } from "../components/app-dialog.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { useAccountMutations } from "../hooks/use-account-mutations.js"
 import { InlineEditName } from "../components/inline-edit-name.js"
@@ -15,13 +17,22 @@ type AccountsTabProps = {
   onAccountCreated: (accountId: string) => void
 }
 
+const todayString = () => new Date().toISOString().slice(0, 10)
+
 const emptyNewAccount = {
   name: "",
   type: "CASH" as Account["type"],
   startingBalance: "0",
+  startingBalanceAt: todayString(),
   loanType: "MORTGAGE" as LoanProfile["loanType"],
   interestRate: "",
   minimumPayment: "",
+}
+
+const formatMoneyForInput = (minor: number) => {
+  const abs = Math.abs(minor)
+  const sign = minor < 0 ? "-" : ""
+  return `${sign}${(abs / 100).toFixed(2)}`
 }
 
 export const AccountsTab = ({
@@ -33,10 +44,14 @@ export const AccountsTab = ({
     useState(false)
   const [newAccount, setNewAccount] = useState(emptyNewAccount)
   const [showInactive, setShowInactive] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [editStartingBalance, setEditStartingBalance] = useState("")
+  const [editStartingBalanceAt, setEditStartingBalanceAt] = useState("")
   const {
     createAccountMutation,
     updateAccountNameMutation,
     toggleAccountActiveMutation,
+    updateStartingBalanceMutation,
     deleteAccountMutation,
   } = useAccountMutations({
     refetchCoreData,
@@ -48,6 +63,16 @@ export const AccountsTab = ({
     onAccountNameUpdated: () => {},
     onCreateReset: () => {},
   })
+
+  const openEditModal = (account: Account) => {
+    setEditingAccount(account)
+    setEditStartingBalance(formatMoneyForInput(account.startingBalanceMinor))
+    setEditStartingBalanceAt(account.startingBalanceAt.slice(0, 10))
+  }
+
+  const closeEditModal = () => {
+    setEditingAccount(null)
+  }
 
   const visibleAccounts = useMemo(() => {
     const all = accountsQuery.data ?? []
@@ -76,8 +101,6 @@ export const AccountsTab = ({
               className="icon-button"
               onClick={() => setIsCreateAccountDialogOpen(true)}
               aria-label="Create account"
-              aria-haspopup="dialog"
-              aria-expanded={isCreateAccountDialogOpen}
             >
               +
             </button>
@@ -153,6 +176,26 @@ export const AccountsTab = ({
                     >
                       {formatMoney(displayBalance)}
                     </strong>
+                    <button
+                      type="button"
+                      className="edit-icon-button"
+                      title="Edit account"
+                      onClick={() => openEditModal(account)}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       className="edit-icon-button"
@@ -235,148 +278,195 @@ export const AccountsTab = ({
         </div>
       </section>
 
-      {isCreateAccountDialogOpen ? (
-        <div
-          className="dialog-backdrop"
-          role="presentation"
-          onClick={() => setIsCreateAccountDialogOpen(false)}
+      <AppDialog
+        open={editingAccount !== null}
+        onOpenChange={(open) => { if (!open) closeEditModal() }}
+        title={editingAccount ? `Edit ${editingAccount.name}` : "Edit Account"}
+      >
+        <form
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!editingAccount) return
+            updateStartingBalanceMutation.mutate(
+              {
+                accountId: editingAccount.id,
+                startingBalanceMinor: parseMoneyInputToMinor(editStartingBalance),
+                startingBalanceAt: editStartingBalanceAt,
+              },
+              { onSuccess: closeEditModal },
+            )
+          }}
         >
-          <div
-            className="dialog-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-account-dialog-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="section-header">
-              <h2 id="create-account-dialog-title">Create account</h2>
-              <button
-                type="button"
-                className="dialog-close-button"
-                onClick={() => setIsCreateAccountDialogOpen(false)}
-                aria-label="Close account dialog"
-              >
-                ×
-              </button>
-            </div>
-            <form
-              className="form-grid"
-              onSubmit={(event) => {
-                event.preventDefault()
-                createAccountMutation.mutate(newAccount)
-              }}
+          <label>
+            Starting Balance
+            <TextInput
+              value={editStartingBalance}
+              onChange={(event) =>
+                setEditStartingBalance(event.target.value)
+              }
+            />
+          </label>
+          <label>
+            Starting Balance Date
+            <DatePicker
+              value={editStartingBalanceAt}
+              onChange={setEditStartingBalanceAt}
+              required
+            />
+          </label>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              onClick={closeEditModal}
+              disabled={updateStartingBalanceMutation.isPending}
             >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={updateStartingBalanceMutation.isPending}
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </AppDialog>
+
+      <AppDialog
+        open={isCreateAccountDialogOpen}
+        onOpenChange={setIsCreateAccountDialogOpen}
+        title="Create account"
+      >
+        <form
+          className="form-grid"
+          onSubmit={(event) => {
+            event.preventDefault()
+            createAccountMutation.mutate(newAccount)
+          }}
+        >
+          <label>
+            Name
+            <TextInput
+              value={newAccount.name}
+              onChange={(event) =>
+                setNewAccount((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              required
+            />
+          </label>
+          <label>
+            Type
+            <AppSelect
+              options={[
+                { value: "CASH", label: "Cash" },
+                { value: "CREDIT", label: "Credit" },
+                { value: "INVESTMENT", label: "Investment" },
+                { value: "LOAN", label: "Loan" },
+              ]}
+              value={newAccount.type}
+              onChange={(value) =>
+                setNewAccount((current) => ({
+                  ...current,
+                  type: value as Account["type"],
+                }))
+              }
+            />
+          </label>
+          {newAccount.type === "LOAN" ? (
+            <>
               <label>
-                Name
+                Loan Type
+                <AppSelect
+                  options={[
+                    { value: "MORTGAGE", label: "Mortgage" },
+                    { value: "AUTO", label: "Auto" },
+                  ]}
+                  value={newAccount.loanType}
+                  onChange={(value) =>
+                    setNewAccount((current) => ({
+                      ...current,
+                      loanType: value as LoanProfile["loanType"],
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Interest Rate (%)
                 <TextInput
-                  value={newAccount.name}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newAccount.interestRate}
                   onChange={(event) =>
                     setNewAccount((current) => ({
                       ...current,
-                      name: event.target.value,
+                      interestRate: event.target.value,
                     }))
                   }
                   required
                 />
               </label>
               <label>
-                Type
-                <AppSelect
-                  options={[
-                    { value: "CASH", label: "Cash" },
-                    { value: "CREDIT", label: "Credit" },
-                    { value: "INVESTMENT", label: "Investment" },
-                    { value: "LOAN", label: "Loan" },
-                  ]}
-                  value={newAccount.type}
-                  onChange={(value) =>
-                    setNewAccount((current) => ({
-                      ...current,
-                      type: value as Account["type"],
-                    }))
-                  }
-                />
-              </label>
-              {newAccount.type === "LOAN" ? (
-                <>
-                  <label>
-                    Loan Type
-                    <AppSelect
-                      options={[
-                        { value: "MORTGAGE", label: "Mortgage" },
-                        { value: "AUTO", label: "Auto" },
-                      ]}
-                      value={newAccount.loanType}
-                      onChange={(value) =>
-                        setNewAccount((current) => ({
-                          ...current,
-                          loanType: value as LoanProfile["loanType"],
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Interest Rate (%)
-                    <TextInput
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={newAccount.interestRate}
-                      onChange={(event) =>
-                        setNewAccount((current) => ({
-                          ...current,
-                          interestRate: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </label>
-                  <label>
-                    Minimum Payment
-                    <TextInput
-                      value={newAccount.minimumPayment}
-                      onChange={(event) =>
-                        setNewAccount((current) => ({
-                          ...current,
-                          minimumPayment: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </>
-              ) : null}
-              <label>
-                Starting Balance
+                Minimum Payment
                 <TextInput
-                  value={newAccount.startingBalance}
+                  value={newAccount.minimumPayment}
                   onChange={(event) =>
                     setNewAccount((current) => ({
                       ...current,
-                      startingBalance: event.target.value,
+                      minimumPayment: event.target.value,
                     }))
                   }
                 />
               </label>
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateAccountDialogOpen(false)}
-                  disabled={createAccountMutation.isPending}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createAccountMutation.isPending}
-                >
-                  Add Account
-                </button>
-              </div>
-            </form>
+            </>
+          ) : null}
+          <label>
+            Starting Balance
+            <TextInput
+              value={newAccount.startingBalance}
+              onChange={(event) =>
+                setNewAccount((current) => ({
+                  ...current,
+                  startingBalance: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            Starting Balance Date
+            <DatePicker
+              value={newAccount.startingBalanceAt}
+              onChange={(date) =>
+                setNewAccount((current) => ({
+                  ...current,
+                  startingBalanceAt: date,
+                }))
+              }
+              required
+            />
+          </label>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              onClick={() => setIsCreateAccountDialogOpen(false)}
+              disabled={createAccountMutation.isPending}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createAccountMutation.isPending}
+            >
+              Add Account
+            </button>
           </div>
-        </div>
-      ) : null}
+        </form>
+      </AppDialog>
     </>
   )
 }
