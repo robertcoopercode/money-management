@@ -3,6 +3,12 @@ import { toast } from "sonner"
 import { apiFetch } from "../lib/api.js"
 import type { AssignmentMutationInput } from "../types.js"
 
+export type MoveBudgetInput = {
+  fromCategoryId: string
+  toCategoryId: string
+  amountMinor: number
+}
+
 export const usePlanningMutations = (opts: {
   month: string
   refetchCoreData: () => void
@@ -47,5 +53,25 @@ export const usePlanningMutations = (opts: {
     },
   })
 
-  return { assignMutation, autoCoverMutation }
+  const moveBudgetMutation = useMutation({
+    mutationFn: (input: MoveBudgetInput) =>
+      apiFetch("/api/planning/move", {
+        method: "POST",
+        body: JSON.stringify({
+          month: opts.month,
+          fromCategoryId: input.fromCategoryId,
+          toCategoryId: input.toCategoryId,
+          amountMinor: input.amountMinor,
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Budget moved")
+      opts.refetchCoreData()
+    },
+    onError: (error) => {
+      toast.error(`Unable to move budget: ${error.message}`)
+    },
+  })
+
+  return { assignMutation, autoCoverMutation, moveBudgetMutation }
 }

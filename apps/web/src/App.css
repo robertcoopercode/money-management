@@ -1638,6 +1638,223 @@ button:disabled {
   color: #8fffc0;
 }
 
+/* ── Available Badge (clickable) ── */
+
+.planning-available-badge {
+  all: unset;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: inherit;
+  transition: background 120ms ease;
+}
+
+.planning-available-badge:disabled {
+  cursor: default;
+}
+
+.planning-available-badge-positive {
+  color: #8fffc0;
+}
+
+.planning-available-badge-positive:hover:not(:disabled) {
+  background: rgb(34 197 94 / 15%);
+}
+
+.planning-available-badge-negative {
+  color: #ffac8f;
+}
+
+.planning-available-badge-negative:hover:not(:disabled) {
+  background: rgb(220 80 60 / 15%);
+}
+
+.planning-available-badge-zero {
+  color: inherit;
+}
+
+/* ── Move Money Popover (Base UI) ── */
+
+.move-money-positioner {
+  z-index: 30;
+}
+
+.move-money-popup {
+  width: 18rem;
+  background: rgb(8 16 41 / 98%);
+  border: 1px solid rgb(95 117 171 / 34%);
+  border-radius: 0.6rem;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 50%);
+  padding: 0.75rem;
+}
+
+.move-money-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.move-money-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgb(194 208 241 / 90%);
+}
+
+.move-money-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.move-money-label {
+  font-size: 0.72rem;
+  color: rgb(194 208 241 / 60%);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.move-money-input {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.move-money-select-trigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font: inherit;
+  background: rgb(5 11 30 / 78%);
+  border: 1px solid rgb(95 117 171 / 28%);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.82rem;
+  color: rgb(225 232 250);
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.move-money-select-trigger:hover {
+  border-color: rgb(130 157 226 / 50%);
+  background: rgb(15 25 55 / 90%);
+}
+
+.move-money-select-trigger[data-popup-open] {
+  border-color: rgb(140 170 255 / 50%);
+}
+
+.move-money-select-positioner {
+  z-index: 50;
+}
+
+.move-money-select-popup {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+  border: 1px solid rgb(95 117 171 / 36%);
+  border-radius: 0.625rem;
+  background: rgb(6 13 35 / 98%);
+  box-shadow: 0 0.875rem 1.75rem rgb(0 0 0 / 35%);
+  max-height: 17.5rem;
+  min-width: 16rem;
+}
+
+.move-money-select-popup > .scroll-area {
+  flex: 1;
+  min-height: 0;
+}
+
+.move-money-select-popup .scroll-area-content {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.move-money-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgb(194 208 241 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.45rem 0.6rem 0.2rem;
+}
+
+.move-money-select-item {
+  all: unset;
+  cursor: pointer;
+  color: rgb(225 232 250);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.move-money-select-item:hover,
+.move-money-select-item[data-highlighted] {
+  background: rgb(70 99 184 / 36%);
+}
+
+.move-money-select-item[data-selected] {
+  color: rgb(130 226 160);
+}
+
+.move-money-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.move-money-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding-top: 0.15rem;
+}
+
+.move-money-btn-cancel {
+  all: unset;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  color: rgb(194 208 241 / 70%);
+  border: 1px solid rgb(95 117 171 / 25%);
+  transition: background 80ms ease;
+}
+
+.move-money-btn-cancel:hover {
+  background: rgb(70 99 184 / 12%);
+}
+
+.move-money-btn-confirm {
+  all: unset;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  background: rgb(70 99 184 / 45%);
+  color: rgb(210 225 255 / 90%);
+  transition: background 80ms ease;
+}
+
+.move-money-btn-confirm:hover:not(:disabled) {
+  background: rgb(70 99 184 / 65%);
+}
+
+.move-money-btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .planning-drag-overlay {
   padding: 0.5rem 1rem;
   border-radius: 0.4rem;

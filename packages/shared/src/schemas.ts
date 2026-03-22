@@ -239,6 +239,25 @@ export const bulkUpdateCategoryAssignmentSchema = z.object({
   assignments: z.array(updateCategoryAssignmentSchema).min(1).max(200),
 })
 
+export const moveBudgetSchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    fromCategoryId: z.string().min(1),
+    toCategoryId: z.string().min(1),
+    amountMinor: z.number().int().positive(),
+  })
+  .refine((data) => data.fromCategoryId !== data.toCategoryId, {
+    message: "Source and destination must be different",
+  })
+  .refine(
+    (data) =>
+      !(
+        data.fromCategoryId === "ready-to-assign" &&
+        data.toCategoryId === "ready-to-assign"
+      ),
+    { message: "Source and destination cannot both be Ready to Assign" },
+  )
+
 export const importColumnMappingSchema = z.object({
   date: z.string().min(1),
   amount: z.string().min(1),
@@ -294,6 +313,7 @@ export type BulkUpdateCategoryAssignmentInput = z.infer<typeof bulkUpdateCategor
 export type TransactionSplitInput = z.infer<typeof transactionSplitInputSchema>
 export type CreateTagInput = z.infer<typeof createTagSchema>
 export type UpdateTagInput = z.infer<typeof updateTagSchema>
+export type MoveBudgetInput = z.infer<typeof moveBudgetSchema>
 export type BulkTransactionIdsInput = z.infer<typeof bulkTransactionIdsSchema>
 export type ClearingStatus = z.infer<typeof clearingStatusSchema>
 export type TransactionSortColumn = z.infer<typeof transactionSortColumnSchema>

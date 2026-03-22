@@ -1,27 +1,39 @@
+import { useState } from "react"
 import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { Popover } from "@base-ui/react/popover"
 import { TextInput } from "./text-input.js"
 import { InlineEditName } from "./inline-edit-name.js"
-import type { PlanningCategoryItem } from "../types.js"
+import { MoveMoneyContent } from "./move-money-popover.js"
+import type { PlanningCategoryItem, PlanningGroup } from "../types.js"
 
 type PlanningCategoryRowProps = {
   category: PlanningCategoryItem
+  groups: PlanningGroup[]
+  readyToAssignMinor: number
   onAssign: (categoryId: string, assignedMinor: number) => void
   onRename: (categoryId: string, name: string) => void
   onDelete: (categoryId: string, name: string) => void
   onToggleIncome: (categoryId: string, isIncome: boolean) => void
+  onMoveBudget: (fromCategoryId: string, toCategoryId: string, amountMinor: number) => void
+  isMovePending: boolean
   isUpdating: boolean
 }
 
 export const PlanningCategoryRow = ({
   category,
+  groups,
+  readyToAssignMinor,
   onAssign,
   onRename,
   onDelete,
   onToggleIncome,
+  onMoveBudget,
+  isMovePending,
   isUpdating,
 }: PlanningCategoryRowProps) => {
+  const [popoverOpen, setPopoverOpen] = useState(false)
   const {
     attributes,
     listeners,
@@ -113,17 +125,43 @@ export const PlanningCategoryRow = ({
           </div>
           <div className="planning-cell">{formatMoney(category.activityMinor)}</div>
           <div className="planning-cell">
-            <span
-              className={
-                category.availableMinor < 0
-                  ? "planning-available-negative"
-                  : category.availableMinor > 0
-                    ? "planning-available-positive"
-                    : ""
-              }
-            >
-              {formatMoney(category.availableMinor)}
-            </span>
+            <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
+              <Popover.Trigger
+                className={`planning-available-badge${
+                  category.availableMinor < 0
+                    ? " planning-available-badge-negative"
+                    : category.availableMinor > 0
+                      ? " planning-available-badge-positive"
+                      : " planning-available-badge-zero"
+                }`}
+                disabled={category.availableMinor === 0}
+              >
+                {formatMoney(category.availableMinor)}
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner
+                  className="move-money-positioner"
+                  sideOffset={6}
+                  side="bottom"
+                  align="end"
+                >
+                  <Popover.Popup className="move-money-popup">
+                    <MoveMoneyContent
+                      categoryId={category.categoryId}
+                      availableMinor={category.availableMinor}
+                      readyToAssignMinor={readyToAssignMinor}
+                      groups={groups}
+                      onMove={(from, to, amount) => {
+                        onMoveBudget(from, to, amount)
+                        setPopoverOpen(false)
+                      }}
+                      onClose={() => setPopoverOpen(false)}
+                      isPending={isMovePending}
+                    />
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
           </div>
         </>
       )}

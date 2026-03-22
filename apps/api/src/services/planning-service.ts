@@ -281,3 +281,74 @@ export const setBulkCategoryAssignments = (
     catch: (error) =>
       new Error(`Unable to set bulk category assignments: ${String(error)}`),
   })
+
+const READY_TO_ASSIGN = "ready-to-assign"
+
+export const moveBudget = (input: {
+  month: string
+  fromCategoryId: string
+  toCategoryId: string
+  amountMinor: number
+}) =>
+  Effect.tryPromise({
+    try: async () => {
+      // Look up current assignments for both sides (if they are real categories)
+      const categoryIds = [input.fromCategoryId, input.toCategoryId].filter(
+        (id) => id !== READY_TO_ASSIGN,
+      )
+
+      const existingAssignments = await prisma.categoryAssignment.findMany({
+        where: {
+          month: input.month,
+          categoryId: { in: categoryIds },
+        },
+      })
+
+      const assignedMap = new Map(
+        existingAssignments.map((a) => [a.categoryId, a.assignedMinor]),
+      )
+
+      const updates: { categoryId: string; assignedMinor: number }[] = []
+
+      if (input.fromCategoryId !== READY_TO_ASSIGN) {
+        const current = assignedMap.get(input.fromCategoryId) ?? 0
+        updates.push({
+          categoryId: input.fromCategoryId,
+          assignedMinor: current - input.amountMinor,
+        })
+      }
+
+      if (input.toCategoryId !== READY_TO_ASSIGN) {
+        const current = assignedMap.get(input.toCategoryId) ?? 0
+        updates.push({
+          categoryId: input.toCategoryId,
+          assignedMinor: current + input.amountMinor,
+        })
+      }
+
+      if (updates.length > 0) {
+        await prisma.$transaction(
+          updates.map((u) =>
+            prisma.categoryAssignment.upsert({
+              where: {
+                month_categoryId: {
+                  month: input.month,
+                  categoryId: u.categoryId,
+                },
+              },
+              update: { assignedMinor: u.assignedMinor },
+              create: {
+                month: input.month,
+                categoryId: u.categoryId,
+                assignedMinor: u.assignedMinor,
+              },
+            }),
+          ),
+        )
+      }
+
+      return { success: true }
+    },
+    catch: (error) =>
+      new Error(`Unable to move budget: ${String(error)}`),
+  })

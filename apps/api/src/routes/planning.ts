@@ -2,6 +2,7 @@ import type { Hono } from "hono"
 import {
   updateCategoryAssignmentSchema,
   bulkUpdateCategoryAssignmentSchema,
+  moveBudgetSchema,
 } from "@ledgr/shared"
 
 import { parseJson } from "../lib/http.js"
@@ -10,6 +11,7 @@ import {
   getPlanningMonth,
   setCategoryAssignment,
   setBulkCategoryAssignments,
+  moveBudget,
 } from "../services/planning-service.js"
 
 export const registerPlanningRoutes = (app: Hono) => {
@@ -31,5 +33,11 @@ export const registerPlanningRoutes = (app: Hono) => {
       setBulkCategoryAssignments(payload.assignments),
     )
     return context.json(results)
+  })
+
+  app.post("/api/planning/move", async (context) => {
+    const payload = await parseJson(context, moveBudgetSchema)
+    const result = await runApiEffect(moveBudget(payload))
+    return context.json(result)
   })
 }

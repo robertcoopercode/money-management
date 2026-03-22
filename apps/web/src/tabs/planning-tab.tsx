@@ -99,7 +99,7 @@ export const PlanningTab = ({
   // Keep a ref to the overlay label so it doesn't change when we move the item between groups
   const activeCategoryLabel = useRef<string | null>(null)
 
-  const { assignMutation, autoCoverMutation } = usePlanningMutations({ month, refetchCoreData })
+  const { assignMutation, autoCoverMutation, moveBudgetMutation } = usePlanningMutations({ month, refetchCoreData })
 
   const {
     updateCategoryMutation,
@@ -227,6 +227,13 @@ export const PlanningTab = ({
       updateCategoryMutation.mutate({ categoryId, isIncomeCategory: isIncome })
     },
     [updateCategoryMutation],
+  )
+
+  const handleMoveBudget = useCallback(
+    (fromCategoryId: string, toCategoryId: string, amountMinor: number) => {
+      moveBudgetMutation.mutate({ fromCategoryId, toCategoryId, amountMinor })
+    },
+    [moveBudgetMutation],
   )
 
   const handleRenameGroup = useCallback(
@@ -586,6 +593,8 @@ export const PlanningTab = ({
               <PlanningGroupSection
                 key={group.groupId}
                 group={group}
+                allGroups={groups}
+                readyToAssignMinor={planningData?.readyToAssignMinor ?? 0}
                 isCollapsed={collapsedGroups.has(group.groupId)}
                 onToggleCollapse={() => toggleCollapse(group.groupId)}
                 onRenameGroup={handleRenameGroup}
@@ -595,6 +604,8 @@ export const PlanningTab = ({
                 onRenameCategory={handleRenameCategory}
                 onDeleteCategory={(id, name) => void handleDeleteCategory(id, name)}
                 onToggleIncome={handleToggleIncome}
+                onMoveBudget={handleMoveBudget}
+                isMovePending={moveBudgetMutation.isPending}
                 isGroupUpdating={updateCategoryGroupMutation.isPending}
                 isCategoryUpdating={updateCategoryMutation.isPending}
               />

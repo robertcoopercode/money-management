@@ -9,6 +9,8 @@ const UNCATEGORIZED_GROUP_ID = "__uncategorized__"
 
 type PlanningGroupProps = {
   group: PlanningGroupType
+  allGroups: PlanningGroupType[]
+  readyToAssignMinor: number
   isCollapsed: boolean
   onToggleCollapse: () => void
   onRenameGroup: (groupId: string, name: string) => void
@@ -18,12 +20,16 @@ type PlanningGroupProps = {
   onRenameCategory: (categoryId: string, name: string) => void
   onDeleteCategory: (categoryId: string, name: string) => void
   onToggleIncome: (categoryId: string, isIncome: boolean) => void
+  onMoveBudget: (fromCategoryId: string, toCategoryId: string, amountMinor: number) => void
+  isMovePending: boolean
   isGroupUpdating: boolean
   isCategoryUpdating: boolean
 }
 
 export const PlanningGroupSection = ({
   group,
+  allGroups,
+  readyToAssignMinor,
   isCollapsed,
   onToggleCollapse,
   onRenameGroup,
@@ -33,6 +39,8 @@ export const PlanningGroupSection = ({
   onRenameCategory,
   onDeleteCategory,
   onToggleIncome,
+  onMoveBudget,
+  isMovePending,
   isGroupUpdating,
   isCategoryUpdating,
 }: PlanningGroupProps) => {
@@ -152,10 +160,14 @@ export const PlanningGroupSection = ({
                 <PlanningCategoryRow
                   key={cat.categoryId}
                   category={cat}
+                  groups={allGroups}
+                  readyToAssignMinor={readyToAssignMinor}
                   onAssign={onAssign}
                   onRename={onRenameCategory}
                   onDelete={onDeleteCategory}
                   onToggleIncome={onToggleIncome}
+                  onMoveBudget={onMoveBudget}
+                  isMovePending={isMovePending}
                   isUpdating={isCategoryUpdating}
                 />
               ))
