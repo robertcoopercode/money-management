@@ -1,21 +1,29 @@
-import { useState, useCallback, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useState, useCallback, useRef, useEffect } from "react"
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  KeyboardSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  rectIntersection,
   closestCenter,
+  getFirstCollision,
 } from "@dnd-kit/core"
-import type { DragStartEvent, DragEndEvent, DragOverEvent } from "@dnd-kit/core"
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import type {
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+  CollisionDetection,
+  UniqueIdentifier,
+} from "@dnd-kit/core"
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable"
 import { generateKeyBetween } from "@ledgr/shared"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { apiFetch } from "../lib/api.js"
 import { usePlanningMutations } from "../hooks/use-planning-mutations.js"
 import { useCategoryMutations } from "../hooks/use-category-mutations.js"
+import { useClientOrdering } from "../hooks/use-client-ordering.js"
 import { TextInput } from "../components/text-input.js"
 import { AppDialog } from "../components/app-dialog.js"
 import { PlanningToolbar } from "../components/planning-toolbar.js"
@@ -27,7 +35,7 @@ import {
   type CategoryGroupDeleteImpact,
 } from "../components/delete-impact-dialog.js"
 import { AutoCoverDialog, type AutoCoverItem } from "../components/auto-cover-dialog.js"
-import type { PlanningResponse, PlanningGroup, PlanningCategoryItem } from "../types.js"
+import type { PlanningResponse, PlanningGroup } from "../types.js"
 
 const UNCATEGORIZED_GROUP_ID = "__uncategorized__"
 
@@ -47,36 +55,6 @@ const parseId = (dndId: string) => {
   return null
 }
 
-/** Move a category between groups in a groups array (pure function). */
-const moveCategoryToGroup = (
-  groups: PlanningGroup[],
-  categoryId: string,
-  targetGroupId: string,
-  targetIndex: number,
-): PlanningGroup[] => {
-  let movedCat: PlanningCategoryItem | undefined
-  // Remove from current group
-  const without = groups.map((g) => {
-    const idx = g.categories.findIndex((c) => c.categoryId === categoryId)
-    if (idx !== -1) {
-      movedCat = g.categories[idx]
-      return { ...g, categories: g.categories.filter((c) => c.categoryId !== categoryId) }
-    }
-    return g
-  })
-  if (!movedCat) return groups
-
-  // Insert into target group at targetIndex
-  return without.map((g) => {
-    if (g.groupId === targetGroupId) {
-      const cats = [...g.categories]
-      cats.splice(targetIndex, 0, movedCat!)
-      return { ...g, categories: cats }
-    }
-    return g
-  })
-}
-
 export const PlanningTab = ({
   month,
   onMonthChange,
@@ -86,11 +64,9 @@ export const PlanningTab = ({
   planningError,
   refetchCoreData,
 }: PlanningTabProps) => {
-  const queryClient = useQueryClient()
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [dragGroups, setDragGroups] = useState<PlanningGroup[] | null>(null)
   const [newGroupPrompt, setNewGroupPrompt] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [addCategoryGroupId, setAddCategoryGroupId] = useState<string | null>(null)
@@ -99,6 +75,10 @@ export const PlanningTab = ({
 
   // Keep a ref to the overlay label so it doesn't change when we move the item between groups
   const activeCategoryLabel = useRef<string | null>(null)
+
+  // Track when we just moved an item to a new container — prevents collision detection jitter
+  const recentlyMovedToNewContainer = useRef(false)
+  const lastOverId = useRef<UniqueIdentifier | null>(null)
 
   const { assignMutation, autoCoverMutation, moveBudgetMutation } = usePlanningMutations({ month, refetchCoreData })
 
@@ -121,12 +101,32 @@ export const PlanningTab = ({
     },
   })
 
-  const serverGroups = planningData?.groups ?? []
-  // During a category drag, render from dragGroups; otherwise from server data
-  const groups = dragGroups ?? serverGroups
+  const {
+    groups,
+    applyGroupReorder,
+    applyCategoryReorder,
+    snapshotOrdering,
+    restoreSnapshot,
+  } = useClientOrdering(month, planningData?.groups)
   const groupIds = groups.map((g) => `group:${g.groupId}`)
 
-  const underfundedCategories = serverGroups
+  // Reset the recentlyMovedToNewContainer flag after layout settles.
+  // Only watch ordering-driven changes, not server refetches.
+  const orderingVersion = useRef(0)
+  const prevGroupIds = useRef("")
+  const currentGroupIds = groups.map((g) => g.groupId + ":" + g.categories.map((c) => c.categoryId).join(",")).join("|")
+  if (currentGroupIds !== prevGroupIds.current) {
+    prevGroupIds.current = currentGroupIds
+    orderingVersion.current += 1
+  }
+  const orderingVer = orderingVersion.current
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      recentlyMovedToNewContainer.current = false
+    })
+  }, [orderingVer])
+
+  const underfundedCategories = groups
     .flatMap((g) => g.categories)
     .filter((c) => c.availableMinor < 0 && !c.isIncomeCategory)
 
@@ -156,7 +156,6 @@ export const PlanningTab = ({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor),
   )
 
   const toggleCollapse = useCallback((groupId: string) => {
@@ -211,9 +210,13 @@ export const PlanningTab = ({
 
   const handleAssign = useCallback(
     (categoryId: string, assignedMinor: number) => {
+      const current = groups
+        .flatMap((g) => g.categories)
+        .find((c) => c.categoryId === categoryId)?.assignedMinor
+      if (current === assignedMinor) return
       assignMutation.mutate({ categoryId, assignedMinor })
     },
-    [assignMutation],
+    [assignMutation, groups],
   )
 
   const handleRenameCategory = useCallback(
@@ -269,16 +272,96 @@ export const PlanningTab = ({
     )
   }
 
+  // --- Helpers for DnD ---
+
+  /** Find which group a category belongs to */
+  const findContainer = (id: string): string | undefined => {
+    // Check if it's a group ID itself
+    if (groups.some((g) => g.groupId === id)) return id
+    // Otherwise find the group containing this category
+    for (const g of groups) {
+      if (g.categories.some((c) => c.categoryId === id)) return g.groupId
+    }
+    return undefined
+  }
+
+  // Custom collision detection following the canonical dnd-kit multi-container pattern.
+  // Key: always exclude the active item from droppable candidates to prevent
+  // closestCenter from returning the dragged item itself as the "over" target.
+  const collisionDetectionStrategy: CollisionDetection = useCallback(
+    (args) => {
+      const parsed = activeId ? parseId(activeId) : null
+
+      // If dragging a group, only collide with other reorderable groups
+      // (exclude self and Uncategorized, which must always stay last)
+      if (parsed?.type === "group") {
+        return closestCenter({
+          ...args,
+          droppableContainers: args.droppableContainers.filter(
+            (container) =>
+              String(container.id).startsWith("group:") &&
+              container.id !== activeId &&
+              container.id !== `group:${UNCATEGORIZED_GROUP_ID}`,
+          ),
+        })
+      }
+
+      // For categories, use pointerWithin first, fall back to rectIntersection
+      const pointerIntersections = pointerWithin(args)
+      const intersections =
+        pointerIntersections.length > 0 ? pointerIntersections : rectIntersection(args)
+
+      let overId = getFirstCollision(intersections, "id")
+
+      if (overId != null) {
+        const overStr = String(overId)
+        const overParsed = parseId(overStr)
+
+        // If hovering over a group container, drill into its categories
+        // to find the closest specific category (excluding the active item)
+        if (overParsed?.type === "group") {
+          const group = groups.find((g) => g.groupId === overParsed.id)
+          if (group && group.categories.length > 0) {
+            const categoryDndIds = group.categories.map((c) => `cat:${c.categoryId}`)
+            const closest = closestCenter({
+              ...args,
+              droppableContainers: args.droppableContainers.filter(
+                (container) =>
+                  categoryDndIds.includes(String(container.id)) &&
+                  container.id !== activeId,
+              ),
+            })
+            if (closest.length > 0) {
+              overId = closest[0]!.id
+            }
+            // If no other categories found (e.g., only the active item is in
+            // this group), keep the group as the over target
+          }
+        }
+
+        lastOverId.current = overId
+        return [{ id: overId }]
+      }
+
+      // If we just moved to a new container, return the active id to prevent jitter
+      if (recentlyMovedToNewContainer.current) {
+        lastOverId.current = activeId
+      }
+
+      return lastOverId.current ? [{ id: lastOverId.current }] : []
+    },
+    [activeId, groups],
+  )
+
   // --- DnD handlers ---
   const handleDragStart = (event: DragStartEvent) => {
     const id = event.active.id as string
     setActiveId(id)
+    snapshotOrdering()
     const parsed = parseId(id)
     if (parsed?.type === "cat") {
-      // Snapshot the groups for live manipulation during drag
-      setDragGroups(serverGroups.map((g) => ({ ...g, categories: [...g.categories] })))
       // Capture label for overlay
-      for (const g of serverGroups) {
+      for (const g of groups) {
         const cat = g.categories.find((c) => c.categoryId === parsed.id)
         if (cat) {
           activeCategoryLabel.current = cat.categoryName
@@ -292,65 +375,55 @@ export const PlanningTab = ({
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event
-    if (!over || !dragGroups) return
+    if (!over) return
 
-    const activeItem = parseId(active.id as string)
-    const overItem = parseId(over.id as string)
-    if (!activeItem || activeItem.type !== "cat" || !overItem) return
+    const activeDndId = String(active.id)
+    const overDndId = String(over.id)
 
-    // Find which group the active cat is currently in (within dragGroups)
-    let currentGroupId: string | undefined
-    for (const g of dragGroups) {
-      const idx = g.categories.findIndex((c) => c.categoryId === activeItem.id)
-      if (idx !== -1) {
-        currentGroupId = g.groupId
-        break
-      }
-    }
-    if (!currentGroupId) return
+    const activeParsed = parseId(activeDndId)
+    const overParsed = parseId(overDndId)
 
-    // Determine the target group and index
-    let targetGroupId: string | undefined
-    let targetIndex: number = 0
+    // Only handle category moves between groups
+    if (!activeParsed || activeParsed.type !== "cat" || !overParsed) return
 
-    if (overItem.type === "group") {
-      targetGroupId = overItem.id
-      const tg = dragGroups.find((g) => g.groupId === targetGroupId)
-      targetIndex = tg ? tg.categories.filter((c) => c.categoryId !== activeItem.id).length : 0
+    const activeContainer = findContainer(activeParsed.id)
+    const overContainer = overParsed.type === "group"
+      ? overParsed.id
+      : findContainer(overParsed.id)
+
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return
+
+    // Determine insertion index
+    const overGroup = groups.find((g) => g.groupId === overContainer)
+    if (!overGroup) return
+
+    let newIndex: number
+
+    if (overParsed.type === "group") {
+      // Dropped on the group itself — append to end
+      newIndex = overGroup.categories.filter((c) => c.categoryId !== activeParsed.id).length
     } else {
-      // overItem is a category — find its group and position
-      for (const g of dragGroups) {
-        const idx = g.categories.findIndex((c) => c.categoryId === overItem.id)
-        if (idx !== -1) {
-          targetGroupId = g.groupId
-          targetIndex = idx
-          break
-        }
-      }
+      const overIndex = overGroup.categories.findIndex((c) => c.categoryId === overParsed.id)
+
+      // Determine if active is below the over item using translated rect
+      const isBelowOverItem =
+        over &&
+        active.rect.current.translated &&
+        active.rect.current.translated.top > over.rect.top + over.rect.height
+
+      const modifier = isBelowOverItem ? 1 : 0
+      newIndex = overIndex >= 0 ? overIndex + modifier : overGroup.categories.length
     }
 
-    if (!targetGroupId) return
-
-    // Only handle cross-group moves here; dnd-kit handles same-group
-    // reordering visually via its own transforms
-    if (currentGroupId === targetGroupId) return
-
-    setDragGroups(moveCategoryToGroup(dragGroups, activeItem.id, targetGroupId, targetIndex))
-  }
-
-  // Optimistically update the React Query cache
-  const patchPlanningCache = (updater: (prev: PlanningResponse) => PlanningResponse) => {
-    queryClient.setQueryData<PlanningResponse>(["planning", month], (prev) =>
-      prev ? updater(prev) : prev,
-    )
+    recentlyMovedToNewContainer.current = true
+    applyCategoryReorder(activeParsed.id, overContainer, newIndex)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    const currentDragGroups = dragGroups
 
     if (!over) {
-      setDragGroups(null)
+      restoreSnapshot()
       setActiveId(null)
       activeCategoryLabel.current = null
       return
@@ -359,66 +432,31 @@ export const PlanningTab = ({
     const activeItem = parseId(active.id as string)
     const overItem = parseId(over.id as string)
     if (!activeItem || !overItem) {
-      setDragGroups(null)
-      setActiveId(null)
-      activeCategoryLabel.current = null
-      return
-    }
-
-    // Use the live drag groups to determine final positions
-    const resolvedGroups = currentDragGroups ?? serverGroups
-
-    // Check if dragGroups moved the category to a different group
-    const hasDragGroupChanges = !!currentDragGroups && activeItem.type === "cat" && (() => {
-      let serverGroupId: string | undefined
-      for (const g of serverGroups) {
-        if (g.categories.some((c) => c.categoryId === activeItem.id)) {
-          serverGroupId = g.groupId
-          break
-        }
-      }
-      let dragGroupId: string | undefined
-      for (const g of currentDragGroups) {
-        if (g.categories.some((c) => c.categoryId === activeItem.id)) {
-          dragGroupId = g.groupId
-          break
-        }
-      }
-      return serverGroupId !== dragGroupId
-    })()
-
-    // If dropped on itself and no cross-group move happened, it's a no-op
-    if (active.id === over.id && !hasDragGroupChanges) {
-      setDragGroups(null)
+      restoreSnapshot()
       setActiveId(null)
       activeCategoryLabel.current = null
       return
     }
 
     if (activeItem.type === "group" && overItem.type === "group") {
-      const oldIndex = serverGroups.findIndex((g) => g.groupId === activeItem.id)
-      const newIndex = serverGroups.findIndex((g) => g.groupId === overItem.id)
-      if (oldIndex === -1 || newIndex === -1) {
-        setDragGroups(null)
+      const oldIndex = groups.findIndex((g) => g.groupId === activeItem.id)
+      const newIndex = groups.findIndex((g) => g.groupId === overItem.id)
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
         setActiveId(null)
         activeCategoryLabel.current = null
         return
       }
 
+      // Compute fractional sort key for the API
       const newSortOrder = generateKeyBetween(
-        newIndex < oldIndex ? (newIndex > 0 ? serverGroups[newIndex - 1]?.groupSortOrder ?? null : null) : serverGroups[newIndex]!.groupSortOrder,
-        newIndex < oldIndex ? serverGroups[newIndex]!.groupSortOrder : (newIndex < serverGroups.length - 1 ? serverGroups[newIndex + 1]?.groupSortOrder ?? null : null),
+        newIndex < oldIndex ? (newIndex > 0 ? groups[newIndex - 1]?.groupSortOrder ?? null : null) : groups[newIndex]!.groupSortOrder,
+        newIndex < oldIndex ? groups[newIndex]!.groupSortOrder : (newIndex < groups.length - 1 ? groups[newIndex + 1]?.groupSortOrder ?? null : null),
       )
 
-      patchPlanningCache((prev) => {
-        const updated = prev.groups.map((g) =>
-          g.groupId === activeItem.id ? { ...g, groupSortOrder: newSortOrder } : g,
-        )
-        updated.sort((a, b) => a.groupSortOrder.localeCompare(b.groupSortOrder))
-        return { ...prev, groups: updated }
-      })
+      // Update client ordering using arrayMove
+      const reordered = arrayMove(groups, oldIndex, newIndex)
+      applyGroupReorder(reordered.map((g) => g.groupId))
 
-      setDragGroups(null)
       setActiveId(null)
       activeCategoryLabel.current = null
 
@@ -427,106 +465,77 @@ export const PlanningTab = ({
         sortOrder: newSortOrder,
       })
     } else if (activeItem.type === "cat") {
-      // Find the source group from original server data
-      let originalSourceGroup: PlanningGroup | undefined
-      for (const g of serverGroups) {
-        if (g.categories.some((c) => c.categoryId === activeItem.id)) {
-          originalSourceGroup = g
-          break
-        }
-      }
+      const activeContainer = findContainer(activeItem.id)
+      const overContainer = overItem.type === "group"
+        ? overItem.id
+        : findContainer(overItem.id)
 
-      // Find which group the category is currently in (after drag-over moves)
-      let finalGroup: PlanningGroup | undefined
-      for (const g of resolvedGroups) {
-        if (g.categories.some((c) => c.categoryId === activeItem.id)) {
-          finalGroup = g
-          break
-        }
-      }
-
-      if (!finalGroup || !originalSourceGroup) {
-        setDragGroups(null)
+      if (!activeContainer || !overContainer) {
+        restoreSnapshot()
         setActiveId(null)
         activeCategoryLabel.current = null
         return
       }
 
-      const isCrossGroup = originalSourceGroup.groupId !== finalGroup.groupId
+      const finalGroup = groups.find((g) => g.groupId === activeContainer)
+      if (!finalGroup) {
+        restoreSnapshot()
+        setActiveId(null)
+        activeCategoryLabel.current = null
+        return
+      }
 
-      // Build the final category order for the target group
-      let reorderedCats: PlanningCategoryItem[]
+      // For same-container: apply arrayMove to finalize the position
+      if (activeContainer === overContainer && overItem.type === "cat") {
+        const activeIdx = finalGroup.categories.findIndex((c) => c.categoryId === activeItem.id)
+        const overIdx = finalGroup.categories.findIndex((c) => c.categoryId === overItem.id)
+        if (activeIdx !== -1 && overIdx !== -1 && activeIdx !== overIdx) {
+          const reordered = arrayMove(finalGroup.categories, activeIdx, overIdx)
+          // Apply the final position to client ordering
+          applyCategoryReorder(activeItem.id, finalGroup.groupId, overIdx)
 
-      if (isCrossGroup) {
-        // Cross-group: dragGroups already has the item in the right group from onDragOver
-        reorderedCats = finalGroup.categories
-      } else {
-        // Same-group: dnd-kit handled the visual preview, so we need to
-        // array-move active to over's position to match what was shown
-        const cats = [...finalGroup.categories]
-        const activeIdx = cats.findIndex((c) => c.categoryId === activeItem.id)
-        if (overItem.type === "cat") {
-          const overIdx = cats.findIndex((c) => c.categoryId === overItem.id)
-          if (activeIdx !== -1 && overIdx !== -1) {
-            const [moved] = cats.splice(activeIdx, 1)
-            cats.splice(overIdx, 0, moved!)
-          }
+          // Compute sort key from the reordered array
+          const newIndex = reordered.findIndex((c) => c.categoryId === activeItem.id)
+          const prevSortOrder = newIndex > 0 ? reordered[newIndex - 1]?.sortOrder ?? null : null
+          const nextSortOrder = newIndex < reordered.length - 1 ? reordered[newIndex + 1]?.sortOrder ?? null : null
+          const newSortOrder = generateKeyBetween(prevSortOrder, nextSortOrder)
+
+          setActiveId(null)
+          activeCategoryLabel.current = null
+
+          reorderCategoryMutation.mutate({
+            categoryId: activeItem.id,
+            sortOrder: newSortOrder,
+          })
+          return
         }
-        reorderedCats = cats
       }
 
-      const newIndex = reorderedCats.findIndex((c) => c.categoryId === activeItem.id)
-
-      // Compute sort order from neighbors in the visual order
-      let prevSortOrder: string | null = null
-      let nextSortOrder: string | null = null
-
-      if (newIndex <= 0) {
-        nextSortOrder = reorderedCats[1]?.sortOrder ?? null
-      } else if (newIndex >= reorderedCats.length - 1) {
-        prevSortOrder = reorderedCats[newIndex - 1]?.sortOrder ?? null
-      } else {
-        prevSortOrder = reorderedCats[newIndex - 1]?.sortOrder ?? null
-        nextSortOrder = reorderedCats[newIndex + 1]?.sortOrder ?? null
+      // Cross-group move (already applied in onDragOver) — compute sort key from current position
+      const catIdx = finalGroup.categories.findIndex((c) => c.categoryId === activeItem.id)
+      if (catIdx === -1) {
+        setActiveId(null)
+        activeCategoryLabel.current = null
+        return
       }
 
+      const prevSortOrder = catIdx > 0 ? finalGroup.categories[catIdx - 1]?.sortOrder ?? null : null
+      const nextSortOrder = catIdx < finalGroup.categories.length - 1 ? finalGroup.categories[catIdx + 1]?.sortOrder ?? null : null
       const newSortOrder = generateKeyBetween(prevSortOrder, nextSortOrder)
 
-      const groupIdForApi =
-        finalGroup.groupId === UNCATEGORIZED_GROUP_ID
-          ? null
-          : finalGroup.groupId
+      const groupIdForApi = finalGroup.groupId === UNCATEGORIZED_GROUP_ID ? null : finalGroup.groupId
 
-      // Commit optimistic update to cache — use the exact visual order
-      patchPlanningCache((prev) => {
-        const movedCat = originalSourceGroup!.categories.find(
-          (c) => c.categoryId === activeItem.id,
-        )
-        if (!movedCat) return prev
-
-        const updatedCat = { ...movedCat, sortOrder: newSortOrder }
-
-        const finalList = reorderedCats.map((c) =>
-          c.categoryId === activeItem.id ? updatedCat : c,
-        )
-
-        const updatedGroups = prev.groups.map((g) => {
-          if (isCrossGroup && g.groupId === originalSourceGroup!.groupId) {
-            return {
-              ...g,
-              categories: g.categories.filter((c) => c.categoryId !== activeItem.id),
-            }
+      // Check if this was a cross-group move (compare against original server data)
+      let isCrossGroup = false
+      if (planningData?.groups) {
+        for (const g of planningData.groups) {
+          if (g.categories.some((c) => c.categoryId === activeItem.id)) {
+            isCrossGroup = g.groupId !== finalGroup.groupId
+            break
           }
-          if (g.groupId === finalGroup!.groupId) {
-            return { ...g, categories: finalList }
-          }
-          return g
-        })
+        }
+      }
 
-        return { ...prev, groups: updatedGroups }
-      })
-
-      setDragGroups(null)
       setActiveId(null)
       activeCategoryLabel.current = null
 
@@ -536,14 +545,13 @@ export const PlanningTab = ({
         groupId: isCrossGroup ? groupIdForApi : undefined,
       })
     } else {
-      setDragGroups(null)
       setActiveId(null)
       activeCategoryLabel.current = null
     }
   }
 
   const handleDragCancel = () => {
-    setDragGroups(null)
+    restoreSnapshot()
     setActiveId(null)
     activeCategoryLabel.current = null
   }
@@ -552,7 +560,7 @@ export const PlanningTab = ({
   const activeParsed = activeId ? parseId(activeId) : null
   let activeGroupForOverlay: PlanningGroup | undefined
   if (activeParsed?.type === "group") {
-    activeGroupForOverlay = serverGroups.find((g) => g.groupId === activeParsed.id)
+    activeGroupForOverlay = groups.find((g) => g.groupId === activeParsed.id)
   }
 
   return (
@@ -561,7 +569,6 @@ export const PlanningTab = ({
         month={month}
         onMonthChange={onMonthChange}
         readyToAssignMinor={planningData?.readyToAssignMinor ?? 0}
-        onCreateGroup={handleCreateGroup}
         onAutoCover={handleAutoCover}
         autoCoverDisabled={underfundedCategories.length === 0 || autoCoverMutation.isPending}
       />
@@ -579,9 +586,18 @@ export const PlanningTab = ({
           No planning categories available yet. Run database seed data.
         </p>
       ) : (
+        <>
+        <div className="planning-column-headers">
+          <button type="button" className="planning-add-group-btn" onClick={handleCreateGroup}>
+            + Group
+          </button>
+          <div className="planning-column-header">Assigned</div>
+          <div className="planning-column-header">Activity</div>
+          <div className="planning-column-header">Available</div>
+        </div>
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={collisionDetectionStrategy}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
@@ -623,6 +639,7 @@ export const PlanningTab = ({
             ) : null}
           </DragOverlay>
         </DndContext>
+        </>
       )}
 
       <AppDialog

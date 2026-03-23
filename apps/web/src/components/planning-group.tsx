@@ -1,6 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { ContextMenu } from "@base-ui/react/context-menu"
 import { InlineEditName } from "./inline-edit-name.js"
 import { PlanningCategoryRow } from "./planning-category-row.js"
 import type { PlanningGroup as PlanningGroupType } from "../types.js"
@@ -66,26 +67,13 @@ export const PlanningGroupSection = ({
 
   const categoryIds = group.categories.map((c) => `cat:${c.categoryId}`)
 
-  return (
+  const headerContent = (
     <div ref={setNodeRef} style={style} className="planning-group" {...attributes}>
-      <div className="planning-group-header">
-        {!isUncategorized && (
-          <div className="planning-drag-handle" {...listeners} title="Drag to reorder group">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="9" cy="6" r="1.5" fill="currentColor" />
-              <circle cx="15" cy="6" r="1.5" fill="currentColor" />
-              <circle cx="9" cy="12" r="1.5" fill="currentColor" />
-              <circle cx="15" cy="12" r="1.5" fill="currentColor" />
-              <circle cx="9" cy="18" r="1.5" fill="currentColor" />
-              <circle cx="15" cy="18" r="1.5" fill="currentColor" />
-            </svg>
-          </div>
-        )}
-
+      <div className="planning-group-header" {...listeners} onClick={onToggleCollapse}>
         <button
           type="button"
           className="category-collapse-btn"
-          onClick={onToggleCollapse}
+          onClick={(e) => { e.stopPropagation(); onToggleCollapse() }}
           title={isCollapsed ? "Expand" : "Collapse"}
         >
           <svg
@@ -109,43 +97,29 @@ export const PlanningGroupSection = ({
         {isUncategorized ? (
           <span className="planning-group-name">{group.groupName}</span>
         ) : (
-          <InlineEditName
-            value={group.groupName}
-            onSave={(name) => onRenameGroup(group.groupId, name)}
-            isSaving={isGroupUpdating}
-            className="planning-group-name"
-            inputWidth="14rem"
-          />
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+          <span onClick={(e) => e.stopPropagation()}>
+            <InlineEditName
+              value={group.groupName}
+              onSave={(name) => onRenameGroup(group.groupId, name)}
+              isSaving={isGroupUpdating}
+              className="planning-group-name"
+              inputWidth="14rem"
+            />
+          </span>
         )}
 
-        <span className="muted planning-group-count">
-          {group.categories.length} categor{group.categories.length === 1 ? "y" : "ies"}
-        </span>
-
-        {!isUncategorized && (
-          <div className="planning-group-actions">
-            <button
-              type="button"
-              className="planning-add-category-btn"
-              title="Add category to group"
-              onClick={() => onAddCategory(group.groupId)}
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="icon-button-danger"
-              title="Delete group"
-              onClick={() => onDeleteGroup(group.groupId, group.groupName)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h18" />
-                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-              </svg>
-            </button>
-          </div>
-        )}
+        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+        <div className="planning-group-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="planning-add-category-btn"
+            title="Add category to group"
+            onClick={() => onAddCategory(group.groupId)}
+          >
+            +
+          </button>
+        </div>
       </div>
 
       {!isCollapsed && (
@@ -176,5 +150,27 @@ export const PlanningGroupSection = ({
         </div>
       )}
     </div>
+  )
+
+  if (isUncategorized) return headerContent
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger render={<div style={{ display: "contents" }} />}>
+        {headerContent}
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Positioner className="context-menu-positioner" sideOffset={4}>
+          <ContextMenu.Popup className="context-menu-popup">
+            <ContextMenu.Item
+              className="context-menu-item context-menu-item-danger"
+              onClick={() => onDeleteGroup(group.groupId, group.groupName)}
+            >
+              Delete group
+            </ContextMenu.Item>
+          </ContextMenu.Popup>
+        </ContextMenu.Positioner>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   )
 }

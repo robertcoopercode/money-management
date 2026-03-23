@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { apiFetch } from "../lib/api.js"
 import type { Category, CategoryGroup } from "../types.js"
@@ -34,8 +34,6 @@ export const useCategoryMutations = (opts: {
   onGroupDeleted?: () => void
   onGroupCreated?: () => void
 }) => {
-  const queryClient = useQueryClient()
-
   const updateCategoryMutation = useMutation({
     mutationFn: ({ categoryId, ...body }: UpdateCategoryInput) =>
       apiFetch<Category>(`/api/categories/${categoryId}`, {
@@ -129,9 +127,8 @@ export const useCategoryMutations = (opts: {
     },
   })
 
-  // Reorder mutations use optimistic updates — the caller patches the cache
-  // before calling mutate, so onSuccess just does a background refetch for
-  // eventual consistency. onError rolls back via the saved snapshot.
+  // Reorder mutations are fire-and-forget — client ordering is authoritative.
+  // No cache invalidation or refetch on settle; just toast on error.
   const reorderCategoryMutation = useMutation({
     mutationFn: (input: { categoryId: string; sortOrder: string; groupId?: string | null }) =>
       apiFetch(`/api/categories/${input.categoryId}/reorder`, {
@@ -140,10 +137,6 @@ export const useCategoryMutations = (opts: {
       }),
     onError: (error) => {
       toast.error(`Unable to reorder category: ${error.message}`)
-      opts.refetchCoreData()
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["planning"] })
     },
   })
 
@@ -155,10 +148,6 @@ export const useCategoryMutations = (opts: {
       }),
     onError: (error) => {
       toast.error(`Unable to reorder group: ${error.message}`)
-      opts.refetchCoreData()
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["planning"] })
     },
   })
 
