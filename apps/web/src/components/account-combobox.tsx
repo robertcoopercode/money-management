@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Combobox } from "@base-ui/react/combobox"
 import { ScrollArea } from "./scroll-area.js"
 
@@ -31,6 +31,12 @@ export const AccountCombobox = ({
     () => accounts.find((a) => a.id === value) ?? null,
     [accounts, value],
   )
+
+  useEffect(() => {
+    if (value && !selectedAccount) {
+      setInputValue("")
+    }
+  }, [value, selectedAccount])
 
   return (
     <Combobox.Root<AccountOption>

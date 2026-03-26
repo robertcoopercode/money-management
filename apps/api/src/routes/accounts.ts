@@ -4,8 +4,8 @@ import { createAccountSchema, updateAccountSchema, reconcileAccountSchema } from
 import { parseJson } from "../lib/http.js"
 import { runApiEffect } from "../lib/effect-helpers.js"
 import {
-  archiveAccount,
   createAccount,
+  deleteAccount,
   listAccounts,
   updateAccount,
 } from "../services/account-service.js"
@@ -75,7 +75,7 @@ export const registerAccountRoutes = (app: Hono) => {
 
   app.delete("/api/accounts/:accountId", async (context) => {
     const accountId = context.req.param("accountId")
-    await runApiEffect(archiveAccount(accountId))
+    await runApiEffect(deleteAccount(accountId))
     return context.body(null, 204)
   })
 }

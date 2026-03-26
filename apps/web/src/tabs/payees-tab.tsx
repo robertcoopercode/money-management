@@ -50,6 +50,7 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
     onPayeesCombined: () => {
       setSelectedPayeeIds(new Set())
       setCombineName("")
+      setShowCombineDialog(false)
     },
     onPayeesDeleted: () => {
       setSelectedPayeeIds(new Set())
@@ -120,7 +121,7 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
     return (payeesQuery.data ?? []).find((p) => p.id === firstId) ?? null
   }, [selectedPayeeIds, payeesQuery.data])
 
-  const showCombineForm = selectedPayeeIds.size >= 2
+  const [showCombineDialog, setShowCombineDialog] = useState(false)
 
   const handleDelete = () => {
     if (selectedPayeeIds.size === 0) return
@@ -138,81 +139,51 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
   return (
     <>
       <section className="card">
-        <div className="payee-header">
-          <div className="payee-header-left">
-            <h2>Payees</h2>
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <TextInput
-                value={payeeSearch}
-                onChange={(event) => setPayeeSearch(event.target.value)}
-                placeholder="Search..."
-              />
-              <label className="app-switch-label">
-                <Switch.Root
-                  className="app-switch"
-                  checked={showUnused}
-                  onCheckedChange={setShowUnused}
-                >
-                  <Switch.Thumb className="app-switch-thumb" />
-                </Switch.Root>
-                Unused
-              </label>
-              {selectedPayeeIds.size >= 1 ? (
-                <button
-                  className="button-danger"
-                  onClick={handleDelete}
-                  disabled={deletePayeeMutation.isPending}
-                  style={{ whiteSpace: "nowrap" }}
-                >
-                  {deletePayeeMutation.isPending
-                    ? "Deleting..."
-                    : `Delete${selectedPayeeIds.size > 1 ? ` (${selectedPayeeIds.size})` : ""}`}
-                </button>
-              ) : null}
-            </div>
-          </div>
-          <div className="payee-header-right">
-            {showCombineForm ? (
-              <div className="combine-form">
-                <strong style={{ fontSize: "0.85rem" }}>
-                  Combine {selectedPayeeIds.size} payees into:
-                </strong>
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
-                  <TextInput
-                    value={combineName}
-                    onChange={(e) => setCombineName(e.target.value)}
-                    placeholder="New payee name"
-                    style={{ flex: 1 }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCombine()
-                    }}
-                    onFocus={() => {
-                      if (!combineName && firstSelectedPayee) {
-                        setCombineName(firstSelectedPayee.name)
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={handleCombine}
-                    disabled={
-                      !combineName.trim() || combinePayeeMutation.isPending
-                    }
-                  >
-                    {combinePayeeMutation.isPending ? "Combining..." : "Combine"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedPayeeIds(new Set())
-                      setCombineName("")
-                    }}
-                    style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
+        <div className="section-header" style={{ marginBottom: "0.8rem" }}>
+          <h2>Payees</h2>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.8rem" }}>
+          <TextInput
+            value={payeeSearch}
+            onChange={(event) => setPayeeSearch(event.target.value)}
+            placeholder="Search..."
+            style={{ width: "12rem" }}
+          />
+          {selectedPayeeIds.size >= 2 ? (
+            <button
+              onClick={() => {
+                if (!combineName && firstSelectedPayee) {
+                  setCombineName(firstSelectedPayee.name)
+                }
+                setShowCombineDialog(true)
+              }}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              Combine ({selectedPayeeIds.size})
+            </button>
+          ) : null}
+          {selectedPayeeIds.size >= 1 ? (
+            <button
+              className="button-danger"
+              onClick={handleDelete}
+              disabled={deletePayeeMutation.isPending}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {deletePayeeMutation.isPending
+                ? "Deleting..."
+                : `Delete${selectedPayeeIds.size > 1 ? ` (${selectedPayeeIds.size})` : ""}`}
+            </button>
+          ) : null}
+          <label className="app-switch-label" style={{ marginLeft: "auto" }}>
+            <Switch.Root
+              className="app-switch"
+              checked={showUnused}
+              onCheckedChange={setShowUnused}
+            >
+              <Switch.Thumb className="app-switch-thumb" />
+            </Switch.Root>
+            Unused
+          </label>
         </div>
 
         <div className="list">
@@ -308,6 +279,54 @@ export const PayeesTab = ({ payeesQuery, categoryGroups, refetchCoreData }: Paye
           )}
         </div>
       </section>
+
+      <AppDialog
+        open={showCombineDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowCombineDialog(false)
+            setCombineName("")
+          }
+        }}
+        title={`Combine ${selectedPayeeIds.size} payees`}
+      >
+        <form
+          className="form-grid"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleCombine()
+          }}
+        >
+          <label>
+            New payee name
+            <TextInput
+              value={combineName}
+              onChange={(e) => setCombineName(e.target.value)}
+              placeholder="Enter name"
+              autoFocus
+            />
+          </label>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCombineDialog(false)
+                setCombineName("")
+              }}
+              disabled={combinePayeeMutation.isPending}
+              style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!combineName.trim() || combinePayeeMutation.isPending}
+            >
+              {combinePayeeMutation.isPending ? "Combining..." : "Combine"}
+            </button>
+          </div>
+        </form>
+      </AppDialog>
 
       <AppDialog
         open={showDeleteConfirm}

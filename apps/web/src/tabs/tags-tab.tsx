@@ -105,11 +105,8 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
   return (
     <>
       <section className="card">
-        <div className="section-header">
+        <div className="section-header" style={{ marginBottom: "0.8rem" }}>
           <h2>Tags</h2>
-          <button type="button" title="Add tag" onClick={openCreate}>
-            +
-          </button>
         </div>
         <div style={{ display: "flex", gap: "0.55rem", alignItems: "center", marginBottom: "0.8rem" }}>
           <TextInput
@@ -118,7 +115,7 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
             placeholder="Search..."
             style={{ width: "12rem" }}
           />
-          <label className="app-switch-label">
+          <label className="app-switch-label" style={{ marginLeft: "auto" }}>
             <Switch.Root
               className="app-switch"
               checked={showArchived}
@@ -128,6 +125,9 @@ export const TagsTab = ({ tagsQuery, refetchCoreData }: TagsTabProps) => {
             </Switch.Root>
             Show archived
           </label>
+          <button type="button" title="Add tag" onClick={openCreate} style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}>
+            +
+          </button>
         </div>
 
         {tagsQuery.isError ? (

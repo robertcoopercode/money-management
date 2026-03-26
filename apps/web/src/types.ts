@@ -13,6 +13,7 @@ export type Account = {
   name: string
   type: "CASH" | "CREDIT" | "INVESTMENT" | "LOAN"
   isActive: boolean
+  transactionCount: number
   startingBalanceMinor: number
   startingBalanceAt: string
   clearedBalanceMinor: number

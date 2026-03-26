@@ -22,9 +22,7 @@ export const AccountFilterSelect = ({
           placeholder="All accounts"
           className="account-filter-value"
         >
-          {value
-            ? (accounts.find((a) => a.id === value)?.name ?? value)
-            : null}
+          {accounts.find((a) => a.id === value)?.name ?? null}
         </Select.Value>
         <Select.Icon className="account-filter-icon">
           <svg

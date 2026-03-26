@@ -93,6 +93,12 @@ export const TransactionsTab = ({
   const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("ledgr:sort-dir", "desc")
   const [showReconciled, setShowReconciled] = useState(false)
 
+  useEffect(() => {
+    if (filterAccountId && accounts.length > 0 && !accounts.some((a) => a.id === filterAccountId)) {
+      setFilterAccountId("")
+    }
+  }, [filterAccountId, accounts, setFilterAccountId])
+
   const handleSort = useCallback(
     (column: string) => {
       if (sortBy === column) {
@@ -643,6 +649,7 @@ export const TransactionsTab = ({
             type="button"
             disabled={!filterAccountId}
             onClick={() => setCsvImportOpen(true)}
+            style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
           >
             Import CSV
           </button>

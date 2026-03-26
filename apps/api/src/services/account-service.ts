@@ -35,6 +35,7 @@ export const listAccounts = Effect.tryPromise({
       return {
         ...rest,
         isActive: account.isActive,
+        transactionCount: transactions.length,
         clearedBalanceMinor: account.startingBalanceMinor + clearedAndReconciledTotal,
         unclearedBalanceMinor: unclearedTotal,
         balanceMinor: account.startingBalanceMinor + transactionTotal,
@@ -78,4 +79,13 @@ export const archiveAccount = (accountId: Account["id"]) =>
         data: { isActive: false },
       }),
     catch: (error) => new Error(`Unable to archive account: ${String(error)}`),
+  })
+
+export const deleteAccount = (accountId: Account["id"]) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.account.delete({
+        where: { id: accountId },
+      }),
+    catch: (error) => new Error(`Unable to delete account: ${String(error)}`),
   })

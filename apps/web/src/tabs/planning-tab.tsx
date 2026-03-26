@@ -383,7 +383,6 @@ export const PlanningTab = ({
     const activeParsed = parseId(activeDndId)
     const overParsed = parseId(overDndId)
 
-    // Only handle category moves between groups
     if (!activeParsed || activeParsed.type !== "cat" || !overParsed) return
 
     const activeContainer = findContainer(activeParsed.id)
@@ -391,9 +390,21 @@ export const PlanningTab = ({
       ? overParsed.id
       : findContainer(overParsed.id)
 
-    if (!activeContainer || !overContainer || activeContainer === overContainer) return
+    if (!activeContainer || !overContainer) return
 
-    // Determine insertion index
+    if (activeContainer === overContainer) {
+      // Same container: reorder within the group
+      if (overParsed.type !== "cat") return
+      const group = groups.find((g) => g.groupId === activeContainer)
+      if (!group) return
+      const activeIdx = group.categories.findIndex((c) => c.categoryId === activeParsed.id)
+      const overIdx = group.categories.findIndex((c) => c.categoryId === overParsed.id)
+      if (activeIdx === -1 || overIdx === -1 || activeIdx === overIdx) return
+      applyCategoryReorder(activeParsed.id, activeContainer, overIdx)
+      return
+    }
+
+    // Cross container: move to different group
     const overGroup = groups.find((g) => g.groupId === overContainer)
     if (!overGroup) return
 
@@ -465,12 +476,9 @@ export const PlanningTab = ({
         sortOrder: newSortOrder,
       })
     } else if (activeItem.type === "cat") {
+      // Ordering was already updated by handleDragOver — just read final position and persist
       const activeContainer = findContainer(activeItem.id)
-      const overContainer = overItem.type === "group"
-        ? overItem.id
-        : findContainer(overItem.id)
-
-      if (!activeContainer || !overContainer) {
+      if (!activeContainer) {
         restoreSnapshot()
         setActiveId(null)
         activeCategoryLabel.current = null
@@ -485,33 +493,6 @@ export const PlanningTab = ({
         return
       }
 
-      // For same-container: apply arrayMove to finalize the position
-      if (activeContainer === overContainer && overItem.type === "cat") {
-        const activeIdx = finalGroup.categories.findIndex((c) => c.categoryId === activeItem.id)
-        const overIdx = finalGroup.categories.findIndex((c) => c.categoryId === overItem.id)
-        if (activeIdx !== -1 && overIdx !== -1 && activeIdx !== overIdx) {
-          const reordered = arrayMove(finalGroup.categories, activeIdx, overIdx)
-          // Apply the final position to client ordering
-          applyCategoryReorder(activeItem.id, finalGroup.groupId, overIdx)
-
-          // Compute sort key from the reordered array
-          const newIndex = reordered.findIndex((c) => c.categoryId === activeItem.id)
-          const prevSortOrder = newIndex > 0 ? reordered[newIndex - 1]?.sortOrder ?? null : null
-          const nextSortOrder = newIndex < reordered.length - 1 ? reordered[newIndex + 1]?.sortOrder ?? null : null
-          const newSortOrder = generateKeyBetween(prevSortOrder, nextSortOrder)
-
-          setActiveId(null)
-          activeCategoryLabel.current = null
-
-          reorderCategoryMutation.mutate({
-            categoryId: activeItem.id,
-            sortOrder: newSortOrder,
-          })
-          return
-        }
-      }
-
-      // Cross-group move (already applied in onDragOver) — compute sort key from current position
       const catIdx = finalGroup.categories.findIndex((c) => c.categoryId === activeItem.id)
       if (catIdx === -1) {
         setActiveId(null)

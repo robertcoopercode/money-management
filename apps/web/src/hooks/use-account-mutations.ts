@@ -78,7 +78,7 @@ export const useAccountMutations = (opts: {
         body: JSON.stringify({ isActive }),
       }),
     onSuccess: (_, { isActive }) => {
-      toast.success(isActive ? "Account reactivated" : "Account marked inactive")
+      toast.success(isActive ? "Account unarchived" : "Account archived")
       opts.refetchCoreData()
     },
     onError: (error) => {

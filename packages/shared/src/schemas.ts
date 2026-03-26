@@ -7,7 +7,7 @@ export const accountTypeSchema = z.enum([
   "LOAN",
 ])
 
-export const loanTypeSchema = z.enum(["MORTGAGE", "AUTO"])
+export const loanTypeSchema = z.enum(["MORTGAGE", "AUTO", "LINE_OF_CREDIT"])
 
 export const clearingStatusSchema = z.enum(["UNCLEARED", "CLEARED", "RECONCILED"])
 

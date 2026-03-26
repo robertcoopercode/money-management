@@ -4,6 +4,7 @@ import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { TextInput } from "../components/text-input.js"
 import { DatePicker } from "../components/date-picker.js"
 import { AppSelect } from "../components/app-select.js"
+import { AppAlertDialog } from "../components/app-alert-dialog.js"
 import { AppDialog } from "../components/app-dialog.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { useAccountMutations } from "../hooks/use-account-mutations.js"
@@ -43,7 +44,8 @@ export const AccountsTab = ({
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] =
     useState(false)
   const [newAccount, setNewAccount] = useState(emptyNewAccount)
-  const [showInactive, setShowInactive] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
   const [editStartingBalance, setEditStartingBalance] = useState("")
   const [editStartingBalanceAt, setEditStartingBalanceAt] = useState("")
@@ -76,9 +78,9 @@ export const AccountsTab = ({
 
   const visibleAccounts = useMemo(() => {
     const all = accountsQuery.data ?? []
-    if (showInactive) return all
+    if (showArchived) return all
     return all.filter((a) => a.isActive)
-  }, [accountsQuery.data, showInactive])
+  }, [accountsQuery.data, showArchived])
 
   return (
     <>
@@ -89,16 +91,17 @@ export const AccountsTab = ({
             <label className="app-switch-label">
               <Switch.Root
                 className="app-switch"
-                checked={showInactive}
-                onCheckedChange={setShowInactive}
+                checked={showArchived}
+                onCheckedChange={setShowArchived}
               >
                 <Switch.Thumb className="app-switch-thumb" />
               </Switch.Root>
-              Show inactive
+              Show archived
             </label>
             <button
               type="button"
               className="icon-button"
+              style={{ background: "none", border: "1px solid rgb(95 117 171 / 28%)" }}
               onClick={() => setIsCreateAccountDialogOpen(true)}
               aria-label="Create account"
             >
@@ -119,9 +122,9 @@ export const AccountsTab = ({
             <p className="muted">Loading accounts...</p>
           ) : visibleAccounts.length === 0 ? (
             <p className="muted">
-              {showInactive
+              {showArchived
                 ? "No accounts yet. Add one to get started."
-                : "No active accounts. Toggle \"Show inactive\" to see archived accounts."}
+                : "No active accounts. Toggle \"Show archived\" to see archived accounts."}
             </p>
           ) : (
             visibleAccounts.map((account) => {
@@ -157,7 +160,7 @@ export const AccountsTab = ({
                           marginLeft: "0.35rem",
                         }}
                       >
-                        Inactive
+                        Archived
                       </span>
                     )}
                   </div>
@@ -199,7 +202,7 @@ export const AccountsTab = ({
                     <button
                       type="button"
                       className="edit-icon-button"
-                      title={account.isActive ? "Mark inactive" : "Reactivate"}
+                      title={account.isActive ? "Archive" : "Unarchive"}
                       onClick={() =>
                         toggleAccountActiveMutation.mutate({
                           accountId: account.id,
@@ -208,50 +211,25 @@ export const AccountsTab = ({
                       }
                       disabled={toggleAccountActiveMutation.isPending}
                     >
-                      {account.isActive ? (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M18.36 6.64A9 9 0 0 1 20.77 15" />
-                          <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" />
-                          <path d="M12 2v4" />
-                          <path d="m2 2 20 20" />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21.801 10A10 10 0 1 1 17 3.335" />
-                          <path d="m9 11 3 3L22 4" />
-                        </svg>
-                      )}
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 8v13H3V8" />
+                        <path d="M1 3h22v5H1z" />
+                        <path d="M10 12h4" />
+                      </svg>
                     </button>
                     <button
                       type="button"
                       className="icon-button-danger"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Delete account "${account.name}"? This will archive the account and hide it from the list.`,
-                          )
-                        ) {
-                          deleteAccountMutation.mutate(account.id)
-                        }
-                      }}
+                      onClick={() => setDeletingAccount(account)}
                       disabled={deleteAccountMutation.isPending}
                       aria-label={`Delete ${account.name}`}
                     >
@@ -384,6 +362,7 @@ export const AccountsTab = ({
                   options={[
                     { value: "MORTGAGE", label: "Mortgage" },
                     { value: "AUTO", label: "Auto" },
+                    { value: "LINE_OF_CREDIT", label: "Line of Credit" },
                   ]}
                   value={newAccount.loanType}
                   onChange={(value) =>
@@ -467,6 +446,45 @@ export const AccountsTab = ({
           </div>
         </form>
       </AppDialog>
+
+      <AppAlertDialog
+        open={deletingAccount !== null}
+        onOpenChange={(open) => { if (!open) setDeletingAccount(null) }}
+        title={deletingAccount && deletingAccount.transactionCount > 0 ? "Unable to Delete Account" : "Delete Account"}
+        description={
+          deletingAccount
+            ? deletingAccount.transactionCount > 0
+              ? `Cannot delete "${deletingAccount.name}" because it has ${deletingAccount.transactionCount} transaction${deletingAccount.transactionCount === 1 ? "" : "s"}. Please delete all transactions from this account first.`
+              : `Are you sure you want to delete "${deletingAccount.name}"? This action cannot be undone.`
+            : ""
+        }
+      >
+        {deletingAccount?.transactionCount ? (
+          <button type="button" onClick={() => setDeletingAccount(null)}>
+            OK
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={() => setDeletingAccount(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button-danger"
+              onClick={() => {
+                if (deletingAccount) {
+                  deleteAccountMutation.mutate(deletingAccount.id, {
+                    onSettled: () => setDeletingAccount(null),
+                  })
+                }
+              }}
+              disabled={deleteAccountMutation.isPending}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </AppAlertDialog>
     </>
   )
 }

@@ -17,6 +17,7 @@ enum AccountType {
 enum LoanType {
   MORTGAGE
   AUTO
+  LINE_OF_CREDIT
 }
 
 enum OriginType {

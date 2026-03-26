@@ -32,7 +32,7 @@ export function ReportsToolbar({
   const [customTo, setCustomTo] = useState("")
   const [accountId, setAccountId] = useState("")
   const [payeeId, setPayeeId] = useState("")
-  const [clearingStatus, setClearingStatus] = useState("all")
+  const [clearingStatus, setClearingStatus] = useState("")
 
   const range = computeDateRange(preset, customFrom || undefined, customTo || undefined)
 
@@ -109,6 +109,7 @@ export function ReportsToolbar({
             ]}
             value={accountId}
             onChange={(v) => { setAccountId(v); fireChange({ accountId: v }) }}
+            placeholder="Select..."
           />
         </label>
         <label>
@@ -120,19 +121,21 @@ export function ReportsToolbar({
             ]}
             value={payeeId}
             onChange={(v) => { setPayeeId(v); fireChange({ payeeId: v }) }}
+            placeholder="Select..."
           />
         </label>
         <label>
           Status
           <AppSelect
             options={[
-              { value: "all", label: "All" },
+              { value: "", label: "All" },
               { value: "CLEARED", label: "Cleared" },
               { value: "UNCLEARED", label: "Uncleared" },
               { value: "RECONCILED", label: "Reconciled" },
             ]}
             value={clearingStatus}
             onChange={(v) => { setClearingStatus(v); fireChange({ clearingStatus: v }) }}
+            placeholder="Select..."
           />
         </label>
       </div>
