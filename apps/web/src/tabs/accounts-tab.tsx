@@ -4,16 +4,18 @@ import { formatMoney, parseMoneyInputToMinor } from "@ledgr/shared"
 import { TextInput } from "../components/text-input.js"
 import { DatePicker } from "../components/date-picker.js"
 import { AppSelect } from "../components/app-select.js"
+import { CategoryAutocomplete } from "../components/category-autocomplete.js"
 import { AppAlertDialog } from "../components/app-alert-dialog.js"
 import { AppDialog } from "../components/app-dialog.js"
 import { toDisplayErrorMessage } from "../lib/errors.js"
 import { useAccountMutations } from "../hooks/use-account-mutations.js"
 import { InlineEditName } from "../components/inline-edit-name.js"
-import type { Account, LoanProfile } from "../types.js"
+import type { Account, LoanProfile, CategoryGroup } from "../types.js"
 import type { UseQueryResult } from "@tanstack/react-query"
 
 type AccountsTabProps = {
   accountsQuery: UseQueryResult<Account[]>
+  categoryGroups: CategoryGroup[]
   refetchCoreData: () => void
   onAccountCreated: (accountId: string) => void
 }
@@ -28,6 +30,7 @@ const emptyNewAccount = {
   loanType: "MORTGAGE" as LoanProfile["loanType"],
   interestRate: "",
   minimumPayment: "",
+  defaultCategoryId: "",
 }
 
 const formatMoneyForInput = (minor: number) => {
@@ -38,6 +41,7 @@ const formatMoneyForInput = (minor: number) => {
 
 export const AccountsTab = ({
   accountsQuery,
+  categoryGroups,
   refetchCoreData,
   onAccountCreated,
 }: AccountsTabProps) => {
@@ -49,6 +53,7 @@ export const AccountsTab = ({
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
   const [editStartingBalance, setEditStartingBalance] = useState("")
   const [editStartingBalanceAt, setEditStartingBalanceAt] = useState("")
+  const [editDefaultCategoryId, setEditDefaultCategoryId] = useState("")
   const {
     createAccountMutation,
     updateAccountNameMutation,
@@ -70,6 +75,7 @@ export const AccountsTab = ({
     setEditingAccount(account)
     setEditStartingBalance(formatMoneyForInput(account.startingBalanceMinor))
     setEditStartingBalanceAt(account.startingBalanceAt.slice(0, 10))
+    setEditDefaultCategoryId(account.loanProfile?.defaultCategory?.id ?? "")
   }
 
   const closeEditModal = () => {
@@ -271,6 +277,9 @@ export const AccountsTab = ({
                 accountId: editingAccount.id,
                 startingBalanceMinor: parseMoneyInputToMinor(editStartingBalance),
                 startingBalanceAt: editStartingBalanceAt,
+                ...(editingAccount.type === "LOAN"
+                  ? { defaultCategoryId: editDefaultCategoryId || null }
+                  : {}),
               },
               { onSuccess: closeEditModal },
             )
@@ -293,6 +302,18 @@ export const AccountsTab = ({
               required
             />
           </label>
+          {editingAccount?.type === "LOAN" ? (
+            <div>
+              <span style={{ fontSize: "0.85rem" }}>Default Category</span>
+              <CategoryAutocomplete
+                categoryGroups={categoryGroups}
+                value={editDefaultCategoryId}
+                onChange={setEditDefaultCategoryId}
+                placeholder="Default category"
+                initialInputValue={editingAccount.loanProfile?.defaultCategory?.name ?? ""}
+              />
+            </div>
+          ) : null}
           <div className="dialog-actions">
             <button
               type="button"
@@ -402,6 +423,20 @@ export const AccountsTab = ({
                   }
                 />
               </label>
+              <div>
+                <span style={{ fontSize: "0.85rem" }}>Default Category</span>
+                <CategoryAutocomplete
+                  categoryGroups={categoryGroups}
+                  value={newAccount.defaultCategoryId}
+                  onChange={(value) =>
+                    setNewAccount((current) => ({
+                      ...current,
+                      defaultCategoryId: value,
+                    }))
+                  }
+                  placeholder="Default category"
+                />
+              </div>
             </>
           ) : null}
           <label>

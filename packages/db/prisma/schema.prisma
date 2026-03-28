@@ -66,12 +66,14 @@ model Account {
 }
 
 model LoanProfile {
-  id                   String   @id @default(cuid())
-  accountId            String   @unique
+  id                   String    @id @default(cuid())
+  accountId            String    @unique
   loanType             LoanType
-  interestRateAnnual   Decimal  @db.Decimal(8, 6)
+  interestRateAnnual   Decimal   @db.Decimal(8, 6)
   minimumPaymentMinor  Int
-  account              Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  defaultCategoryId    String?
+  account              Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  defaultCategory      Category? @relation("LoanProfileDefaultCategory", fields: [defaultCategoryId], references: [id], onDelete: SetNull)
 }
 
 model Payee {
@@ -114,6 +116,7 @@ model Category {
   transactions      Transaction[]
   transactionSplits TransactionSplit[]
   payeesWithDefault Payee[]            @relation("PayeeDefaultCategory")
+  loanProfilesWithDefault LoanProfile[] @relation("LoanProfileDefaultCategory")
 }
 
 model Transaction {

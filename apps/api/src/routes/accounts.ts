@@ -35,6 +35,9 @@ export const registerAccountRoutes = (app: Hono) => {
                   loanType: payload.loanType,
                   interestRateAnnual: payload.interestRateAnnual ?? 0,
                   minimumPaymentMinor: payload.minimumPaymentMinor ?? 0,
+                  ...(payload.defaultCategoryId
+                    ? { defaultCategoryId: payload.defaultCategoryId }
+                    : {}),
                 },
               },
             }
@@ -58,6 +61,15 @@ export const registerAccountRoutes = (app: Hono) => {
           ? { startingBalanceAt: new Date(payload.startingBalanceAt) }
           : {}),
         ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
+        ...(payload.defaultCategoryId !== undefined
+          ? {
+              loanProfile: {
+                update: {
+                  defaultCategoryId: payload.defaultCategoryId ?? null,
+                },
+              },
+            }
+          : {}),
       }),
     )
 

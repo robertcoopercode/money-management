@@ -19,6 +19,7 @@ const accountBaseSchema = z.object({
   loanType: loanTypeSchema.optional(),
   interestRateAnnual: z.number().min(0).max(100).optional(),
   minimumPaymentMinor: z.number().int().min(0).optional(),
+  defaultCategoryId: z.string().optional().nullable(),
 })
 
 const loanRefinement = (

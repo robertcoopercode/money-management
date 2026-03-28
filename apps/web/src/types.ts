@@ -4,6 +4,7 @@ export type LoanProfile = {
   loanType: "MORTGAGE" | "AUTO"
   interestRateAnnual: number
   minimumPaymentMinor: number
+  defaultCategory?: { id: string; name: string; groupId: string } | null
 }
 
 export type ClearingStatus = "UNCLEARED" | "CLEARED" | "RECONCILED"

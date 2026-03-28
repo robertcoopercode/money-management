@@ -13,7 +13,13 @@ export const listAccounts = Effect.tryPromise({
             clearingStatus: true,
           },
         },
-        loanProfile: true,
+        loanProfile: {
+          include: {
+            defaultCategory: {
+              select: { id: true, name: true, groupId: true },
+            },
+          },
+        },
       },
     }),
   catch: (error) => new Error(`Unable to list accounts: ${String(error)}`),
@@ -44,6 +50,7 @@ export const listAccounts = Effect.tryPromise({
               loanType: loanProfile.loanType,
               interestRateAnnual: Number(loanProfile.interestRateAnnual),
               minimumPaymentMinor: loanProfile.minimumPaymentMinor,
+              defaultCategory: loanProfile.defaultCategory ?? null,
             }
           : null,
       }

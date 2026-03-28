@@ -249,12 +249,20 @@ export const TransactionEditRow = ({
             if (!selection) {
               update({ payeeId: "", transferAccountId: "" })
             } else if (selection.kind === "transfer") {
+              const targetAccount = accounts.find((a) => a.id === selection.accountId)
+              const sourceAccount = accounts.find((a) => a.id === draft.accountId)
+              const loanAccount = targetAccount?.type === "LOAN" ? targetAccount : sourceAccount?.type === "LOAN" ? sourceAccount : null
+              const loanDefaultCategoryId = loanAccount?.loanProfile?.defaultCategory?.id
               const patch: Partial<TransactionDraft> = {
                 payeeId: "",
                 transferAccountId: selection.accountId,
                 splits: [],
               }
-              if (!selection.isLoanPayment) {
+              if (selection.isLoanPayment) {
+                if (loanDefaultCategoryId) {
+                  patch.categoryId = loanDefaultCategoryId
+                }
+              } else {
                 patch.categoryId = ""
               }
               update(patch)

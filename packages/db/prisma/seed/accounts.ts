@@ -11,6 +11,7 @@ export type LoanProfileSeed = {
   loanType: LoanType
   interestRateAnnual: number
   minimumPaymentMinor: number
+  defaultCategoryName?: string
 }
 
 export const accounts: AccountSeed[] = [
@@ -31,11 +32,13 @@ export const loanProfiles: LoanProfileSeed[] = [
     loanType: "AUTO",
     interestRateAnnual: 5.49,
     minimumPaymentMinor: 42500,
+    defaultCategoryName: "🚗 Car Payment",
   },
   {
     accountName: "Scotiabank Mortgage",
     loanType: "MORTGAGE",
     interestRateAnnual: 4.19,
     minimumPaymentMinor: 158000,
+    defaultCategoryName: "🏠 Mortgage",
   },
 ]

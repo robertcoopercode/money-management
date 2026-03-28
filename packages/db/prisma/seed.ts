@@ -93,6 +93,7 @@ const main = async () => {
         loanType: lp.loanType,
         interestRateAnnual: lp.interestRateAnnual,
         minimumPaymentMinor: lp.minimumPaymentMinor,
+        defaultCategoryId: lp.defaultCategoryName ? categoryMap.get(lp.defaultCategoryName) ?? null : null,
       },
     })
   }

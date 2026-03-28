@@ -422,11 +422,17 @@ export const TransactionsTab = ({
                   }
                 }
                 if (selection.kind === "transfer") {
+                  const targetAccount = accounts.find((a) => a.id === selection.accountId)
+                  const sourceAccount = accounts.find((a) => a.id === current.accountId)
+                  const loanAccount = targetAccount?.type === "LOAN" ? targetAccount : sourceAccount?.type === "LOAN" ? sourceAccount : null
+                  const loanDefaultCategoryId = loanAccount?.loanProfile?.defaultCategory?.id
                   return {
                     ...current,
                     payeeId: "",
                     transferAccountId: selection.accountId,
-                    ...(selection.isLoanPayment ? {} : { categoryId: "" }),
+                    ...(selection.isLoanPayment
+                      ? (loanDefaultCategoryId ? { categoryId: loanDefaultCategoryId } : {})
+                      : { categoryId: "" }),
                   }
                 }
                 const selectedPayee = payees.find((p) => p.id === selection.id)

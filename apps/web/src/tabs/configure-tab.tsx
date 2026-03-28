@@ -25,6 +25,7 @@ export const ConfigureTab = ({
     <div className="configure-left">
       <AccountsTab
         accountsQuery={accountsQuery}
+        categoryGroups={categoryGroups}
         refetchCoreData={refetchCoreData}
         onAccountCreated={onAccountCreated}
       />

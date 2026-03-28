@@ -12,6 +12,7 @@ type NewAccountState = {
   loanType: LoanProfile["loanType"]
   interestRate: string
   minimumPayment: string
+  defaultCategoryId: string
 }
 
 export const useAccountMutations = (opts: {
@@ -40,6 +41,9 @@ export const useAccountMutations = (opts: {
                 minimumPaymentMinor: parseMoneyInputToMinor(
                   newAccount.minimumPayment,
                 ),
+                ...(newAccount.defaultCategoryId
+                  ? { defaultCategoryId: newAccount.defaultCategoryId }
+                  : {}),
               }
             : {}),
         }),
@@ -91,16 +95,21 @@ export const useAccountMutations = (opts: {
       accountId,
       startingBalanceMinor,
       startingBalanceAt,
+      defaultCategoryId,
     }: {
       accountId: string
       startingBalanceMinor: number
       startingBalanceAt: string
+      defaultCategoryId?: string | null
     }) =>
       apiFetch(`/api/accounts/${accountId}`, {
         method: "PATCH",
         body: JSON.stringify({
           startingBalanceMinor,
           startingBalanceAt: new Date(startingBalanceAt + "T00:00:00.000Z").toISOString(),
+          ...(defaultCategoryId !== undefined
+            ? { defaultCategoryId }
+            : {}),
         }),
       }),
     onSuccess: () => {
