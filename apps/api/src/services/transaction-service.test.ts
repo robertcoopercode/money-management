@@ -339,7 +339,7 @@ describe("transaction-service", () => {
     })
 
     describe("loan transfer", () => {
-      it("preserves categoryId on both sides when source account is LOAN", async () => {
+      it("strips categoryId from source when source is LOAN, assigns to mirror", async () => {
         setupAccountLookups(ACCOUNT_LOAN, ACCOUNT_SAVINGS)
         mockPrisma.transaction.create
           .mockResolvedValueOnce({ id: "txn-source" })
@@ -357,11 +357,11 @@ describe("transaction-service", () => {
 
         const sourceData = callArg(mockPrisma.transaction.create, 0).data
         const mirrorData = callArg(mockPrisma.transaction.create, 1).data
-        expect(sourceData.categoryId).toBe("cat-loan")
+        expect(sourceData.categoryId).toBeUndefined()
         expect(mirrorData.categoryId).toBe("cat-loan")
       })
 
-      it("preserves categoryId when target account is LOAN", async () => {
+      it("keeps categoryId on source when target is LOAN, strips from mirror", async () => {
         setupAccountLookups(ACCOUNT_CHECKING, ACCOUNT_LOAN)
         mockPrisma.transaction.create
           .mockResolvedValueOnce({ id: "txn-source" })
@@ -380,7 +380,7 @@ describe("transaction-service", () => {
         const sourceData = callArg(mockPrisma.transaction.create, 0).data
         const mirrorData = callArg(mockPrisma.transaction.create, 1).data
         expect(sourceData.categoryId).toBe("cat-loan")
-        expect(mirrorData.categoryId).toBe("cat-loan")
+        expect(mirrorData.categoryId).toBeUndefined()
       })
     })
   })
@@ -562,7 +562,7 @@ describe("transaction-service", () => {
         expect(mirrorData.categoryId).toBeUndefined()
       })
 
-      it("preserves categoryId on both sides for loan transfer conversion", async () => {
+      it("assigns categoryId only to source when converting CASH to LOAN transfer", async () => {
         mockPrisma.transaction.findUnique.mockResolvedValue(makeExistingForUpdate())
         mockPrisma.account.findUnique
           .mockResolvedValueOnce({ type: "CASH" })
@@ -585,7 +585,7 @@ describe("transaction-service", () => {
         expect(sourceData.categoryId).toBe("cat-interest")
 
         const mirrorData = callArg(mockPrisma.transaction.create).data
-        expect(mirrorData.categoryId).toBe("cat-interest")
+        expect(mirrorData.categoryId).toBeUndefined()
       })
 
       it("removes existing splits when converting to transfer", async () => {
@@ -844,7 +844,7 @@ describe("transaction-service", () => {
     })
 
     describe("loan transfer update", () => {
-      it("allows categoryId update on both sides", async () => {
+      it("assigns categoryId only to mirror when source is LOAN", async () => {
         mockPrisma.transaction.findUnique.mockResolvedValue(
           makeExistingForUpdate({
             transferPairId: "pair-1",
@@ -864,8 +864,32 @@ describe("transaction-service", () => {
         expect(mockPrisma.transaction.update).toHaveBeenCalledTimes(2)
         const sourceData = callArg(mockPrisma.transaction.update, 0).data
         const mirrorData = callArg(mockPrisma.transaction.update, 1).data
-        expect(sourceData.categoryId).toBe("cat-loan-payment")
+        expect(sourceData.categoryId).toBeUndefined()
         expect(mirrorData.categoryId).toBe("cat-loan-payment")
+      })
+
+      it("assigns categoryId only to source when target is LOAN", async () => {
+        mockPrisma.transaction.findUnique.mockResolvedValue(
+          makeExistingForUpdate({
+            transferPairId: "pair-1",
+            isTransfer: true,
+            account: { type: "CASH" },
+            transferAccount: { type: "LOAN" },
+          }),
+        )
+        mockPrisma.transaction.update.mockResolvedValue({})
+        mockPrisma.transaction.findFirst.mockResolvedValue({ id: "txn-mirror" })
+        mockPrisma.transaction.findUniqueOrThrow.mockResolvedValue(makeFullTransaction())
+
+        await Effect.runPromise(
+          updateTransaction("txn-1", { categoryId: "cat-loan-payment" }),
+        )
+
+        expect(mockPrisma.transaction.update).toHaveBeenCalledTimes(2)
+        const sourceData = callArg(mockPrisma.transaction.update, 0).data
+        const mirrorData = callArg(mockPrisma.transaction.update, 1).data
+        expect(sourceData.categoryId).toBe("cat-loan-payment")
+        expect(mirrorData.categoryId).toBeUndefined()
       })
     })
   })

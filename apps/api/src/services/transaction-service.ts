@@ -109,6 +109,7 @@ export const createTransaction = (input: {
 
       // Check if this is a loan transfer (category allowed)
       let isLoanTransfer = false
+      let sourceIsLoan = false
       if (input.transferAccountId) {
         const [sourceAccount, targetAccount] = await Promise.all([
           prisma.account.findUnique({
@@ -122,6 +123,7 @@ export const createTransaction = (input: {
         ])
         isLoanTransfer =
           sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+        sourceIsLoan = sourceAccount?.type === "LOAN"
       }
 
       const sourceTransaction = await prisma.$transaction(
@@ -135,7 +137,8 @@ export const createTransaction = (input: {
               amountMinor: input.amountMinor,
               payeeId: input.payeeId,
               categoryId:
-                (input.transferAccountId && !isLoanTransfer) || hasSplits
+                (input.transferAccountId && (!isLoanTransfer || sourceIsLoan)) ||
+                hasSplits
                   ? undefined
                   : input.categoryId,
               note: input.note,
@@ -193,7 +196,10 @@ export const createTransaction = (input: {
                 date: toDate(input.date),
                 amountMinor: toMirrorTransferAmountMinor(input.amountMinor),
                 payeeId: input.payeeId,
-                categoryId: isLoanTransfer ? input.categoryId : undefined,
+                categoryId:
+                  isLoanTransfer && sourceIsLoan
+                    ? input.categoryId
+                    : undefined,
                 note: input.note,
                 clearingStatus: input.clearingStatus,
                 manualCreated: true,
@@ -324,6 +330,7 @@ export const updateTransaction = (
       const existingIsLoanTransfer =
         existing.account.type === "LOAN" ||
         existing.transferAccount?.type === "LOAN"
+      const existingSourceIsLoan = existing.account.type === "LOAN"
 
       if (
         existing.transferPairId &&
@@ -363,6 +370,7 @@ export const updateTransaction = (
         ])
         const isLoanTransfer =
           sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
+        const sourceIsLoan = sourceAccount?.type === "LOAN"
 
         const transferPairId = randomUUID()
         const effectiveAmountMinor = input.amountMinor ?? existing.amountMinor
@@ -387,7 +395,8 @@ export const updateTransaction = (
               date: input.date ? toDate(input.date) : undefined,
               amountMinor: input.amountMinor,
               payeeId: input.payeeId,
-              categoryId: isLoanTransfer ? input.categoryId : null,
+              categoryId:
+                isLoanTransfer && !sourceIsLoan ? input.categoryId : null,
               note: input.note,
               clearingStatus: input.clearingStatus,
               pendingApproval: false,
@@ -402,7 +411,8 @@ export const updateTransaction = (
               date: effectiveDate,
               amountMinor: toMirrorTransferAmountMinor(effectiveAmountMinor),
               payeeId: input.payeeId,
-              categoryId: isLoanTransfer ? input.categoryId : undefined,
+              categoryId:
+                isLoanTransfer && sourceIsLoan ? input.categoryId : undefined,
               note: effectiveNote,
               clearingStatus: "UNCLEARED",
               manualCreated: true,
@@ -510,7 +520,10 @@ export const updateTransaction = (
             date: input.date ? toDate(input.date) : undefined,
             amountMinor: input.amountMinor,
             payeeId: input.payeeId,
-            categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
+            categoryId:
+              existingIsLoanTransfer && !existingSourceIsLoan
+                ? input.categoryId
+                : undefined,
             note: input.note,
             clearingStatus: input.clearingStatus,
             pendingApproval: false,
@@ -535,7 +548,10 @@ export const updateTransaction = (
                   ? toMirrorTransferAmountMinor(input.amountMinor)
                   : undefined,
               payeeId: input.payeeId,
-              categoryId: existingIsLoanTransfer ? input.categoryId : undefined,
+              categoryId:
+                existingIsLoanTransfer && existingSourceIsLoan
+                  ? input.categoryId
+                  : undefined,
               note:
                 input.note !== undefined
                   ? input.note

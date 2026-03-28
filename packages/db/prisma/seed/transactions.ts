@@ -92,7 +92,7 @@ function generateRecurring(
     txs.push(base(1, "TD Chequing", "Scotiabank Mortgage", "🏠 Mortgage", -158000, {
       isTransfer: true, transferAccountName: "Scotiabank Mortgage", transferPairId: mortgageId,
     }))
-    txs.push(base(1, "Scotiabank Mortgage", null, "🏠 Mortgage", 158000, {
+    txs.push(base(1, "Scotiabank Mortgage", null, null, 158000, {
       isTransfer: true, transferAccountName: "TD Chequing", transferPairId: mortgageId,
     }))
 
@@ -104,7 +104,7 @@ function generateRecurring(
     txs.push(base(5, "TD Chequing", "TD Auto Finance", "🚗 Car Payment", -42500, {
       isTransfer: true, transferAccountName: "Honda CR-V Loan (TD)", transferPairId: carId,
     }))
-    txs.push(base(5, "Honda CR-V Loan (TD)", null, "🚗 Car Payment", 42500, {
+    txs.push(base(5, "Honda CR-V Loan (TD)", null, null, 42500, {
       isTransfer: true, transferAccountName: "TD Chequing", transferPairId: carId,
     }))
 
