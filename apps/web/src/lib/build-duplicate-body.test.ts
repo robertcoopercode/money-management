@@ -36,13 +36,13 @@ const makeTransaction = (overrides: Partial<Transaction> = {}): Transaction => (
 })
 
 describe("buildDuplicateBody", () => {
-  it("returns correct accountId, amountMinor, clearingStatus: UNCLEARED, and same date", () => {
+  it("returns correct accountId, amountMinor, clearingStatus: UNCLEARED, and today's date", () => {
     const body = buildDuplicateBody(makeTransaction({ date: "2026-01-15" }))
 
     expect(body.accountId).toBe("acc-1")
     expect(body.amountMinor).toBe(-2500)
     expect(body.clearingStatus).toBe("UNCLEARED")
-    expect(body.date).toBe("2026-01-15")
+    expect(body.date).toBe(new Date().toISOString().slice(0, 10))
   })
 
   it("preserves payeeId, categoryId, and note when present", () => {

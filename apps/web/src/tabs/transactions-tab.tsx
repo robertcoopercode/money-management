@@ -81,6 +81,7 @@ export const TransactionsTab = ({
 }: TransactionsTabProps) => {
   const queryClient = useQueryClient()
   const dateRef = useRef<HTMLInputElement | null>(null)
+  const pendingDuplicateRef = useRef(false)
 
   const [editingTransaction, setEditingTransaction] =
     useState<EditingTransaction | null>(null)
@@ -139,7 +140,16 @@ export const TransactionsTab = ({
     createCategoryMutation,
   } = useTransactionMutations({
     refetchCoreData,
-    onTransactionCreated: () => {
+    onTransactionCreated: (transaction) => {
+      if (pendingDuplicateRef.current) {
+        pendingDuplicateRef.current = false
+        setEditingTransaction({
+          transactionId: transaction.id,
+          draft: transactionToEditDraft(transaction),
+          focusField: "date",
+        })
+        return
+      }
       setNewTransaction((current) => buildNextTransactionDraft(current))
       window.setTimeout(() => dateRef.current?.focus(), 0)
     },
@@ -793,9 +803,10 @@ export const TransactionsTab = ({
                         patch: { clearingStatus },
                       })
                     }
-                    onDuplicate={(t) =>
+                    onDuplicate={(t) => {
+                      pendingDuplicateRef.current = true
                       createTransactionMutation.mutate(buildDuplicateBody(t))
-                    }
+                    }}
                     onDelete={(id) =>
                       deleteTransactionMutation.mutate(id)
                     }

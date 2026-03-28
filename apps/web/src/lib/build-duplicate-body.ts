@@ -3,7 +3,7 @@ import type { Transaction } from "../types.js"
 export function buildDuplicateBody(t: Transaction): Record<string, unknown> {
   const body: Record<string, unknown> = {
     accountId: t.account.id,
-    date: t.date.slice(0, 10),
+    date: new Date().toISOString().slice(0, 10),
     amountMinor: t.amountMinor,
     clearingStatus: "UNCLEARED",
   }

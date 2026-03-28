@@ -10,7 +10,7 @@ import type {
 
 export const useTransactionMutations = (opts: {
   refetchCoreData: () => void
-  onTransactionCreated?: () => void
+  onTransactionCreated?: (transaction: Transaction) => void
   onTransactionUpdated?: () => void
 }) => {
   const queryClient = useQueryClient()
@@ -21,9 +21,9 @@ export const useTransactionMutations = (opts: {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    onSuccess: () => {
+    onSuccess: (transaction) => {
       toast.success("Transaction saved")
-      opts.onTransactionCreated?.()
+      opts.onTransactionCreated?.(transaction)
       opts.refetchCoreData()
     },
     onError: (error) => {
