@@ -1,313 +1,242 @@
-import "../src/env.js"
+import "../src/env.ts"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../src/generated/prisma/client.js"
 import { generateNKeysBetween } from "@ledgr/shared"
+import { accounts, loanProfiles } from "./seed/accounts.js"
+import { categoryGroups } from "./seed/categories.js"
+import { payees } from "./seed/payees.js"
+import { tags } from "./seed/tags.js"
+import { generateAllTransactions } from "./seed/transactions.js"
+import { generateAssignments } from "./seed/assignments.js"
+import { importBatches } from "./seed/imports.js"
+import { monthsInRange, normalizeName, startOfRange } from "./seed/helpers.js"
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 })
 
-type CategorySeed = {
-  name: string
-  isIncomeCategory?: boolean
-}
-
-type CategoryGroupSeed = {
-  name: string
-  categories: CategorySeed[]
-}
-
-const groups: CategoryGroupSeed[] = [
-  {
-    name: "Income",
-    categories: [{ name: "Ready to Assign", isIncomeCategory: true }],
-  },
-  {
-    name: "Fixed / Annual",
-    categories: [{ name: "Hydro" }, { name: "Internet" }, { name: "Phone" }],
-  },
-  {
-    name: "Home",
-    categories: [{ name: "Furniture & Home Goods" }, { name: "Yard & Garden" }],
-  },
-  {
-    name: "Vehicle",
-    categories: [
-      { name: "Car" },
-      { name: "Fuel + Parking" },
-      { name: "Repairs + Maintenance" },
-    ],
-  },
-  {
-    name: "Food",
-    categories: [{ name: "Groceries & Household" }, { name: "Eating Out" }],
-  },
-]
-
-const accounts = [
-  {
-    name: "TD Chequing",
-    type: "CASH" as const,
-    startingBalanceMinor: 450000,
-  },
-  {
-    name: "Visa Infinite",
-    type: "CREDIT" as const,
-    startingBalanceMinor: -128500,
-  },
-]
-
-const payees = [
-  "Loblaws",
-  "Costco",
-  "Amazon",
-  "Netflix",
-  "Hydro One",
-  "Bell Canada",
-  "Shell",
-  "Tim Hortons",
-  "IKEA",
-  "Canadian Tire",
-]
-
-type TransactionSeed = {
-  accountName: string
-  payeeName: string
-  categoryPath: [string, string]
-  amountMinor: number
-  daysAgo: number
-  clearingStatus?: "UNCLEARED" | "CLEARED" | "RECONCILED"
-  note?: string
-}
-
-const transactions: TransactionSeed[] = [
-  // Chequing transactions
-  {
-    accountName: "TD Chequing",
-    payeeName: "Loblaws",
-    categoryPath: ["Food", "Groceries & Household"],
-    amountMinor: -14523,
-    daysAgo: 2,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Shell",
-    categoryPath: ["Vehicle", "Fuel + Parking"],
-    amountMinor: -7845,
-    daysAgo: 4,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Hydro One",
-    categoryPath: ["Fixed / Annual", "Hydro"],
-    amountMinor: -18900,
-    daysAgo: 7,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Bell Canada",
-    categoryPath: ["Fixed / Annual", "Internet"],
-    amountMinor: -11499,
-    daysAgo: 7,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Canadian Tire",
-    categoryPath: ["Home", "Yard & Garden"],
-    amountMinor: -4599,
-    daysAgo: 10,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Costco",
-    categoryPath: ["Food", "Groceries & Household"],
-    amountMinor: -23150,
-    daysAgo: 14,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Tim Hortons",
-    categoryPath: ["Food", "Eating Out"],
-    amountMinor: -1285,
-    daysAgo: 1,
-    clearingStatus: "UNCLEARED",
-  },
-  // Credit card transactions
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Amazon",
-    categoryPath: ["Home", "Furniture & Home Goods"],
-    amountMinor: -8999,
-    daysAgo: 3,
-    clearingStatus: "CLEARED",
-    note: "Desk lamp",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Netflix",
-    categoryPath: ["Fixed / Annual", "Phone"],
-    amountMinor: -2099,
-    daysAgo: 5,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "IKEA",
-    categoryPath: ["Home", "Furniture & Home Goods"],
-    amountMinor: -34900,
-    daysAgo: 8,
-    clearingStatus: "CLEARED",
-    note: "Bookshelf",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Costco",
-    categoryPath: ["Food", "Groceries & Household"],
-    amountMinor: -18720,
-    daysAgo: 11,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Loblaws",
-    categoryPath: ["Food", "Groceries & Household"],
-    amountMinor: -9845,
-    daysAgo: 15,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Shell",
-    categoryPath: ["Vehicle", "Fuel + Parking"],
-    amountMinor: -6530,
-    daysAgo: 18,
-    clearingStatus: "CLEARED",
-  },
-  {
-    accountName: "Visa Infinite",
-    payeeName: "Tim Hortons",
-    categoryPath: ["Food", "Eating Out"],
-    amountMinor: -875,
-    daysAgo: 0,
-    clearingStatus: "UNCLEARED",
-  },
-  // Income
-  {
-    accountName: "TD Chequing",
-    payeeName: "Loblaws",
-    categoryPath: ["Income", "Ready to Assign"],
-    amountMinor: 325000,
-    daysAgo: 15,
-    clearingStatus: "CLEARED",
-    note: "Paycheque",
-  },
-  {
-    accountName: "TD Chequing",
-    payeeName: "Loblaws",
-    categoryPath: ["Income", "Ready to Assign"],
-    amountMinor: 325000,
-    daysAgo: 30,
-    clearingStatus: "CLEARED",
-    note: "Paycheque",
-  },
-]
-
 const main = async () => {
-  // Seed category groups and categories
-  const categoryMap = new Map<string, string>() // "Group|Category" -> categoryId
+  const today = new Date()
+  const monthKeys = monthsInRange(today)
+  const rangeStart = startOfRange(today)
 
-  const groupSortKeys = generateNKeysBetween(null, null, groups.length)
+  console.log(`Seeding 6 months: ${monthKeys[0]} → ${monthKeys[5]}`)
 
-  for (const [groupIndex, group] of groups.entries()) {
-    const upsertedGroup = await prisma.categoryGroup.upsert({
-      where: { name: group.name },
-      update: { sortOrder: groupSortKeys[groupIndex] },
-      create: { name: group.name, sortOrder: groupSortKeys[groupIndex] },
+  // Truncate all tables in dependency order
+  console.log("Truncating tables...")
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "SplitTag",
+      "TransactionSplit",
+      "TransactionTag",
+      "TransactionOrigin",
+      "ImportRowMatch",
+      "ImportedTransaction",
+      "ImportBatch",
+      "Transaction",
+      "CategoryAssignment",
+      "Category",
+      "CategoryGroup",
+      "Payee",
+      "Tag",
+      "LoanProfile",
+      "Account"
+    CASCADE
+  `)
+
+  // Seed category groups & categories
+  console.log("Seeding categories...")
+  const categoryMap = new Map<string, string>()
+  const groupSortKeys = generateNKeysBetween(null, null, categoryGroups.length)
+
+  for (const [groupIndex, group] of categoryGroups.entries()) {
+    const createdGroup = await prisma.categoryGroup.create({
+      data: { name: group.name, sortOrder: groupSortKeys[groupIndex] },
     })
 
     const categorySortKeys = generateNKeysBetween(null, null, group.categories.length)
 
-    for (const [categoryIndex, category] of group.categories.entries()) {
-      const upsertedCategory = await prisma.category.upsert({
-        where: {
-          name: category.name,
-        },
-        update: {
-          isIncomeCategory: category.isIncomeCategory ?? false,
-          sortOrder: categorySortKeys[categoryIndex],
-        },
-        create: {
-          name: category.name,
-          groupId: upsertedGroup.id,
-          isIncomeCategory: category.isIncomeCategory ?? false,
-          sortOrder: categorySortKeys[categoryIndex],
+    for (const [catIndex, cat] of group.categories.entries()) {
+      const created = await prisma.category.create({
+        data: {
+          name: cat.name,
+          groupId: createdGroup.id,
+          isIncomeCategory: cat.isIncomeCategory ?? false,
+          sortOrder: categorySortKeys[catIndex],
         },
       })
-      categoryMap.set(`${group.name}|${category.name}`, upsertedCategory.id)
+      categoryMap.set(cat.name, created.id)
     }
   }
 
   // Seed accounts
+  console.log("Seeding accounts...")
   const accountMap = new Map<string, string>()
   for (const account of accounts) {
-    const existing = await prisma.account.findFirst({
-      where: { name: account.name },
+    const created = await prisma.account.create({
+      data: {
+        name: account.name,
+        type: account.type,
+        startingBalanceMinor: account.startingBalanceMinor,
+        startingBalanceAt: rangeStart,
+      },
     })
-    if (existing) {
-      accountMap.set(account.name, existing.id)
-    } else {
-      const created = await prisma.account.create({ data: account })
-      accountMap.set(account.name, created.id)
-    }
+    accountMap.set(account.name, created.id)
+  }
+
+  // Seed loan profiles
+  for (const lp of loanProfiles) {
+    const accountId = accountMap.get(lp.accountName)!
+    await prisma.loanProfile.create({
+      data: {
+        accountId,
+        loanType: lp.loanType,
+        interestRateAnnual: lp.interestRateAnnual,
+        minimumPaymentMinor: lp.minimumPaymentMinor,
+      },
+    })
   }
 
   // Seed payees
+  console.log("Seeding payees...")
   const payeeMap = new Map<string, string>()
-  for (const name of payees) {
-    const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "")
-    const existing = await prisma.payee.findFirst({ where: { normalizedName } })
-    if (existing) {
-      payeeMap.set(name, existing.id)
-    } else {
-      const created = await prisma.payee.create({
-        data: { name, normalizedName },
-      })
-      payeeMap.set(name, created.id)
-    }
+  for (const p of payees) {
+    const created = await prisma.payee.create({
+      data: {
+        name: p.name,
+        normalizedName: normalizeName(p.name),
+        defaultCategoryId: p.defaultCategoryName ? categoryMap.get(p.defaultCategoryName) ?? null : null,
+      },
+    })
+    payeeMap.set(p.name, created.id)
+  }
+
+  // Seed tags
+  console.log("Seeding tags...")
+  const tagMap = new Map<string, string>()
+  for (const t of tags) {
+    const created = await prisma.tag.create({
+      data: {
+        name: t.name,
+        normalizedName: t.normalizedName,
+        description: t.description,
+        backgroundColor: t.backgroundColor,
+        textColor: t.textColor,
+      },
+    })
+    tagMap.set(t.name, created.id)
   }
 
   // Seed transactions
-  const existingTxCount = await prisma.transaction.count()
-  if (existingTxCount === 0) {
-    const now = new Date()
-    for (const tx of transactions) {
-      const date = new Date(now)
-      date.setDate(date.getDate() - tx.daysAgo)
+  console.log("Seeding transactions...")
+  const allTxs = generateAllTransactions(monthKeys, today)
+  let txCount = 0
+  let splitCount = 0
+  let tagCount = 0
 
-      const categoryKey = `${tx.categoryPath[0]}|${tx.categoryPath[1]}`
+  for (const tx of allTxs) {
+    const accountId = accountMap.get(tx.accountName)
+    if (!accountId) {
+      console.warn(`Skipping tx: unknown account "${tx.accountName}"`)
+      continue
+    }
 
-      await prisma.transaction.create({
-        data: {
-          accountId: accountMap.get(tx.accountName)!,
-          payeeId: payeeMap.get(tx.payeeName)!,
-          categoryId: categoryMap.get(categoryKey)!,
-          amountMinor: tx.amountMinor,
-          date,
-          clearingStatus: tx.clearingStatus ?? "UNCLEARED",
-          note: tx.note ?? null,
-          origins: {
-            create: { originType: "MANUAL" },
+    const created = await prisma.transaction.create({
+      data: {
+        accountId,
+        date: tx.date,
+        amountMinor: tx.amountMinor,
+        payeeId: tx.payeeName ? payeeMap.get(tx.payeeName) ?? null : null,
+        categoryId: tx.categoryName ? categoryMap.get(tx.categoryName) ?? null : null,
+        note: tx.note,
+        clearingStatus: tx.clearingStatus,
+        isTransfer: tx.isTransfer,
+        transferAccountId: tx.transferAccountName ? accountMap.get(tx.transferAccountName) ?? null : null,
+        transferPairId: tx.transferPairId,
+        origins: {
+          create: { originType: "MANUAL" },
+        },
+      },
+    })
+    txCount++
+
+    // Create tags
+    for (const tagName of tx.tagNames) {
+      const tagId = tagMap.get(tagName)
+      if (tagId) {
+        await prisma.transactionTag.create({
+          data: { transactionId: created.id, tagId },
+        })
+        tagCount++
+      }
+    }
+
+    // Create splits
+    if (tx.splits) {
+      for (const [i, split] of tx.splits.entries()) {
+        await prisma.transactionSplit.create({
+          data: {
+            transactionId: created.id,
+            categoryId: categoryMap.get(split.categoryName)!,
+            payeeId: split.payeeName ? payeeMap.get(split.payeeName) ?? null : null,
+            note: split.note ?? null,
+            amountMinor: split.amountMinor,
+            sortOrder: i,
           },
+        })
+        splitCount++
+      }
+    }
+  }
+
+  // Seed category assignments
+  console.log("Seeding budget assignments...")
+  const assignments = generateAssignments(monthKeys)
+  let assignmentCount = 0
+
+  for (const a of assignments) {
+    const categoryId = categoryMap.get(a.categoryName)
+    if (categoryId) {
+      await prisma.categoryAssignment.create({
+        data: {
+          month: a.month,
+          categoryId,
+          assignedMinor: a.assignedMinor,
+        },
+      })
+      assignmentCount++
+    }
+  }
+
+  // Seed import batches
+  console.log("Seeding import batches...")
+  for (const ib of importBatches) {
+    const accountId = accountMap.get(ib.accountName)
+    if (accountId) {
+      await prisma.importBatch.create({
+        data: {
+          accountId,
+          fileName: ib.fileName,
+          status: ib.status,
+          rowsTotal: ib.rowsTotal,
+          rowsMatched: ib.rowsMatched,
+          rowsCreated: ib.rowsCreated,
+          rowsSkipped: ib.rowsSkipped,
         },
       })
     }
   }
+
+  console.log(`\nSeed complete:`)
+  console.log(`  Accounts:      ${accounts.length}`)
+  console.log(`  Categories:    ${categoryMap.size}`)
+  console.log(`  Payees:        ${payeeMap.size}`)
+  console.log(`  Tags:          ${tagMap.size}`)
+  console.log(`  Transactions:  ${txCount}`)
+  console.log(`  Splits:        ${splitCount}`)
+  console.log(`  Tag links:     ${tagCount}`)
+  console.log(`  Assignments:   ${assignmentCount}`)
+  console.log(`  Import batches: ${importBatches.length}`)
 }
 
 main()
