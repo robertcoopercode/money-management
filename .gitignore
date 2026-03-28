@@ -13,3 +13,4 @@ packages/db/prisma/dev.db*
 *.tsbuildinfo
 .vercel
 .env*.local
+.mcp.json
