@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Tabs } from "@base-ui/react/tabs"
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -57,6 +57,9 @@ const AuthenticatedApp = () => {
   })
 
   const [activeTab, setActiveTab] = useState<AppTab>(getInitialAppTab)
+  const [focusTransactionId, setFocusTransactionId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("txn"),
+  )
   const [month, setMonth] = useState(formatMonth(new Date()))
   const [newTransaction, setNewTransaction] = useState<TransactionDraft>({
     accountId: "",
@@ -74,17 +77,23 @@ const AuthenticatedApp = () => {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
-    if (searchParams.get("tab") === activeTab) {
-      return
-    }
-
     searchParams.set("tab", activeTab)
+    if (focusTransactionId) {
+      searchParams.set("txn", focusTransactionId)
+    } else {
+      searchParams.delete("txn")
+    }
     const nextQuery = searchParams.toString()
     const nextUrl = `${window.location.pathname}${
       nextQuery ? `?${nextQuery}` : ""
     }${window.location.hash}`
     window.history.replaceState(null, "", nextUrl)
-  }, [activeTab])
+  }, [activeTab, focusTransactionId])
+
+  const handleNavigateToTransaction = useCallback((id: string) => {
+    setFocusTransactionId(id)
+    setActiveTab("transactions")
+  }, [])
 
   const {
     accountsQuery,
@@ -172,12 +181,14 @@ const AuthenticatedApp = () => {
             <TransactionsTab
               newTransaction={newTransaction}
               setNewTransaction={setNewTransaction}
-              accounts={(accountsQuery.data ?? []).filter((a) => a.isActive)}
+              accounts={accountsQuery.data ?? []}
               payees={payeesQuery.data ?? []}
               tags={tagsQuery.data ?? []}
               categoryGroups={categoriesQuery.data ?? []}
               refetchCoreData={refetchCoreData}
               onNavigateToPayees={() => setActiveTab("configure")}
+              focusTransactionId={focusTransactionId}
+              onClearFocusTransaction={() => setFocusTransactionId(null)}
             />
           </ScrollArea>
         </Tabs.Panel>
@@ -192,6 +203,7 @@ const AuthenticatedApp = () => {
               planningIsError={planningQuery.isError}
               planningError={planningQuery.error}
               refetchCoreData={refetchCoreData}
+              onNavigateToTransaction={handleNavigateToTransaction}
             />
           </ScrollArea>
         </Tabs.Panel>

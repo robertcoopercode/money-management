@@ -15,7 +15,10 @@ export const getReports = (filters: ReportFilters) =>
   Effect.tryPromise({
     try: async () => {
       const transactionWhere = {
-        isTransfer: false,
+        OR: [
+          { isTransfer: false },
+          { isTransfer: true, categoryId: { not: null } },
+        ],
         date: {
           gte: filters.fromDate
             ? new Date(`${filters.fromDate}T00:00:00.000Z`)
@@ -89,7 +92,10 @@ export const getCategoryReport = (filters: ReportFilters) =>
 
       const transactions = await prisma.transaction.findMany({
         where: {
-          isTransfer: false,
+          OR: [
+            { isTransfer: false },
+            { isTransfer: true, categoryId: { not: null } },
+          ],
           date: { gte: fromDate, lte: toDate },
           accountId: filters.accountIds?.length
             ? { in: filters.accountIds }

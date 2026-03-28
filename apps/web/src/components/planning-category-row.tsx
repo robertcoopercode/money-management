@@ -22,6 +22,7 @@ type PlanningCategoryRowProps = {
   onMoveBudget: (fromCategoryId: string, toCategoryId: string, amountMinor: number) => void
   isMovePending: boolean
   isUpdating: boolean
+  onNavigateToTransaction: (transactionId: string) => void
 }
 
 export const PlanningCategoryRow = ({
@@ -36,6 +37,7 @@ export const PlanningCategoryRow = ({
   onMoveBudget,
   isMovePending,
   isUpdating,
+  onNavigateToTransaction,
 }: PlanningCategoryRowProps) => {
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [editingAssigned, setEditingAssigned] = useState(false)
@@ -105,6 +107,7 @@ export const PlanningCategoryRow = ({
                   categoryName={category.categoryName}
                   activityMinor={category.activityMinor}
                   month={month}
+                  onNavigateToTransaction={onNavigateToTransaction}
                 />
               </div>
               <div className="planning-cell" />
@@ -146,6 +149,7 @@ export const PlanningCategoryRow = ({
                   categoryName={category.categoryName}
                   activityMinor={category.activityMinor}
                   month={month}
+                  onNavigateToTransaction={onNavigateToTransaction}
                 />
               </div>
               <div className="planning-cell">

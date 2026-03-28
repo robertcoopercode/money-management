@@ -24,7 +24,7 @@ export const ReportsTab = ({
     toDate: initialRange.toDate,
     accountId: "",
     payeeId: "",
-    clearingStatus: "all",
+    clearingStatus: "",
   })
 
   const reportQuery = useQuery({
@@ -37,7 +37,7 @@ export const ReportsTab = ({
 
       if (filters.accountId) query.set("accountIds", filters.accountId)
       if (filters.payeeId) query.set("payeeIds", filters.payeeId)
-      if (filters.clearingStatus !== "all") query.set("clearingStatus", filters.clearingStatus)
+      if (filters.clearingStatus) query.set("clearingStatus", filters.clearingStatus)
 
       return apiFetch<CategoryReportResponse>(
         `/api/reports/categories?${query.toString()}`,

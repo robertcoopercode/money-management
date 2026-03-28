@@ -26,6 +26,7 @@ type PlanningGroupProps = {
   isMovePending: boolean
   isGroupUpdating: boolean
   isCategoryUpdating: boolean
+  onNavigateToTransaction: (transactionId: string) => void
 }
 
 export const PlanningGroupSection = ({
@@ -46,6 +47,7 @@ export const PlanningGroupSection = ({
   isMovePending,
   isGroupUpdating,
   isCategoryUpdating,
+  onNavigateToTransaction,
 }: PlanningGroupProps) => {
   const isUncategorized = group.groupId === UNCATEGORIZED_GROUP_ID
 
@@ -146,6 +148,7 @@ export const PlanningGroupSection = ({
                   onMoveBudget={onMoveBudget}
                   isMovePending={isMovePending}
                   isUpdating={isCategoryUpdating}
+                  onNavigateToTransaction={onNavigateToTransaction}
                 />
               ))
             )}

@@ -57,6 +57,8 @@ type TransactionsTabProps = {
   categoryGroups: CategoryGroup[]
   refetchCoreData: () => void
   onNavigateToPayees: () => void
+  focusTransactionId: string | null
+  onClearFocusTransaction: () => void
 }
 
 const DEFAULT_SORT_DIRS: Record<string, "asc" | "desc"> = {
@@ -78,10 +80,13 @@ export const TransactionsTab = ({
   categoryGroups,
   refetchCoreData,
   onNavigateToPayees,
+  focusTransactionId,
+  onClearFocusTransaction,
 }: TransactionsTabProps) => {
   const queryClient = useQueryClient()
   const dateRef = useRef<HTMLInputElement | null>(null)
   const pendingDuplicateRef = useRef(false)
+  const activeAccounts = useMemo(() => accounts.filter((a) => a.isActive), [accounts])
 
   const [editingTransaction, setEditingTransaction] =
     useState<EditingTransaction | null>(null)
@@ -132,6 +137,12 @@ export const TransactionsTab = ({
     },
   })
 
+  const focusedTxQuery = useQuery({
+    queryKey: ["transaction", focusTransactionId],
+    queryFn: () => apiFetch<Transaction>(`/api/transactions/${focusTransactionId}`),
+    enabled: !!focusTransactionId,
+  })
+
   const {
     createTransactionMutation,
     updateTransactionMutation,
@@ -155,23 +166,25 @@ export const TransactionsTab = ({
     },
     onTransactionUpdated: () => {
       setEditingTransaction(null)
+      if (focusTransactionId) onClearFocusTransaction()
     },
   })
 
   const [csvImportOpen, setCsvImportOpen] = useState(false)
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false)
   const [reconciledWarningOpen, setReconciledWarningOpen] = useState(false)
-  const [pendingReconciledEdit, setPendingReconciledEdit] = useState<{
-    transaction: Transaction
-    field: EditableField
-    splitIndex?: number
-  } | null>(null)
+  const [pendingReconciledSave, setPendingReconciledSave] = useState<(() => void) | null>(null)
 
   const { createTagMutation } = useTagMutations({ refetchCoreData })
   const { approveMutation, rejectMutation, unmatchMutation } = useImportApprovalMutations()
   const { reconcileMutation } = useReconciliationMutation({ refetchCoreData })
 
-  const transactions = transactionsQuery.data ?? []
+  const transactions = useMemo(() => {
+    const base = transactionsQuery.data ?? []
+    if (!focusedTxQuery.data) return base
+    const filtered = base.filter((t) => t.id !== focusedTxQuery.data!.id)
+    return [focusedTxQuery.data, ...filtered]
+  }, [transactionsQuery.data, focusedTxQuery.data])
   const {
     selectedIds,
     toggleSelection,
@@ -199,6 +212,17 @@ export const TransactionsTab = ({
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [editingTransaction, clearSelection])
+
+  useEffect(() => {
+    if (!focusTransactionId || !focusedTxQuery.data) return
+    if (editingTransaction?.transactionId === focusTransactionId) return
+    setEditingTransaction({
+      transactionId: focusedTxQuery.data.id,
+      draft: transactionToEditDraft(focusedTxQuery.data),
+      focusField: "date",
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only trigger on focus/data change, not editing state
+  }, [focusTransactionId, focusedTxQuery.data])
 
   const payeeSelection = useMemo(
     () =>
@@ -251,11 +275,6 @@ export const TransactionsTab = ({
     field: EditableField,
     splitIndex?: number,
   ) => {
-    if (transaction.clearingStatus === "RECONCILED") {
-      setPendingReconciledEdit({ transaction, field, splitIndex })
-      setReconciledWarningOpen(true)
-      return
-    }
     setEditingTransaction({
       transactionId: transaction.id,
       draft: transactionToEditDraft(transaction),
@@ -280,20 +299,8 @@ export const TransactionsTab = ({
     [transactionsQuery.data],
   )
 
-  const handleSaveEdit = () => {
-    if (!editingTransaction) return
-    const { draft, transactionId } = editingTransaction
+  const executeSaveEdit = (transactionId: string, draft: TransactionDraft) => {
     const hasSplits = draft.splits.length > 0
-    if (hasSplits) {
-      const parentMinor = draft.isExpense
-        ? -Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
-        : Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
-      const status = getSplitBalanceStatus(draft.splits, parentMinor)
-      if (!status.isBalanced) {
-        toast.error(`Split amounts don't add up. ${status.message}`)
-        return
-      }
-    }
     updateTransactionMutation.mutate({
       transactionId,
       patch: {
@@ -321,6 +328,39 @@ export const TransactionsTab = ({
         tagIds: draft.tagIds,
       },
     })
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingTransaction) return
+    const { draft, transactionId } = editingTransaction
+    const hasSplits = draft.splits.length > 0
+    if (hasSplits) {
+      const parentMinor = draft.isExpense
+        ? -Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+        : Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
+      const status = getSplitBalanceStatus(draft.splits, parentMinor)
+      if (!status.isBalanced) {
+        toast.error(`Split amounts don't add up. ${status.message}`)
+        return
+      }
+    }
+
+    const originalTransaction = transactions.find((t) => t.id === transactionId)
+    if (originalTransaction?.clearingStatus === "RECONCILED") {
+      const newAmountMinor = draft.isExpense
+        ? -Math.abs(parseMoneyInputToMinor(draft.amount))
+        : Math.abs(parseMoneyInputToMinor(draft.amount))
+      const amountChanged = newAmountMinor !== originalTransaction.amountMinor
+      const originalTransferAccountId = originalTransaction.transferAccount?.id ?? ""
+      const transferChanged = draft.transferAccountId !== originalTransferAccountId
+      if (amountChanged || transferChanged) {
+        setPendingReconciledSave(() => () => executeSaveEdit(transactionId, draft))
+        setReconciledWarningOpen(true)
+        return
+      }
+    }
+
+    executeSaveEdit(transactionId, draft)
   }
 
   const handleCreateTransaction = () => {
@@ -386,7 +426,7 @@ export const TransactionsTab = ({
           }}
         >
           <AccountCombobox
-            accounts={accounts}
+            accounts={activeAccounts}
             value={newTransaction.accountId}
             onChange={(accountId) =>
               setNewTransaction((current) => ({
@@ -409,7 +449,7 @@ export const TransactionsTab = ({
           />
           <PayeeAutocomplete
             payees={payees}
-            accounts={accounts}
+            accounts={activeAccounts}
             currentAccountId={newTransaction.accountId}
             value={payeeSelection}
             onChange={(selection) => {
@@ -636,7 +676,7 @@ export const TransactionsTab = ({
                 setNewTransaction((current) => ({ ...current, splits }))
               }
               payees={payees}
-              accounts={accounts}
+              accounts={activeAccounts}
               categoryGroups={categoryGroups}
               onCreateCategory={({ name, groupName }) =>
                 createCategoryMutation.mutateAsync({ name, groupName })
@@ -654,7 +694,7 @@ export const TransactionsTab = ({
       <div className="transaction-filter-bar">
         <div className="filter-bar-row">
           <AccountFilterSelect
-            accounts={accounts}
+            accounts={activeAccounts}
             value={filterAccountId}
             onChange={(value) => {
               setFilterAccountId(value)
@@ -750,12 +790,12 @@ export const TransactionsTab = ({
               <div className="transaction-list-full-row muted">
                 Loading transactions...
               </div>
-            ) : (transactionsQuery.data?.length ?? 0) === 0 ? (
+            ) : transactions.length === 0 ? (
               <div className="transaction-list-full-row muted">
                 No transactions in this account yet.
               </div>
             ) : (
-              (transactionsQuery.data ?? []).map((transaction) =>
+              transactions.map((transaction) =>
                 editingTransaction?.transactionId === transaction.id ? (
                   <TransactionEditRow
                     key={transaction.id}
@@ -773,7 +813,11 @@ export const TransactionsTab = ({
                     categoryGroups={categoryGroups}
                     onSave={handleSaveEdit}
                     onCancel={() => {
-                      toggleSelection(editingTransaction.transactionId)
+                      if (focusTransactionId) {
+                        onClearFocusTransaction()
+                      } else {
+                        toggleSelection(editingTransaction.transactionId)
+                      }
                       setEditingTransaction(null)
                     }}
                     isSaving={updateTransactionMutation.isPending}
@@ -813,9 +857,10 @@ export const TransactionsTab = ({
                       pendingDuplicateRef.current = true
                       createTransactionMutation.mutate(buildDuplicateBody(t))
                     }}
-                    onDelete={(id) =>
+                    onDelete={(id) => {
                       deleteTransactionMutation.mutate(id)
-                    }
+                      clearSelection()
+                    }}
                   >
                     <TransactionDisplayRow
                       transaction={transaction}
@@ -928,17 +973,14 @@ export const TransactionsTab = ({
 
       <ReconciledEditWarning
         open={reconciledWarningOpen}
-        onOpenChange={setReconciledWarningOpen}
+        onOpenChange={(open) => {
+          setReconciledWarningOpen(open)
+          if (!open) setPendingReconciledSave(null)
+        }}
         onContinue={() => {
-          if (pendingReconciledEdit) {
-            clearSelection()
-            setEditingTransaction({
-              transactionId: pendingReconciledEdit.transaction.id,
-              draft: transactionToEditDraft(pendingReconciledEdit.transaction),
-              focusField: pendingReconciledEdit.field,
-              focusSplitIndex: pendingReconciledEdit.splitIndex,
-            })
-            setPendingReconciledEdit(null)
+          if (pendingReconciledSave) {
+            pendingReconciledSave()
+            setPendingReconciledSave(null)
           }
         }}
       />

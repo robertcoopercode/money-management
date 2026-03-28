@@ -2573,6 +2573,24 @@ button:disabled {
   opacity: 0.5;
 }
 
+.category-not-applicable {
+  color: rgb(180 195 230 / 40%);
+  font-style: italic;
+  font-size: 0.85em;
+}
+
+.category-needs-badge {
+  display: inline-block;
+  background-color: rgb(255 210 70 / 25%);
+  color: rgb(230 185 40);
+  border: 1px solid rgb(230 185 40 / 35%);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.8em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .split-category-clear {
   position: absolute;
   right: 0.35rem;
@@ -3994,4 +4012,12 @@ button:disabled {
 
 .activity-popover-close-btn:hover {
   background: rgb(95 117 171 / 12%);
+}
+
+.activity-popover-row {
+  cursor: pointer;
+}
+
+.activity-popover-row:hover td {
+  background: rgb(95 117 171 / 10%);
 }

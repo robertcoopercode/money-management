@@ -10,6 +10,7 @@ type ActivityPopoverProps = {
   categoryName: string
   activityMinor: number
   month: string
+  onNavigateToTransaction?: (transactionId: string) => void
 }
 
 const lastDayOfMonth = (month: string): string => {
@@ -30,6 +31,7 @@ export const ActivityPopover = ({
   categoryName,
   activityMinor,
   month,
+  onNavigateToTransaction,
 }: ActivityPopoverProps) => {
   const [open, setOpen] = useState(false)
 
@@ -65,7 +67,7 @@ export const ActivityPopover = ({
           className="activity-popover-positioner"
           sideOffset={6}
           side="bottom"
-          align="center"
+          align="end"
         >
           <Popover.Popup className="activity-popover-popup">
             <div className="activity-popover-header">
@@ -106,7 +108,14 @@ export const ActivityPopover = ({
                         : (tx.note ?? "")
                       const payee = matchingSplit?.payee ?? tx.payee
                       return (
-                        <tr key={matchingSplit ? `${tx.id}-${matchingSplit.id}` : tx.id}>
+                        <tr
+                          key={matchingSplit ? `${tx.id}-${matchingSplit.id}` : tx.id}
+                          className={onNavigateToTransaction ? "activity-popover-row" : undefined}
+                          onClick={onNavigateToTransaction ? () => {
+                            onNavigateToTransaction(tx.id)
+                            setOpen(false)
+                          } : undefined}
+                        >
                           <td>{tx.account.name}</td>
                           <td>{formatDate(tx.date)}</td>
                           <td>{payee?.name ?? ""}</td>

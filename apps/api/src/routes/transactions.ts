@@ -15,6 +15,7 @@ import {
   bulkRejectTransactions,
   createTransaction,
   deleteTransaction,
+  getTransaction,
   listTransactions,
   updateTransaction,
 } from "../services/transaction-service.js"
@@ -42,6 +43,14 @@ export const registerTransactionRoutes = (app: Hono) => {
     const filters = parseQuery(context, transactionFilterSchema)
     const transactions = await runApiEffect(listTransactions(filters))
     return context.json(transactions)
+  })
+
+  app.get("/api/transactions/:transactionId", async (context) => {
+    const transactionId = transactionIdSchema.parse(
+      context.req.param("transactionId"),
+    )
+    const transaction = await runApiEffect(getTransaction(transactionId))
+    return context.json(transaction)
   })
 
   app.post("/api/transactions", async (context) => {

@@ -294,18 +294,23 @@ export function TransactionDisplayRow({
               </svg>
               <em>Split transaction</em>
             </button>
-          ) : (
-            <TruncatedText
-              text={transaction.isTransfer
-                ? (() => {
-                    const isLoan =
-                      transaction.transferAccount?.type === "LOAN" ||
-                      transaction.account.type === "LOAN"
-                    return isLoan ? (transaction.category?.name || "") : ""
-                  })()
-                : (transaction.category?.name || "")}
-            />
-          )}
+          ) : (() => {
+            const isLoanAccount = transaction.account.type === "LOAN"
+            const isLoanTransfer =
+              transaction.isTransfer &&
+              (transaction.transferAccount?.type === "LOAN" || isLoanAccount)
+            const isNonLoanTransfer = transaction.isTransfer && !isLoanTransfer
+            const categoryNotApplicable = isNonLoanTransfer || isLoanAccount
+            const categoryName = transaction.category?.name
+
+            if (categoryNotApplicable) {
+              return <span className="category-not-applicable">Not applicable</span>
+            }
+            if (categoryName) {
+              return <TruncatedText text={categoryName} />
+            }
+            return <span className="category-needs-badge">Needs category</span>
+          })()}
         </div>
         <div
           className="transaction-cell clickable-cell truncated-cell"

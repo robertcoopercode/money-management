@@ -52,6 +52,17 @@ const transactionInclude = {
   },
 } satisfies Prisma.TransactionInclude
 
+export const getTransaction = (id: string) =>
+  Effect.tryPromise({
+    try: () =>
+      prisma.transaction.findUniqueOrThrow({
+        where: { id },
+        include: transactionInclude,
+      }),
+    catch: (error) =>
+      new Error(`Unable to get transaction: ${String(error)}`),
+  })
+
 export const listTransactions = (filters: TransactionFilterInput) =>
   Effect.tryPromise({
     try: () =>

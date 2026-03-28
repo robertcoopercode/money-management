@@ -47,6 +47,7 @@ type PlanningTabProps = {
   planningIsError: boolean
   planningError: Error | null
   refetchCoreData: () => void
+  onNavigateToTransaction: (transactionId: string) => void
 }
 
 const parseId = (dndId: string) => {
@@ -63,6 +64,7 @@ export const PlanningTab = ({
   planningIsError,
   planningError,
   refetchCoreData,
+  onNavigateToTransaction,
 }: PlanningTabProps) => {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null)
@@ -605,6 +607,7 @@ export const PlanningTab = ({
                 isMovePending={moveBudgetMutation.isPending}
                 isGroupUpdating={updateCategoryGroupMutation.isPending}
                 isCategoryUpdating={updateCategoryMutation.isPending}
+                onNavigateToTransaction={onNavigateToTransaction}
               />
             ))}
           </SortableContext>

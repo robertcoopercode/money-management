@@ -149,12 +149,17 @@ export const TransactionEditRow = ({
 
   const hasSplits = draft.splits.length > 0
   const isTransfer = Boolean(draft.transferAccountId)
+  const isLoanAccount = useMemo(() => {
+    const account = accounts.find((a) => a.id === draft.accountId)
+    return account?.type === "LOAN"
+  }, [draft.accountId, accounts])
   const isLoanTransfer = useMemo(() => {
     if (!draft.transferAccountId) return false
     const sourceAccount = accounts.find((a) => a.id === draft.accountId)
     const targetAccount = accounts.find((a) => a.id === draft.transferAccountId)
     return sourceAccount?.type === "LOAN" || targetAccount?.type === "LOAN"
   }, [draft.accountId, draft.transferAccountId, accounts])
+  const categoryNotApplicable = (isTransfer && !isLoanTransfer) || isLoanAccount
 
   const parentAmountMinor = draft.isExpense
     ? -Math.abs(parseMoneyInputToMinor(draft.amount || "0"))
@@ -315,7 +320,7 @@ export const TransactionEditRow = ({
               </svg>
             </button>
           </div>
-        ) : isTransfer && !isLoanTransfer ? (
+        ) : categoryNotApplicable ? (
           <TextInput
             value="Not applicable"
             readOnly
@@ -330,7 +335,7 @@ export const TransactionEditRow = ({
             onCreateCategory={onCreateCategory}
             isCreating={isCreatingCategory}
             onSplit={
-              isTransfer && !isLoanTransfer ? undefined : toggleSplitMode
+              categoryNotApplicable ? undefined : toggleSplitMode
             }
             initialInputValue={initialCategoryName}
           />
