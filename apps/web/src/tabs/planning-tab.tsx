@@ -591,6 +591,7 @@ export const PlanningTab = ({
                 group={group}
                 allGroups={groups}
                 readyToAssignMinor={planningData?.readyToAssignMinor ?? 0}
+                month={month}
                 isCollapsed={collapsedGroups.has(group.groupId)}
                 onToggleCollapse={() => toggleCollapse(group.groupId)}
                 onRenameGroup={handleRenameGroup}

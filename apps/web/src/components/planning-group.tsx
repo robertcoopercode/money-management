@@ -12,6 +12,7 @@ type PlanningGroupProps = {
   group: PlanningGroupType
   allGroups: PlanningGroupType[]
   readyToAssignMinor: number
+  month: string
   isCollapsed: boolean
   onToggleCollapse: () => void
   onRenameGroup: (groupId: string, name: string) => void
@@ -31,6 +32,7 @@ export const PlanningGroupSection = ({
   group,
   allGroups,
   readyToAssignMinor,
+  month,
   isCollapsed,
   onToggleCollapse,
   onRenameGroup,
@@ -136,6 +138,7 @@ export const PlanningGroupSection = ({
                   category={cat}
                   groups={allGroups}
                   readyToAssignMinor={readyToAssignMinor}
+                  month={month}
                   onAssign={onAssign}
                   onRename={onRenameCategory}
                   onDelete={onDeleteCategory}

@@ -58,7 +58,14 @@ export const listTransactions = (filters: TransactionFilterInput) =>
       prisma.transaction.findMany({
         where: {
           accountId: filters.accountId,
-          categoryId: filters.categoryId,
+          ...(filters.categoryId
+            ? {
+                OR: [
+                  { categoryId: filters.categoryId },
+                  { splits: { some: { categoryId: filters.categoryId } } },
+                ],
+              }
+            : {}),
           payeeId: filters.payeeId,
           clearingStatus: filters.clearingStatus
             ? filters.clearingStatus

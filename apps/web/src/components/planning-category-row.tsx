@@ -7,12 +7,14 @@ import { ContextMenu } from "@base-ui/react/context-menu"
 import { TextInput } from "./text-input.js"
 import { InlineEditName } from "./inline-edit-name.js"
 import { MoveMoneyContent } from "./move-money-popover.js"
+import { ActivityPopover } from "./activity-popover.js"
 import type { PlanningCategoryItem, PlanningGroup } from "../types.js"
 
 type PlanningCategoryRowProps = {
   category: PlanningCategoryItem
   groups: PlanningGroup[]
   readyToAssignMinor: number
+  month: string
   onAssign: (categoryId: string, assignedMinor: number) => void
   onRename: (categoryId: string, name: string) => void
   onDelete: (categoryId: string, name: string) => void
@@ -26,6 +28,7 @@ export const PlanningCategoryRow = ({
   category,
   groups,
   readyToAssignMinor,
+  month,
   onAssign,
   onRename,
   onDelete,
@@ -96,7 +99,14 @@ export const PlanningCategoryRow = ({
           {category.isIncomeCategory ? (
             <>
               <div className="planning-cell planning-cell-input" />
-              <div className="planning-cell">{formatMoney(category.activityMinor)}</div>
+              <div className="planning-cell">
+                <ActivityPopover
+                  categoryId={category.categoryId}
+                  categoryName={category.categoryName}
+                  activityMinor={category.activityMinor}
+                  month={month}
+                />
+              </div>
               <div className="planning-cell" />
             </>
           ) : (
@@ -130,7 +140,14 @@ export const PlanningCategoryRow = ({
                   </button>
                 )}
               </div>
-              <div className="planning-cell">{formatMoney(category.activityMinor)}</div>
+              <div className="planning-cell">
+                <ActivityPopover
+                  categoryId={category.categoryId}
+                  categoryName={category.categoryName}
+                  activityMinor={category.activityMinor}
+                  month={month}
+                />
+              </div>
               <div className="planning-cell">
                 <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <Popover.Trigger
