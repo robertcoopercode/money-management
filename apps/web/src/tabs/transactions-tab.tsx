@@ -97,7 +97,7 @@ export const TransactionsTab = ({
   const [filterAccountId, setFilterAccountId] = useLocalStorage("ledgr:filter-account", "")
   const [sortBy, setSortBy] = useLocalStorage("ledgr:sort-by", "date")
   const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("ledgr:sort-dir", "desc")
-  const [showReconciled, setShowReconciled] = useState(false)
+  const [showReconciled, setShowReconciled] = useLocalStorage("ledgr:show-reconciled", false)
 
   useEffect(() => {
     if (filterAccountId && accounts.length > 0 && !accounts.some((a) => a.id === filterAccountId)) {

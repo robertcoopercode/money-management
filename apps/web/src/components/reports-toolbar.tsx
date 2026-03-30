@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect } from "react"
 import { AppSelect } from "./app-select.js"
 import { DatePicker } from "./date-picker.js"
 import {
@@ -8,6 +8,7 @@ import {
   formatRangeLabel,
   type ReportPreset,
 } from "../lib/report-presets.js"
+import { useLocalStorage } from "../hooks/use-local-storage.js"
 import type { Account, Payee } from "../types.js"
 
 type ReportsToolbarProps = {
@@ -27,12 +28,12 @@ export function ReportsToolbar({
   payees,
   onFiltersChange,
 }: ReportsToolbarProps) {
-  const [preset, setPreset] = useState<ReportPreset>(DEFAULT_PRESET)
-  const [customFrom, setCustomFrom] = useState("")
-  const [customTo, setCustomTo] = useState("")
-  const [accountId, setAccountId] = useState("")
-  const [payeeId, setPayeeId] = useState("")
-  const [clearingStatus, setClearingStatus] = useState("")
+  const [preset, setPreset] = useLocalStorage<ReportPreset>("ledgr:report-preset", DEFAULT_PRESET)
+  const [customFrom, setCustomFrom] = useLocalStorage("ledgr:report-custom-from", "")
+  const [customTo, setCustomTo] = useLocalStorage("ledgr:report-custom-to", "")
+  const [accountId, setAccountId] = useLocalStorage("ledgr:report-account", "")
+  const [payeeId, setPayeeId] = useLocalStorage("ledgr:report-payee", "")
+  const [clearingStatus, setClearingStatus] = useLocalStorage("ledgr:report-status", "")
 
   const range = computeDateRange(preset, customFrom || undefined, customTo || undefined)
 
@@ -47,18 +48,17 @@ export function ReportsToolbar({
     })
   }
 
+  useEffect(() => {
+    fireChange()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync persisted state to parent on mount only
+  }, [])
+
   const handlePresetChange = (value: string) => {
     const p = value as ReportPreset
     setPreset(p)
     if (p !== "custom") {
       const r = computeDateRange(p)
       fireChange({ fromDate: r.fromDate, toDate: r.toDate })
-    }
-  }
-
-  const handleApplyCustom = () => {
-    if (customFrom && customTo) {
-      fireChange({ fromDate: customFrom, toDate: customTo })
     }
   }
 
@@ -79,19 +79,16 @@ export function ReportsToolbar({
               From
               <DatePicker
                 value={customFrom}
-                onChange={(v) => setCustomFrom(v)}
+                onChange={(v) => { setCustomFrom(v); if (v && customTo) fireChange({ fromDate: v, toDate: customTo }) }}
               />
             </label>
             <label>
               To
               <DatePicker
                 value={customTo}
-                onChange={(v) => setCustomTo(v)}
+                onChange={(v) => { setCustomTo(v); if (customFrom && v) fireChange({ fromDate: customFrom, toDate: v }) }}
               />
             </label>
-            <button className="btn btn-sm" onClick={handleApplyCustom}>
-              Apply
-            </button>
           </>
         ) : (
           <span className="report-date-badge">
